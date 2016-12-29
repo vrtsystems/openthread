@@ -57,6 +57,7 @@ endif
 noinst_HEADERS                            = \
     cc2538-reg.h                            \
     gpio.h                                  \
+    firefly/leds.h                          \
     platform-cc2538.h                       \
     rom-utility.h                           \
     $(NULL)

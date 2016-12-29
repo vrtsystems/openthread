@@ -39,6 +39,7 @@
 #include <openthread-types.h>
 
 #include "cc2538-reg.h"
+#include "firefly/leds.h"
 
 // Global OpenThread instance structure
 extern otInstance *sInstance;
