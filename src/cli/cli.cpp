@@ -56,6 +56,8 @@
 #include <net/ip6.hpp>
 #include <platform/uart.h>
 
+#include "../../examples/platforms/cc2538/firefly/leds.h"
+
 using Thread::Encoding::BigEndian::HostSwap16;
 using Thread::Encoding::BigEndian::HostSwap32;
 
@@ -99,6 +101,7 @@ const struct Command Interpreter::sCommands[] =
 #endif
     { "joinerport", &Interpreter::ProcessJoinerPort },
     { "keysequence", &Interpreter::ProcessKeySequence },
+    { "leds", &Interpreter::ProcessLeds },
     { "leaderdata", &Interpreter::ProcessLeaderData },
     { "leaderpartitionid", &Interpreter::ProcessLeaderPartitionId },
     { "leaderweight", &Interpreter::ProcessLeaderWeight },
@@ -2146,6 +2149,49 @@ void Interpreter::ProcessVersion(int argc, char *argv[])
     AppendResult(kThreadError_None);
     (void)argc;
     (void)argv;
+}
+
+void Interpreter::ProcessLeds(int argc, char *argv[])
+{
+    uint8_t state;
+    ThreadError error = kThreadError_None;
+
+    VerifyOrExit(argc > 1, error = kThreadError_Parse);
+
+    if (strcmp(argv[1], "on") == 0)
+    {
+        state = 1;
+    }
+    else if (strcmp(argv[1], "off") == 0)
+    {
+        state = 0;
+    }
+    else
+    {
+        ExitNow(error = kThreadError_Parse);
+    }
+
+    if (strcmp(argv[0], "red") == 0)
+    {
+        state ? LED0_ON : LED0_OFF;
+    }
+    else if (strcmp(argv[0], "green") == 0)
+    {
+        state ? LED1_ON : LED1_OFF;
+    }
+    else if (strcmp(argv[0], "blue") == 0)
+    {
+        state ? LED2_ON : LED2_OFF;
+    }
+    else
+    {
+        error = kThreadError_Parse;
+    }
+
+exit:
+    (void)argc;
+    (void)argv;
+    AppendResult(error);
 }
 
 #if OPENTHREAD_ENABLE_COMMISSIONER
