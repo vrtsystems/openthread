@@ -40,7 +40,7 @@
 #define SOC_ADC_ADCCON_DIV      0x30 // 512 decimation rate (12 bits ENOB)
 
 // ADC functions
-void cc2538AdcPinInit(uint8_t port, uint8_t pin);
+void cc2538AdcPinInit(uint8_t pin);
 int16_t cc2538AdcReadChannel(uint8_t channel);
 
 #ifdef __cplusplus

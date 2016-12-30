@@ -39,11 +39,11 @@
 #include "adc.h"
 #include "gpio.h"
 
-void cc2538AdcPinInit(uint8_t port, uint8_t pin)
+void cc2538AdcPinInit(uint8_t pin)
 {
-    cc2538GpioSoftwareControl(port, pin);
-    cc2538GpioDirInput(port, pin);
-    cc2538GpioIocOver(port, pin, IOC_OVERRIDE_ANA);
+    cc2538GpioSoftwareControl(GPIO_A_NUM, pin);
+    cc2538GpioDirInput(GPIO_A_NUM, pin);
+    cc2538GpioIocOver(GPIO_A_NUM, pin, IOC_OVERRIDE_ANA);
     HWREG(SOC_ADC_ADCCON1) |= SOC_ADC_ADCCON1_STSEL;
 }
 
