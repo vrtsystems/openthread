@@ -41,7 +41,7 @@
 
 // ADC functions
 void cc2538AdcPinInit(uint8_t pin);
-int16_t cc2538AdcReadChannel(uint8_t channel);
+int16_t cc2538AdcReadChannel(uint8_t pin);
 
 #ifdef __cplusplus
 } // end extern "C"

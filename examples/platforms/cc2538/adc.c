@@ -47,9 +47,12 @@ void cc2538AdcPinInit(uint8_t pin)
     HWREG(SOC_ADC_ADCCON1) |= SOC_ADC_ADCCON1_STSEL;
 }
 
-int16_t cc2538AdcReadChannel(uint8_t channel)
+int16_t cc2538AdcReadChannel(uint8_t pin)
 {
     int16_t res;
+    uint8_t channel;
+
+    channel = GPIO_PIN_MASK(pin);
 
     HWREG(SOC_ADC_ADCCON3) = HWREG(SOC_ADC_ADCCON3) &
                              ~(SOC_ADC_ADCCON3_EREF | SOC_ADC_ADCCON3_EDIV |
