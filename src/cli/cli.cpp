@@ -57,6 +57,7 @@
 #include <platform/uart.h>
 
 #include "../../examples/platforms/cc2538/firefly/leds.h"
+#include "../../examples/platforms/cc2538/adc.h"
 
 using Thread::Encoding::BigEndian::HostSwap16;
 using Thread::Encoding::BigEndian::HostSwap32;
@@ -68,6 +69,7 @@ namespace Cli {
 const struct Command Interpreter::sCommands[] =
 {
     { "help", &Interpreter::ProcessHelp },
+    { "adc", &Interpreter::ProcessAdc },
     { "blacklist", &Interpreter::ProcessBlacklist },
     { "bufferinfo", &Interpreter::ProcessBufferInfo },
     { "channel", &Interpreter::ProcessChannel },
@@ -2187,6 +2189,34 @@ void Interpreter::ProcessLeds(int argc, char *argv[])
     {
         error = kThreadError_Parse;
     }
+
+exit:
+    (void)argc;
+    (void)argv;
+    AppendResult(error);
+}
+
+void Interpreter::ProcessAdc(int argc, char *argv[])
+{
+    long channel;
+    int16_t result;
+
+    ThreadError error = kThreadError_None;
+
+    VerifyOrExit(argc > 0, error = kThreadError_Parse);
+
+    SuccessOrExit(error = ParseLong(argv[0], channel));
+
+    // PA0 and PA1 are used by the serial console CLI
+    if((channel < 2) || (channel > 7))
+    {
+        ExitNow(error = kThreadError_Parse);
+    }
+
+    cc2538AdcPinInit((uint8_t)channel);
+    result = cc2538AdcReadChannel((uint8_t)channel);
+
+    sServer->OutputFormat("%d\r\n", result);
 
 exit:
     (void)argc;
