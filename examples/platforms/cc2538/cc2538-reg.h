@@ -227,8 +227,8 @@
 #define SOC_ADC_ADCCON3_EDIV                    0x00000030  // Decimation rate for extra
 #define SOC_ADC_ADCCON3_ECH                     0x0000000F  // Single channel select
 
-#define SOC_ADC_ADCL                            0x000000FC  // ADC least significant part
-#define SOC_ADC_ADCH                            0x000000FF  // ADC most significant part
+#define SOC_ADC_ADCL                            0x400D700C  // ADC least significant part
+#define SOC_ADC_ADCH                            0x400D7010  // ADC most significant part
 
 #define FLASH_BASE                              0x00200000  // Flash base address
 #define FLASH_CTRL_FCTL                         0x400D3008  // Flash control

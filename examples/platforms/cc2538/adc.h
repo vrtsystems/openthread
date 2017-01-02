@@ -36,12 +36,12 @@
 #endif
 
 // ADC specific values
-#define SOC_ADC_ADCCON_REF      0x80 // AVDD5 pin
-#define SOC_ADC_ADCCON_DIV      0x30 // 512 decimation rate (12 bits ENOB)
+#define SOC_ADC_ADCCON_REF      0x00000080 // AVDD5 pin
+#define SOC_ADC_ADCCON_DIV      0x00000030 // 512 decimation rate (12 bits ENOB)
 
 // ADC functions
 void cc2538AdcPinInit(uint8_t pin);
-int16_t cc2538AdcReadChannel(uint8_t pin);
+int cc2538AdcReadChannel(uint8_t pin);
 
 #ifdef __cplusplus
 } // end extern "C"

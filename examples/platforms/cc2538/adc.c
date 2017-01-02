@@ -44,22 +44,18 @@ void cc2538AdcPinInit(uint8_t pin)
     cc2538GpioSoftwareControl(GPIO_A_NUM, pin);
     cc2538GpioDirInput(GPIO_A_NUM, pin);
     cc2538GpioIocOver(GPIO_A_NUM, pin, IOC_OVERRIDE_ANA);
-    HWREG(SOC_ADC_ADCCON1) |= SOC_ADC_ADCCON1_STSEL;
 }
 
-int16_t cc2538AdcReadChannel(uint8_t pin)
+int cc2538AdcReadChannel(uint8_t pin)
 {
-    int16_t res;
-    uint8_t channel;
+    int res;
 
-    channel = GPIO_PIN_MASK(pin);
+    HWREG(SOC_ADC_ADCCON1) |= SOC_ADC_ADCCON1_STSEL;
 
-    HWREG(SOC_ADC_ADCCON3) = HWREG(SOC_ADC_ADCCON3) &
+    HWREG(SOC_ADC_ADCCON3) = (HWREG(SOC_ADC_ADCCON3) &
                              ~(SOC_ADC_ADCCON3_EREF | SOC_ADC_ADCCON3_EDIV |
-                             SOC_ADC_ADCCON3_ECH);
-    HWREG(SOC_ADC_ADCCON3) |= SOC_ADC_ADCCON_REF;
-    HWREG(SOC_ADC_ADCCON3) |= SOC_ADC_ADCCON_DIV;
-    HWREG(SOC_ADC_ADCCON3) |= channel;
+                             SOC_ADC_ADCCON3_ECH)) | SOC_ADC_ADCCON_REF |
+                             SOC_ADC_ADCCON_DIV | pin;
 
     while(!(HWREG(SOC_ADC_ADCCON1) & SOC_ADC_ADCCON1_EOC));
 

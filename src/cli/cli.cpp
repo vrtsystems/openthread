@@ -2198,25 +2198,25 @@ exit:
 
 void Interpreter::ProcessAdc(int argc, char *argv[])
 {
-    long channel;
-    int16_t result;
+    int channel;
+    int result;
 
     ThreadError error = kThreadError_None;
 
     VerifyOrExit(argc > 0, error = kThreadError_Parse);
 
-    SuccessOrExit(error = ParseLong(argv[0], channel));
+    channel = atoi((const char *)argv[0]);
 
     // PA0 and PA1 are used by the serial console CLI
     if((channel < 2) || (channel > 7))
     {
+        sServer->OutputFormat("invalid channel: %u\r\n", channel);
         ExitNow(error = kThreadError_Parse);
     }
 
     cc2538AdcPinInit((uint8_t)channel);
     result = cc2538AdcReadChannel((uint8_t)channel);
-
-    sServer->OutputFormat("%d\r\n", result);
+    sServer->OutputFormat("%u: %d\r\n", (uint8_t)channel, result);
 
 exit:
     (void)argc;
