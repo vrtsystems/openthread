@@ -41,6 +41,7 @@ libopenthread_cc2538_a_SOURCES            = \
     alarm.c                                 \
     flash.c                                 \
     gpio.c                                  \
+    i2c.c                                   \
     misc.c                                  \
     platform.c                              \
     radio.c                                 \
@@ -58,8 +59,9 @@ endif
 noinst_HEADERS                            = \
     adc.h                                   \
     cc2538-reg.h                            \
-    gpio.h                                  \
     firefly/leds.h                          \
+    gpio.h                                  \
+    i2c.h                                   \
     platform-cc2538.h                       \
     rom-utility.h                           \
     $(NULL)
