@@ -84,7 +84,7 @@
   LED_FADE_EXPAND(led)
 
 #define LED_FADE_EXPAND(led)                  \
-  for(k = 0; k < 100; ++k) {                  \
+  for(k = 0; k < 1000; ++k) {                  \
     j = k > 600 ? 1000 - k : k;                \
     led##_ON;                                 \
     for(i = 0; i < j; ++i) {                  \
