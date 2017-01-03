@@ -5,6 +5,11 @@ Instruments CC2538][cc2538].
 
 [cc2538]: http://www.ti.com/product/CC2538
 
+This branch has been modified to fit the Zolertia's Firefly platform, which uses
+the same system-on-chip:
+
+[firefly]: https://github.com/Zolertia/Resources/wiki/Firefly
+
 The example platform drivers are intended to present the minimal code
 necessary to support OpenThread.  As a result, the example platform
 drivers do not necessarily highlight the platform's full capabilities.
@@ -44,12 +49,13 @@ for flashing a CC2538 via the UART.
 
 ## Interact
 
-1. Open terminal to `/dev/ttyUSB1` (serial port settings: 115200 8-N-1).
+1. Open terminal to `/dev/ttyUSB0` (serial port settings: 115200 8-N-1).
 2. Type `help` for list of commands.
 
 ```bash
 > help
 help
+adc
 channel
 childtimeout
 contextreusedelay
@@ -58,6 +64,8 @@ extpanid
 ipaddr
 keysequence
 leaderweight
+leds
+light
 masterkey
 mode
 netdataregister

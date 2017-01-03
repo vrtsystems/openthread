@@ -7,6 +7,7 @@ OpenThread test scripts use the CLI to execute test cases.
 
 ## OpenThread Command List
 
+* [adc](#adc)
 * [channel](#channel)
 * [blacklist](#blacklist)
 * [child](#child)
@@ -30,6 +31,8 @@ OpenThread test scripts use the CLI to execute test cases.
 * [keysequence](#keysequence)
 * [leaderpartitionid](#leaderpartitionid)
 * [leaderweight](#leaderweight)
+* [leds](#leds)
+* [light](#light)
 * [linkquality](#linkquality)
 * [masterkey](#masterkey)
 * [mode](#mode)
@@ -60,6 +63,18 @@ OpenThread test scripts use the CLI to execute test cases.
 * [diag](#diag)
 
 ## OpenThread Command Details
+
+### adc \<pin\>
+
+Request an ADC reading on a single pin (only pins from PA2-PA7 are available)
+
+* pin: number of the pin, from 2-7
+
+```bash
+> adc 5
+5: 2280
+Done
+```
 
 ### blacklist
 
@@ -959,6 +974,29 @@ Set the Thread Leader Weight.
 
 ```bash
 > leaderweight 128
+Done
+```
+
+### leds \<color\> \<state\>
+
+Turns a single LED on or off.
+
+* color: red, blue, green
+* state: on, off
+
+```bash
+> leds red on
+Done
+```
+
+### light
+
+Request a sensor light reading.  It requires the Grove's digital light sensor
+(v1.1) to be connected to the Firefly on ports PC2-3 (SDA/SCL).
+
+```bash
+> light
+214
 Done
 ```
 
