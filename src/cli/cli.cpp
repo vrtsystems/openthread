@@ -57,7 +57,9 @@
 #include <platform/uart.h>
 
 #include "../../examples/platforms/cc2538/firefly/leds.h"
+#include "../../examples/platforms/cc2538/firefly/tsl2x6x.h"
 #include "../../examples/platforms/cc2538/adc.h"
+#include "../../examples/platforms/cc2538/i2c.h"
 
 using Thread::Encoding::BigEndian::HostSwap16;
 using Thread::Encoding::BigEndian::HostSwap32;
@@ -107,6 +109,7 @@ const struct Command Interpreter::sCommands[] =
     { "leaderdata", &Interpreter::ProcessLeaderData },
     { "leaderpartitionid", &Interpreter::ProcessLeaderPartitionId },
     { "leaderweight", &Interpreter::ProcessLeaderWeight },
+    { "light", &Interpreter::ProcessSensorLightRead },
     { "linkquality", &Interpreter::ProcessLinkQuality },
     { "masterkey", &Interpreter::ProcessMasterKey },
     { "mode", &Interpreter::ProcessMode },
@@ -2217,6 +2220,29 @@ void Interpreter::ProcessAdc(int argc, char *argv[])
     cc2538AdcPinInit((uint8_t)channel);
     result = cc2538AdcReadChannel((uint8_t)channel);
     sServer->OutputFormat("%u: %d\r\n", (uint8_t)channel, result);
+
+exit:
+    (void)argc;
+    (void)argv;
+    AppendResult(error);
+}
+
+void Interpreter::ProcessSensorLightRead(int argc, char *argv[])
+{
+    int result;
+    ThreadError error = kThreadError_None;
+
+    VerifyOrExit(argc == 0, error = kThreadError_Parse);
+
+    if (tsl2x6xReadLight(&result) == I2C_MASTER_ERR_NONE)
+    {
+      sServer->OutputFormat("%d\r\n", result);
+    }
+    else
+    {
+      sServer->OutputFormat("I2C/Sensor error\r\n");
+      ExitNow(error = kThreadError_Parse);
+    }
 
 exit:
     (void)argc;

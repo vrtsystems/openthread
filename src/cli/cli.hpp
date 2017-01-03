@@ -184,6 +184,7 @@ private:
     void ProcessLeaderData(int argc, char *argv[]);
     void ProcessLeaderPartitionId(int argc, char *argv[]);
     void ProcessLeaderWeight(int argc, char *argv[]);
+    void ProcessSensorLightRead(int argc, char *argv[]);
     void ProcessLinkQuality(int argc, char *argv[]);
     void ProcessMasterKey(int argc, char *argv[]);
     void ProcessMode(int argc, char *argv[]);
