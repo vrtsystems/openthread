@@ -142,6 +142,7 @@ private:
 
     void ProcessHelp(int argc, char *argv[]);
     void ProcessAdc(int argc, char *argv[]);
+    void ProcessRelay(int argc, char *argv[]);
     void ProcessBufferInfo(int argc, char *argv[]);
     void ProcessBlacklist(int argc, char *argv[]);
     void ProcessChannel(int argc, char *argv[]);
