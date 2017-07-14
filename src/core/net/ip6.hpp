@@ -133,6 +133,18 @@ public:
     otError SendDatagram(Message &aMessage, MessageInfo &aMessageInfo, IpProto aIpProto);
 
     /**
+     * This method sends a raw IPv6 datagram with a fully formed IPv6 header.
+     *
+     * @param[in]  aMessage          A reference to the message.
+     * @param[in]  aInterfaceId      The interface identifier of the network interface that received the message.
+     *
+     * @retval OT_ERROR_NONE   Successfully processed the message.
+     * @retval OT_ERROR_DROP   Message processing failed and the message should be dropped.
+     *
+     */
+    otError SendRaw(Message &aMessage, int8_t aInterfaceId);
+
+    /**
      * This method processes a received IPv6 datagram.
      *
      * @param[in]  aMessage          A reference to the message.
@@ -362,10 +374,13 @@ public:
 
     MessagePool mMessagePool;
     TaskletScheduler mTaskletScheduler;
-    TimerScheduler mTimerScheduler;
+    TimerMilliScheduler mTimerMilliScheduler;
+#if OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
+    TimerMicroScheduler mTimerMicroScheduler;
+#endif
 
 private:
-    static void HandleSendQueue(void *aContext);
+    static void HandleSendQueue(Tasklet &aTasklet);
     void HandleSendQueue(void);
 
     otError ProcessReceiveCallback(const Message &aMessage, const MessageInfo &aMessageInfo, uint8_t aIpProto,
@@ -380,6 +395,8 @@ private:
     otError HandleOptions(Message &aMessage, Header &aHeader, bool &aForward);
     otError HandlePayload(Message &aMessage, MessageInfo &aMessageInfo, uint8_t aIpProto);
     int8_t FindForwardInterfaceId(const MessageInfo &aMessageInfo);
+
+    static Ip6 &GetOwner(const Context &aContext);
 
     bool mForwardingEnabled;
 
@@ -396,11 +413,6 @@ private:
 static inline Ip6 *Ip6FromTaskletScheduler(TaskletScheduler *aTaskletScheduler)
 {
     return (Ip6 *)CONTAINING_RECORD(aTaskletScheduler, Ip6, mTaskletScheduler);
-}
-
-static inline Ip6 *Ip6FromTimerScheduler(TimerScheduler *aTimerScheduler)
-{
-    return (Ip6 *)CONTAINING_RECORD(aTimerScheduler, Ip6, mTimerScheduler);
 }
 
 /**

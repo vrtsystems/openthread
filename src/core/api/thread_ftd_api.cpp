@@ -244,8 +244,8 @@ otError otThreadSetSteeringData(otInstance *aInstance, otExtAddress *aExtAddress
 #if OPENTHREAD_CONFIG_ENABLE_STEERING_DATA_SET_OOB
     error = aInstance->mThreadNetif.GetMle().SetSteeringData(aExtAddress);
 #else
-    (void)aInstance;
-    (void)aExtAddress;
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(aExtAddress);
 
     error = OT_ERROR_DISABLED_FEATURE;
 #endif  // OPENTHREAD_CONFIG_ENABLE_STEERING_DATA_SET_OOB
@@ -266,11 +266,21 @@ otError otThreadSetPSKc(otInstance *aInstance, const uint8_t *aPSKc)
                  error = OT_ERROR_INVALID_STATE);
 
     aInstance->mThreadNetif.GetKeyManager().SetPSKc(aPSKc);
-    aInstance->mThreadNetif.GetActiveDataset().Clear(false);
-    aInstance->mThreadNetif.GetPendingDataset().Clear(false);
+    aInstance->mThreadNetif.GetActiveDataset().Clear();
+    aInstance->mThreadNetif.GetPendingDataset().Clear();
 
 exit:
     return error;
+}
+
+int8_t otThreadGetParentPriority(otInstance *aInstance)
+{
+    return aInstance->mThreadNetif.GetMle().GetAssignParentPriority();
+}
+
+otError otThreadSetParentPriority(otInstance *aInstance, const int8_t aParentPriority)
+{
+    return aInstance->mThreadNetif.GetMle().SetAssignParentPriority(aParentPriority);
 }
 
 #endif // OPENTHREAD_FTD

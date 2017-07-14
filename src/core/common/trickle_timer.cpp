@@ -37,19 +37,20 @@
 
 #include <openthread/platform/random.h>
 
+#include "openthread-instance.h"
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 
 namespace ot {
 
 TrickleTimer::TrickleTimer(
-    TimerScheduler &aScheduler,
+    Ip6::Ip6 &aIp6,
 #ifdef ENABLE_TRICKLE_TIMER_SUPPRESSION_SUPPORT
     uint32_t aRedundancyConstant,
 #endif
     Handler aTransmitHandler, Handler aIntervalExpiredHandler, void *aContext)
     :
-    mTimer(aScheduler, HandleTimerFired, this),
+    TimerMilli(aIp6, HandleTimerFired, aContext),
 #ifdef ENABLE_TRICKLE_TIMER_SUPPRESSION_SUPPORT
     k(aRedundancyConstant),
     c(0),
@@ -61,8 +62,7 @@ TrickleTimer::TrickleTimer(
     t(0),
     mPhase(kPhaseDormant),
     mTransmitHandler(aTransmitHandler),
-    mIntervalExpiredHandler(aIntervalExpiredHandler),
-    mContext(aContext)
+    mIntervalExpiredHandler(aIntervalExpiredHandler)
 {
 }
 
@@ -97,7 +97,7 @@ void TrickleTimer::Start(uint32_t aIntervalMin, uint32_t aIntervalMax, Mode aMod
 void TrickleTimer::Stop(void)
 {
     mPhase = kPhaseDormant;
-    mTimer.Stop();
+    TimerMilli::Stop();
 }
 
 #ifdef ENABLE_TRICKLE_TIMER_SUPPRESSION_SUPPORT
@@ -117,7 +117,7 @@ void TrickleTimer::IndicateInconsistent(void)
         I = Imin;
 
         // Stop the existing timer
-        mTimer.Stop();
+        TimerMilli::Stop();
 
         // Start a new interval
         StartNewInterval();
@@ -156,13 +156,12 @@ void TrickleTimer::StartNewInterval(void)
     }
 
     // Start the timer for 't' milliseconds from now
-    mTimer.Start(t);
+    TimerMilli::Start(t);
 }
 
-void TrickleTimer::HandleTimerFired(void *aContext)
+void TrickleTimer::HandleTimerFired(Timer &aTimer)
 {
-    TrickleTimer *obj = static_cast<TrickleTimer *>(aContext);
-    obj->HandleTimerFired();
+    static_cast<TrickleTimer *>(&aTimer)->HandleTimerFired();
 }
 
 void TrickleTimer::HandleTimerFired(void)
@@ -205,7 +204,7 @@ void TrickleTimer::HandleTimerFired(void)
                 mPhase = kPhaseInterval;
 
                 // Start the time for 'I - t' milliseconds
-                mTimer.Start(I - t);
+                TimerMilli::Start(I - t);
             }
         }
 

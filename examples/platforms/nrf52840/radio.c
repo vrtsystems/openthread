@@ -50,8 +50,8 @@
 #include <openthread/platform/radio.h>
 #include <openthread/platform/diag.h>
 
-#include "device/nrf.h"
-#include "drivers/nrf_drv_radio802154.h"
+#include <device/nrf.h>
+#include <nrf_drv_radio802154.h>
 
 #include <openthread-core-config.h>
 #include <openthread/config.h>
@@ -70,8 +70,19 @@ static bool sDisabled;
 
 static otRadioFrame sReceivedFrames[RADIO_RX_BUFFERS];
 static otRadioFrame sTransmitFrame;
+
+#if defined ( __GNUC__ )
+
 static uint8_t      sTransmitPsdu[OT_RADIO_FRAME_MAX_SIZE + 1]
 __attribute__((section("nrf_radio_buffer.sTransmiPsdu")));
+
+#elif defined ( __ICCARM__ )
+
+#pragma location="NRF_RADIO_BUFFER"
+static uint8_t      sTransmitPsdu[OT_RADIO_FRAME_MAX_SIZE + 1];
+
+#endif
+
 static otRadioFrame sAckFrame;
 
 static uint32_t     sEnergyDetectionTime;
@@ -81,6 +92,7 @@ static int8_t       sEnergyDetected;
 typedef enum
 {
     kPendingEventSleep,                // Requested to enter Sleep state.
+    kPendingEventTransmit,             // Frame is queued for transmission.
     kPendingEventFrameTransmitted,     // Transmitted frame and received ACK (if requested).
     kPendingEventChannelAccessFailure, // Failed to transmit frame (channel busy).
     kPendingEventEnergyDetectionStart, // Requested to start Energy Detection procedure.
@@ -121,10 +133,10 @@ static void setPendingEvent(RadioPendingEvents aEvent)
 
     do
     {
-        pendingEvents = __LDREXW(&sPendingEvents);
+        pendingEvents = __LDREXW((unsigned long volatile *)&sPendingEvents);
         pendingEvents |= bitToSet;
     }
-    while (__STREXW(pendingEvents, &sPendingEvents));
+    while (__STREXW(pendingEvents, (unsigned long volatile *)&sPendingEvents));
 }
 
 static void resetPendingEvent(RadioPendingEvents aEvent)
@@ -134,10 +146,10 @@ static void resetPendingEvent(RadioPendingEvents aEvent)
 
     do
     {
-        pendingEvents = __LDREXW(&sPendingEvents);
+        pendingEvents = __LDREXW((unsigned long volatile *)&sPendingEvents);
         pendingEvents &= bitsToRemain;
     }
-    while (__STREXW(pendingEvents, &sPendingEvents));
+    while (__STREXW(pendingEvents, (unsigned long volatile *)&sPendingEvents));
 }
 
 static inline void clearPendingEvents(void)
@@ -153,18 +165,18 @@ static inline void clearPendingEvents(void)
 
     do
     {
-        pendingEvents = __LDREXW(&sPendingEvents);
+        pendingEvents = __LDREXW((unsigned long volatile *)&sPendingEvents);
         pendingEvents &= bitsToRemain;
     }
-    while (__STREXW(pendingEvents, &sPendingEvents));
+    while (__STREXW(pendingEvents, (unsigned long volatile *)&sPendingEvents));
 }
 
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64)
 {
     (void) aInstance;
 
-    uint64_t factoryAddress;
-    factoryAddress = (((uint64_t)NRF_FICR->DEVICEID[0] << 32) | NRF_FICR->DEVICEID[1]);
+    uint64_t factoryAddress = (uint64_t)NRF_FICR->DEVICEID[0] << 32;
+    factoryAddress |=  NRF_FICR->DEVICEID[1];
 
     memcpy(aIeeeEui64, &factoryAddress, sizeof(factoryAddress));
 }
@@ -313,14 +325,15 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
 
     aFrame->mPsdu[-1] = aFrame->mLength;
 
-    if (nrf_drv_radio802154_transmit(&aFrame->mPsdu[-1], aFrame->mChannel, aFrame->mPower))
+    if (nrf_drv_radio802154_transmit(&aFrame->mPsdu[-1], aFrame->mChannel, aFrame->mPower, true))
     {
         clearPendingEvents();
+        otPlatRadioTxStarted(aInstance, aFrame);
     }
     else
     {
         clearPendingEvents();
-        setPendingEvent(kPendingEventChannelAccessFailure);
+        setPendingEvent(kPendingEventTransmit);
     }
 
     return OT_ERROR_NONE;
@@ -512,6 +525,15 @@ void nrf5RadioProcess(otInstance *aInstance)
         }
     }
 
+    if (isPendingEventSet(kPendingEventTransmit))
+    {
+        if (nrf_drv_radio802154_transmit(sTransmitPsdu, sTransmitFrame.mChannel, sTransmitFrame.mPower, true))
+        {
+            resetPendingEvent(kPendingEventTransmit);
+            otPlatRadioTxStarted(aInstance, &sTransmitFrame);
+        }
+    }
+
     if (isPendingEventSet(kPendingEventFrameTransmitted))
     {
 #if OPENTHREAD_ENABLE_DIAG
@@ -581,6 +603,13 @@ void nrf_drv_radio802154_received(uint8_t *p_data, int8_t power, int8_t lqi)
 {
     otRadioFrame *receivedFrame = NULL;
 
+    if (isPendingEventSet(kPendingEventTransmit))
+    {
+        nrf_drv_radio802154_buffer_free(p_data);
+
+        return;
+    }
+
     for (uint32_t i = 0; i < RADIO_RX_BUFFERS; i++)
     {
         if (sReceivedFrames[i].mPsdu == NULL)
@@ -626,7 +655,8 @@ void nrf_drv_radio802154_busy_channel(void)
 
 void nrf_drv_radio802154_energy_detected(int8_t result)
 {
-    sEnergyDetected = result;
+    // TODO: Correct RSSI calculation after lab tests.
+    sEnergyDetected = 94 - result;
 
     setPendingEvent(kPendingEventEnergyDetected);
 }

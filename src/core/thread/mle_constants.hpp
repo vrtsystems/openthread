@@ -105,21 +105,24 @@ enum
     kMleEndDeviceTimeout        = OPENTHREAD_CONFIG_DEFAULT_CHILD_TIMEOUT,  ///< MLE_END_DEVICE_TIMEOUT (seconds)
 };
 
+/**
+ * Parent Priority values
+ *
+ */
+enum
+{
+    kParentPriorityHigh        = 1,    // Parent Priority High
+    kParentPriorityMedium      = 0,    // Parent Priority Medium (default)
+    kParentPriorityLow         = -1,   // Parent Priority Low
+    kParentPriorityUnspecified = -2,   // Parent Priority Unspecified
+};
+
 enum
 {
     kLinkQuality3LinkCost       = 1,    ///< Link Cost for Link Quality 3
     kLinkQuality2LinkCost       = 2,    ///< Link Cost for Link Quality 2
     kLinkQuality1LinkCost       = 4,    ///< Link Cost for Link Quality 1
     kLinkQuality0LinkCost       = 16,   ///< Link Cost for Link Quality 0
-};
-
-// add for certification testing
-enum
-{
-    kMinAssignedLinkMargin3     = 0x15, ///< minimal link margin for Link Quality 3 (21 - 255)
-    kMinAssignedLinkMargin2     = 0x0b, ///< minimal link margin for Link Quality 2 (11 - 20)
-    kMinAssignedLinkMargin1     = 0x03, ///< minimal link margin for Link Quality 1 (3 - 9)
-    kMinAssignedLinkMargin0     = 0x00, ///< minimal link margin for Link Quality 0 (0 - 2)
 };
 
 /**

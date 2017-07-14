@@ -31,11 +31,10 @@
 #include <assert.h>
 
 #include <openthread/types.h>
-#include <openthread/platform/alarm.h>
+#include <openthread/platform/alarm-milli.h>
 #include <utils/flash.h>
 #include <utils/code_utils.h>
 
-#include "hal/nrf_nvmc.h"
 #include "platform-nrf5.h"
 
 extern uint32_t __flash_data_start;
@@ -70,7 +69,7 @@ otError utilsFlashErasePage(uint32_t aAddress)
     otError error = OT_ERROR_NONE;
     otEXPECT_ACTION(aAddress < utilsFlashGetSize(), error = OT_ERROR_INVALID_ARGS);
 
-    nrf_nvmc_page_erase(mapAddress(aAddress & FLASH_PAGE_ADDR_MASK));
+    error = nrf5FlashPageErase(mapAddress(aAddress & FLASH_PAGE_ADDR_MASK));
 
 exit:
     return error;
@@ -82,24 +81,24 @@ otError utilsFlashStatusWait(uint32_t aTimeout)
 
     if (aTimeout == 0)
     {
-        if (NRF_NVMC->READY == NVMC_READY_READY_Ready)
+        if (!nrf5FlashIsBusy())
         {
             error = OT_ERROR_NONE;
         }
     }
     else
     {
-        uint32_t startTime = otPlatAlarmGetNow();
+        uint32_t startTime = otPlatAlarmMilliGetNow();
 
         do
         {
-            if (NRF_NVMC->READY == NVMC_READY_READY_Ready)
+            if (!nrf5FlashIsBusy())
             {
                 error = OT_ERROR_NONE;
                 break;
             }
         }
-        while (otPlatAlarmGetNow() - startTime < aTimeout);
+        while (otPlatAlarmMilliGetNow() - startTime < aTimeout);
     }
 
     return error;
@@ -110,9 +109,9 @@ uint32_t utilsFlashWrite(uint32_t aAddress, uint8_t *aData, uint32_t aSize)
     uint32_t result = 0;
     otEXPECT(aData);
     otEXPECT(aAddress < utilsFlashGetSize());
+    otEXPECT(aSize);
 
-    nrf_nvmc_write_bytes(mapAddress(aAddress), aData, aSize);
-    result = aSize;
+    result = nrf5FlashWrite(mapAddress(aAddress), aData, aSize);
 
 exit:
     return result;

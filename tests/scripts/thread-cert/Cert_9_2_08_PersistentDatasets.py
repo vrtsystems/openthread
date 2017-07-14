@@ -45,7 +45,7 @@ LEADER_ACTIVE_TIMESTAMP = 10
 COMMISSIONER_PENDING_CHANNEL = 20
 COMMISSIONER_PENDING_PANID = 0xafce
 
-class Cert_9_2_8_DelayTimer(unittest.TestCase):
+class Cert_9_2_8_PersistentDatasets(unittest.TestCase):
     def setUp(self):
         self.nodes = {}
         for i in range(1,6):
@@ -67,18 +67,27 @@ class Cert_9_2_8_DelayTimer(unittest.TestCase):
 
         self.nodes[ROUTER].set_active_dataset(LEADER_ACTIVE_TIMESTAMP, panid=PANID_INIT, channel=CHANNEL_INIT)
         self.nodes[ROUTER].set_mode('rsdn')
+        self._setUpRouter()
+
+        self.nodes[ED].set_active_dataset(LEADER_ACTIVE_TIMESTAMP, panid=PANID_INIT, channel=CHANNEL_INIT)
+        self.nodes[ED].set_mode('rsn')
+        self._setUpEd()
+
+        self.nodes[SED].set_active_dataset(LEADER_ACTIVE_TIMESTAMP, panid=PANID_INIT, channel=CHANNEL_INIT)
+        self.nodes[SED].set_mode('s')
+        self._setUpSed()
+
+    def _setUpRouter(self):
         self.nodes[ROUTER].add_whitelist(self.nodes[LEADER].get_addr64())
         self.nodes[ROUTER].enable_whitelist()
         self.nodes[ROUTER].set_router_selection_jitter(1)
 
-        self.nodes[ED].set_active_dataset(LEADER_ACTIVE_TIMESTAMP, panid=PANID_INIT, channel=CHANNEL_INIT)
-        self.nodes[ED].set_mode('rsn')
+    def _setUpEd(self):
         self.nodes[ED].add_whitelist(self.nodes[LEADER].get_addr64())
         self.nodes[ED].enable_whitelist()
         self.nodes[ED].set_timeout(3)
 
-        self.nodes[SED].set_active_dataset(LEADER_ACTIVE_TIMESTAMP, panid=PANID_INIT, channel=CHANNEL_INIT)
-        self.nodes[SED].set_mode('s')
+    def _setUpSed(self):
         self.nodes[SED].add_whitelist(self.nodes[LEADER].get_addr64())
         self.nodes[SED].enable_whitelist()
         self.nodes[SED].set_timeout(3)
@@ -119,9 +128,9 @@ class Cert_9_2_8_DelayTimer(unittest.TestCase):
                                                        panid=COMMISSIONER_PENDING_PANID)
         time.sleep(5)
 
-        self.nodes[ROUTER].stop()
-        self.nodes[ED].stop()
-        self.nodes[SED].stop()
+        self.nodes[ROUTER].reset()
+        self.nodes[ED].reset()
+        self.nodes[SED].reset()
 
         time.sleep(60)
 
@@ -131,8 +140,15 @@ class Cert_9_2_8_DelayTimer(unittest.TestCase):
         self.assertEqual(self.nodes[LEADER].get_channel(), COMMISSIONER_PENDING_CHANNEL)
         self.assertEqual(self.nodes[COMMISSIONER].get_channel(), COMMISSIONER_PENDING_CHANNEL)
         
+        # reset the devices here again to simulate the fact that the devices were disabled the entire time
+        self.nodes[ROUTER].reset()
+        self._setUpRouter()
         self.nodes[ROUTER].start()
+        self.nodes[ED].reset()
+        self._setUpEd()
         self.nodes[ED].start()
+        self.nodes[SED].reset()
+        self._setUpSed()
         self.nodes[SED].start()
 
         self.assertEqual(self.nodes[ROUTER].get_panid(), PANID_INIT)

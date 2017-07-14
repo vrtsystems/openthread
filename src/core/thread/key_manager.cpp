@@ -36,6 +36,7 @@
 
 #include "key_manager.hpp"
 
+#include "openthread-instance.h"
 #include "common/code_utils.hpp"
 #include "common/timer.hpp"
 #include "crypto/hmac_sha256.hpp"
@@ -50,16 +51,17 @@ static const uint8_t kThreadString[] =
 };
 
 KeyManager::KeyManager(ThreadNetif &aThreadNetif):
-    mNetif(aThreadNetif),
+    ThreadNetifLocator(aThreadNetif),
     mKeySequence(0),
     mMacFrameCounter(0),
     mMleFrameCounter(0),
     mStoredMacFrameCounter(0),
     mStoredMleFrameCounter(0),
+    mHoursSinceKeyRotation(0),
     mKeyRotationTime(kDefaultKeyRotationTime),
     mKeySwitchGuardTime(kDefaultKeySwitchGuardTime),
     mKeySwitchGuardEnabled(false),
-    mKeyRotationTimer(aThreadNetif.GetIp6().mTimerScheduler, &KeyManager::HandleKeyRotationTimer, this),
+    mKeyRotationTimer(aThreadNetif.GetIp6(), &KeyManager::HandleKeyRotationTimer, this),
     mKekFrameCounter(0),
     mSecurityPolicyFlags(0xff)
 {
@@ -68,7 +70,7 @@ KeyManager::KeyManager(ThreadNetif &aThreadNetif):
 void KeyManager::Start(void)
 {
     mKeySwitchGuardEnabled = false;
-    mKeyRotationTimer.Start(Timer::HoursToMsec(mKeyRotationTime));
+    StartKeyRotationTimer();
 }
 
 void KeyManager::Stop(void)
@@ -107,13 +109,13 @@ otError KeyManager::SetMasterKey(const otMasterKey &aKey)
     ComputeKey(mKeySequence, mKey);
 
     // reset parent frame counters
-    routers = mNetif.GetMle().GetParent();
+    routers = GetNetif().GetMle().GetParent();
     routers->SetKeySequence(0);
     routers->SetLinkFrameCounter(0);
     routers->SetMleFrameCounter(0);
 
     // reset router frame counters
-    routers = mNetif.GetMle().GetRouters(&num);
+    routers = GetNetif().GetMle().GetRouters(&num);
 
     for (uint8_t i = 0; i < num; i++)
     {
@@ -123,7 +125,7 @@ otError KeyManager::SetMasterKey(const otMasterKey &aKey)
     }
 
     // reset child frame counters
-    children = mNetif.GetMle().GetChildren(&num);
+    children = GetNetif().GetMle().GetChildren(&num);
 
     for (uint8_t i = 0; i < num; i++)
     {
@@ -132,7 +134,7 @@ otError KeyManager::SetMasterKey(const otMasterKey &aKey)
         children[i].SetMleFrameCounter(0);
     }
 
-    mNetif.SetStateChangedFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER);
+    GetNetif().SetStateChangedFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER);
 
 exit:
     return error;
@@ -170,25 +172,7 @@ void KeyManager::SetCurrentKeySequence(uint32_t aKeySequence)
         mKeyRotationTimer.IsRunning() &&
         mKeySwitchGuardEnabled)
     {
-        uint32_t now = Timer::GetNow();
-        uint32_t guardStartTimestamp = mKeyRotationTimer.Gett0();
-        uint32_t guardEndTimestamp = guardStartTimestamp + Timer::HoursToMsec(mKeySwitchGuardTime);
-
-        // Check for timer overflow
-        if (guardEndTimestamp < mKeyRotationTimer.Gett0())
-        {
-            if ((now > guardStartTimestamp) || (now < guardEndTimestamp))
-            {
-                ExitNow();
-            }
-        }
-        else
-        {
-            if ((now > guardStartTimestamp) && (now < guardEndTimestamp))
-            {
-                ExitNow();
-            }
-        }
+        VerifyOrExit(mHoursSinceKeyRotation < mKeySwitchGuardTime);
     }
 
     mKeySequence = aKeySequence;
@@ -200,10 +184,10 @@ void KeyManager::SetCurrentKeySequence(uint32_t aKeySequence)
     if (mKeyRotationTimer.IsRunning())
     {
         mKeySwitchGuardEnabled = true;
-        mKeyRotationTimer.Start(Timer::HoursToMsec(mKeyRotationTime));
+        StartKeyRotationTimer();
     }
 
-    mNetif.SetStateChangedFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER);
+    GetNetif().SetStateChangedFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER);
 
 exit:
     return;
@@ -227,7 +211,7 @@ void KeyManager::IncrementMacFrameCounter(void)
 
     if (mMacFrameCounter >= mStoredMacFrameCounter)
     {
-        mNetif.GetMle().Store();
+        GetNetif().GetMle().Store();
     }
 }
 
@@ -237,7 +221,7 @@ void KeyManager::IncrementMleFrameCounter(void)
 
     if (mMleFrameCounter >= mStoredMleFrameCounter)
     {
-        mNetif.GetMle().Store();
+        GetNetif().GetMle().Store();
     }
 }
 
@@ -252,7 +236,6 @@ otError KeyManager::SetKeyRotation(uint32_t aKeyRotation)
     otError result = OT_ERROR_NONE;
 
     VerifyOrExit(aKeyRotation >= static_cast<uint32_t>(kMinKeyRotationTime), result = OT_ERROR_INVALID_ARGS);
-    VerifyOrExit(aKeyRotation <= static_cast<uint32_t>(kMaxKeyRotationTime), result = OT_ERROR_INVALID_ARGS);
 
     mKeyRotationTime = aKeyRotation;
 
@@ -260,14 +243,45 @@ exit:
     return result;
 }
 
-void KeyManager::HandleKeyRotationTimer(void *aContext)
+void KeyManager::StartKeyRotationTimer(void)
 {
-    static_cast<KeyManager *>(aContext)->HandleKeyRotationTimer();
+    mHoursSinceKeyRotation = 0;
+    mKeyRotationTimer.Start(kOneHourIntervalInMsec);
+}
+
+void KeyManager::HandleKeyRotationTimer(Timer &aTimer)
+{
+    GetOwner(aTimer).HandleKeyRotationTimer();
 }
 
 void KeyManager::HandleKeyRotationTimer(void)
 {
-    SetCurrentKeySequence(mKeySequence + 1);
+    mHoursSinceKeyRotation++;
+
+    // Order of operations below is important. We should restart the timer (from
+    // last fire time for one hour interval) before potentially calling
+    // `SetCurrentKeySequence()`. `SetCurrentKeySequence()` uses the fact that
+    // timer is running to decide to check for the guard time and to reset the
+    // rotation timer (and the `mHoursSinceKeyRotation`) if it updates the key
+    // sequence.
+
+    mKeyRotationTimer.StartAt(mKeyRotationTimer.GetFireTime(), kOneHourIntervalInMsec);
+
+    if (mHoursSinceKeyRotation >= mKeyRotationTime)
+    {
+        SetCurrentKeySequence(mKeySequence + 1);
+    }
+}
+
+KeyManager &KeyManager::GetOwner(const Context &aContext)
+{
+#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+    KeyManager &keyManager = *static_cast<KeyManager *>(aContext.GetContext());
+#else
+    KeyManager &keyManager = otGetThreadNetif().GetKeyManager();
+    OT_UNUSED_VARIABLE(aContext);
+#endif
+    return keyManager;
 }
 
 }  // namespace ot

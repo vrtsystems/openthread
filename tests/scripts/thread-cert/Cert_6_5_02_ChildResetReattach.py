@@ -48,6 +48,9 @@ class Cert_6_5_2_ChildResetReattach(unittest.TestCase):
 
         self.nodes[ED].set_panid(0xface)
         self.nodes[ED].set_mode('rsn')
+        self._setUpEd()
+
+    def _setUpEd(self):
         self.nodes[ED].add_whitelist(self.nodes[LEADER].get_addr64())
         self.nodes[ED].enable_whitelist()
 
@@ -68,13 +71,13 @@ class Cert_6_5_2_ChildResetReattach(unittest.TestCase):
         self.nodes[LEADER].remove_whitelist(self.nodes[ED].get_addr64())
         self.nodes[ED].remove_whitelist(self.nodes[LEADER].get_addr64())
 
-        self.nodes[ED].stop()
+        self.nodes[ED].reset()
+        self._setUpEd()
         time.sleep(5)
         self.nodes[ED].start()
 
         time.sleep(5)
         self.nodes[LEADER].add_whitelist(self.nodes[ED].get_addr64())
-        self.nodes[ED].add_whitelist(self.nodes[LEADER].get_addr64())
         time.sleep(5)
         self.assertEqual(self.nodes[ED].get_state(), 'child')
 

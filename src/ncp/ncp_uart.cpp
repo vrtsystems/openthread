@@ -106,10 +106,11 @@ NcpUart::NcpUart(otInstance *aInstance):
 }
 
 void NcpUart::HandleFrameAddedToNcpBuffer(void *aContext, NcpFrameBuffer::FrameTag aTag,
-                                          NcpFrameBuffer *aNcpFrameBuffer)
+                                          NcpFrameBuffer::Priority aPriority, NcpFrameBuffer *aNcpFrameBuffer)
 {
-    (void)aNcpFrameBuffer;
-    (void)aTag;
+    OT_UNUSED_VARIABLE(aNcpFrameBuffer);
+    OT_UNUSED_VARIABLE(aTag);
+    OT_UNUSED_VARIABLE(aPriority);
 
     static_cast<NcpUart *>(aContext)->HandleFrameAddedToNcpBuffer();
 }
@@ -122,11 +123,10 @@ void NcpUart::HandleFrameAddedToNcpBuffer(void)
     }
 }
 
-void NcpUart::EncodeAndSendToUart(void *aContext)
+void NcpUart::EncodeAndSendToUart(Tasklet &aTasklet)
 {
-    NcpUart *obj = static_cast<NcpUart *>(aContext);
-
-    obj->EncodeAndSendToUart();
+    OT_UNUSED_VARIABLE(aTasklet);
+    static_cast<NcpUart *>(GetNcpInstance())->EncodeAndSendToUart();
 }
 
 // This method encodes a frame from the tx frame buffer (mTxFrameBuffer) into the uart buffer and sends it over uart.
@@ -293,8 +293,8 @@ void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat
 
     va_end(args);
 
-    (void)aLogLevel;
-    (void)aLogRegion;
+    OT_UNUSED_VARIABLE(aLogLevel);
+    OT_UNUSED_VARIABLE(aLogRegion);
 }
 #ifdef __cplusplus
 }  // extern "C"

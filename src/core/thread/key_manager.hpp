@@ -38,12 +38,11 @@
 
 #include <openthread/types.h>
 
+#include "common/locator.hpp"
 #include "common/timer.hpp"
 #include "crypto/hmac_sha256.hpp"
 
 namespace ot {
-
-class ThreadNetif;
 
 /**
  * @addtogroup core-security
@@ -54,7 +53,7 @@ class ThreadNetif;
  * @{
  */
 
-class KeyManager
+class KeyManager: public ThreadNetifLocator
 {
 public:
     enum
@@ -272,7 +271,7 @@ public:
      * This method sets the KeyRotation time.
      *
      * The KeyRotation time is the time interval after witch security key will be automatically rotated.
-     * It's value shall be in range [kMinKeyRotationTime, kMaxKeyRotationTime].
+     * Its value shall be larger than or equal to kMinKeyRotationTime.
      *
      * @param[in]  aKeyRotation  The KeyRotation value in hours.
      *
@@ -328,18 +327,19 @@ private:
     enum
     {
         kMinKeyRotationTime = 1,
-        kMaxKeyRotationTime = 0xffffffff / 3600u / 1000u,
         kDefaultKeyRotationTime = 672,
         kDefaultKeySwitchGuardTime = 624,
         kMacKeyOffset = 16,
+        kOneHourIntervalInMsec = 3600u * 1000u,
     };
 
     otError ComputeKey(uint32_t aKeySequence, uint8_t *aKey);
 
-    static void HandleKeyRotationTimer(void *aContext);
+    void StartKeyRotationTimer(void);
+    static void HandleKeyRotationTimer(Timer &aTimer);
     void HandleKeyRotationTimer(void);
 
-    ThreadNetif &mNetif;
+    static KeyManager &GetOwner(const Context &aContext);
 
     otMasterKey mMasterKey;
 
@@ -353,10 +353,11 @@ private:
     uint32_t mStoredMacFrameCounter;
     uint32_t mStoredMleFrameCounter;
 
+    uint32_t mHoursSinceKeyRotation;
     uint32_t mKeyRotationTime;
     uint32_t mKeySwitchGuardTime;
     bool     mKeySwitchGuardEnabled;
-    Timer    mKeyRotationTimer;
+    TimerMilli mKeyRotationTimer;
 
 #if OPENTHREAD_FTD
     uint8_t mPSKc[kMaxKeyLength];

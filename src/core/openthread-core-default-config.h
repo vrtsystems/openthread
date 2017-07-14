@@ -150,6 +150,22 @@
 #endif // OPENTHREAD_CONFIG_MAX_TX_ATTEMPTS_INDIRECT_POLLS
 
 /**
+ * @def OPENTHREAD_CONFIG_DROP_MESSAGE_ON_FRAGMENT_TX_FAILURE
+ *
+ * Define as 1 for OpenThread to drop a message (and not send any remaining fragments of the message) if all transmit
+ * attempts fail for a fragment of the message. For a direct transmission, a failure occurs after all MAC transmission
+ * attempts for a given fragment are unsuccessful. For an indirect transmission, a failure occurs after all data poll
+ * triggered transmission attempts for a given fragment fail.
+ *
+ * If set to zero (disabled), OpenThread will attempt to send subsequent fragments, whether or not all transmission
+ * attempts fail for a given fragment.
+ *
+ */
+#ifndef OPENTHREAD_CONFIG_DROP_MESSAGE_ON_FRAGMENT_TX_FAILURE
+#define OPENTHREAD_CONFIG_DROP_MESSAGE_ON_FRAGMENT_TX_FAILURE   1
+#endif // OPENTHREAD_CONFIG_DROP_MESSAGE_ON_FRAGMENT_TX_FAILURE
+
+/**
  * @def OPENTHREAD_CONFIG_ATTACH_DATA_POLL_PERIOD
  *
  * The Data Poll period during attach in milliseconds.
@@ -386,24 +402,14 @@
 #endif  // OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT
 
 /**
- * @def OPENTHREAD_CONFIG_MAC_BLACKLIST_SIZE
+ * @def OPENTHREAD_CONFIG_MAC_FILTER_SIZE
  *
- * The number if MAC blacklist entries.
- *
- */
-#ifndef OPENTHREAD_CONFIG_MAC_BLACKLIST_SIZE
-#define OPENTHREAD_CONFIG_MAC_BLACKLIST_SIZE                    32
-#endif  // OPENTHREAD_CONFIG_MAC_BLACKLIST_SIZE
-
-/**
- * @def OPENTHREAD_CONFIG_MAC_WHITELIST_SIZE
- *
- * The number if MAC whitelist entries.
+ * The number of MAC Filter entries.
  *
  */
-#ifndef OPENTHREAD_CONFIG_MAC_WHITELIST_SIZE
-#define OPENTHREAD_CONFIG_MAC_WHITELIST_SIZE                    32
-#endif  // OPENTHREAD_CONFIG_MAC_WHITELIST_SIZE
+#ifndef OPENTHREAD_CONFIG_MAC_FILTER_SIZE
+#define OPENTHREAD_CONFIG_MAC_FILTER_SIZE                       32
+#endif  // OPENTHREAD_CONFIG_MAC_FILTER_SIZE
 
 /**
  * @def OPENTHREAD_CONFIG_STORE_FRAME_COUNTER_AHEAD
@@ -719,13 +725,13 @@
 #endif
 
 /**
- * @def OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_BACKOFF_TIMER
+ * @def OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
  *
  * Define to 1 if you want to enable microsecond backoff timer implemented in platform.
  *
  */
-#ifndef OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_BACKOFF_TIMER
-#define OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_BACKOFF_TIMER    0
+#ifndef OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
+#define OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER    0
 #endif
 
 /**
@@ -755,7 +761,7 @@
  *
  */
 #ifndef OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE
-#define OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE                     (2048 * sizeof(void *))
+#define OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE                     (1536 * sizeof(void *))
 #endif
 
 /**
@@ -833,6 +839,17 @@
  */
 #ifndef OPENTHREAD_CONFIG_NCP_ENABLE_PEEK_POKE
 #define OPENTHREAD_CONFIG_NCP_ENABLE_PEEK_POKE                  0
+#endif
+
+/*
+ * @def OPENTHREAD_CONFIG_STAY_AWAKE_BETWEEN_FRAGMENTS
+ *
+ * Define as 1 to stay awake between fragments while transmitting a large packet,
+ * and to stay awake after receiving a packet with frame pending set to true.
+ *
+ */
+#ifndef OPENTHREAD_CONFIG_STAY_AWAKE_BETWEEN_FRAGMENTS
+#define OPENTHREAD_CONFIG_STAY_AWAKE_BETWEEN_FRAGMENTS          0
 #endif
 
 #endif  // OPENTHREAD_CORE_DEFAULT_CONFIG_H_

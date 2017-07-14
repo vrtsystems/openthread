@@ -223,6 +223,14 @@ enum
     SPINEL_ROUTE_PREFERENCE_LOW         = (3 << SPINEL_NET_FLAG_PREFERENCE_OFFSET),
 };
 
+enum
+{
+    SPINEL_THREAD_MODE_FULL_NETWORK_DATA    = (1 << 0),
+    SPINEL_THREAD_MODE_FULL_FUNCTION_DEV    = (1 << 1),
+    SPINEL_THREAD_MODE_SECURE_DATA_REQUEST  = (1 << 2),
+    SPINEL_THREAD_MODE_RX_ON_WHEN_IDLE      = (1 << 3),
+};
+
 enum {
     SPINEL_GPIO_FLAG_DIR_INPUT          = 0,
     SPINEL_GPIO_FLAG_DIR_OUTPUT         = SPINEL_BIT_MASK(0, 8),
@@ -628,16 +636,17 @@ typedef enum
     SPINEL_PROP_PHY_EXT__END            = 0x1300,
 
     SPINEL_PROP_MAC__BEGIN              = 0x30,
-    SPINEL_PROP_MAC_SCAN_STATE          = SPINEL_PROP_MAC__BEGIN + 0, ///< [C]
-    SPINEL_PROP_MAC_SCAN_MASK           = SPINEL_PROP_MAC__BEGIN + 1, ///< [A(C)]
-    SPINEL_PROP_MAC_SCAN_PERIOD         = SPINEL_PROP_MAC__BEGIN + 2, ///< ms-per-channel [S]
-    SPINEL_PROP_MAC_SCAN_BEACON         = SPINEL_PROP_MAC__BEGIN + 3, ///< chan,rssi,mac_data,net_data [CcdD]
-    SPINEL_PROP_MAC_15_4_LADDR          = SPINEL_PROP_MAC__BEGIN + 4, ///< [E]
-    SPINEL_PROP_MAC_15_4_SADDR          = SPINEL_PROP_MAC__BEGIN + 5, ///< [S]
-    SPINEL_PROP_MAC_15_4_PANID          = SPINEL_PROP_MAC__BEGIN + 6, ///< [S]
-    SPINEL_PROP_MAC_RAW_STREAM_ENABLED  = SPINEL_PROP_MAC__BEGIN + 7, ///< [C]
-    SPINEL_PROP_MAC_PROMISCUOUS_MODE    = SPINEL_PROP_MAC__BEGIN + 8, ///< [C]
-    SPINEL_PROP_MAC_ENERGY_SCAN_RESULT  = SPINEL_PROP_MAC__BEGIN + 9, ///< chan,maxRssi [Cc]
+    SPINEL_PROP_MAC_SCAN_STATE          = SPINEL_PROP_MAC__BEGIN + 0,  ///< [C]
+    SPINEL_PROP_MAC_SCAN_MASK           = SPINEL_PROP_MAC__BEGIN + 1,  ///< [A(C)]
+    SPINEL_PROP_MAC_SCAN_PERIOD         = SPINEL_PROP_MAC__BEGIN + 2,  ///< ms-per-channel [S]
+    SPINEL_PROP_MAC_SCAN_BEACON         = SPINEL_PROP_MAC__BEGIN + 3,  ///< chan,rssi,mac_data,net_data [CcdD]
+    SPINEL_PROP_MAC_15_4_LADDR          = SPINEL_PROP_MAC__BEGIN + 4,  ///< [E]
+    SPINEL_PROP_MAC_15_4_SADDR          = SPINEL_PROP_MAC__BEGIN + 5,  ///< [S]
+    SPINEL_PROP_MAC_15_4_PANID          = SPINEL_PROP_MAC__BEGIN + 6,  ///< [S]
+    SPINEL_PROP_MAC_RAW_STREAM_ENABLED  = SPINEL_PROP_MAC__BEGIN + 7,  ///< [C]
+    SPINEL_PROP_MAC_PROMISCUOUS_MODE    = SPINEL_PROP_MAC__BEGIN + 8,  ///< [C]
+    SPINEL_PROP_MAC_ENERGY_SCAN_RESULT  = SPINEL_PROP_MAC__BEGIN + 9,  ///< chan,maxRssi [Cc]
+    SPINEL_PROP_MAC_DATA_POLL_PERIOD    = SPINEL_PROP_MAC__BEGIN + 10, ///< pollPeriod (in ms) [L]
     SPINEL_PROP_MAC__END                = 0x40,
 
     SPINEL_PROP_MAC_EXT__BEGIN          = 0x1300,
@@ -693,6 +702,17 @@ typedef enum
     /** Format: `b`
      */
     SPINEL_PROP_MAC_BLACKLIST_ENABLED   = SPINEL_PROP_MAC_EXT__BEGIN + 7,
+
+    /// MAC Received Signal Strength Filter
+    /** Format: `A(t(Ec))`
+     *
+     * Structure Parameters:
+     *
+     * * `E`: Optional EUI64 address of node. Set default RSS if not included.
+     * * `c`: Fixed RSS. OT_MAC_FILTER_FIXED_RSS_OVERRIDE_DISABLED(127) means not set.
+     */
+    SPINEL_PROP_MAC_FIXED_RSS            = SPINEL_PROP_MAC_EXT__BEGIN + 8,
+
     SPINEL_PROP_MAC_EXT__END            = 0x1400,
 
     SPINEL_PROP_NET__BEGIN              = 0x40,

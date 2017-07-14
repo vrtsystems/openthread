@@ -58,6 +58,10 @@ Ip6::Ip6(void):
     mUdp(*this),
     mMpl(*this),
     mMessagePool(GetInstance()),
+    mTimerMilliScheduler(*this),
+#if OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
+    mTimerMicroScheduler(*this),
+#endif
     mForwardingEnabled(false),
     mSendQueueTask(mTaskletScheduler, HandleSendQueue, this),
     mReceiveIp6DatagramCallback(NULL),
@@ -421,9 +425,9 @@ exit:
     return error;
 }
 
-void Ip6::HandleSendQueue(void *aContext)
+void Ip6::HandleSendQueue(Tasklet &aTasklet)
 {
-    static_cast<Ip6 *>(aContext)->HandleSendQueue();
+    GetOwner(aTasklet).HandleSendQueue();
 }
 
 void Ip6::HandleSendQueue(void)
@@ -654,6 +658,32 @@ exit:
     return error;
 }
 
+otError Ip6::SendRaw(Message &aMessage, int8_t aInterfaceId)
+{
+    otError error = OT_ERROR_NONE;
+    Header header;
+    MessageInfo messageInfo;
+
+    // check aMessage length
+    VerifyOrExit(aMessage.Read(0, sizeof(header), &header) == sizeof(header), error = OT_ERROR_DROP);
+
+    messageInfo.SetPeerAddr(header.GetSource());
+    messageInfo.SetSockAddr(header.GetDestination());
+    messageInfo.SetInterfaceId(aInterfaceId);
+    messageInfo.SetHopLimit(header.GetHopLimit());
+    messageInfo.SetLinkInfo(NULL);
+
+    if (header.GetDestination().IsMulticast())
+    {
+        SuccessOrExit(error = InsertMplOption(aMessage, header, messageInfo));
+    }
+
+    error = HandleDatagram(aMessage, NULL, aInterfaceId, NULL, true);
+
+exit:
+    return error;
+}
+
 otError Ip6::HandleDatagram(Message &aMessage, Netif *aNetif, int8_t aInterfaceId, const void *aLinkMessageInfo,
                             bool aFromNcpHost)
 {
@@ -711,11 +741,6 @@ otError Ip6::HandleDatagram(Message &aMessage, Netif *aNetif, int8_t aInterfaceI
         else
         {
             forward = true;
-
-            if (aFromNcpHost)
-            {
-                SuccessOrExit(error = InsertMplOption(aMessage, header, messageInfo));
-            }
         }
     }
     else
@@ -1096,6 +1121,17 @@ exit:
 otInstance *Ip6::GetInstance(void)
 {
     return otInstanceFromIp6(this);
+}
+
+Ip6 &Ip6::GetOwner(const Context &aContext)
+{
+#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+    Ip6 &ip6 = *static_cast<Ip6 *>(aContext.GetContext());
+#else
+    Ip6 &ip6 = otGetIp6();
+    OT_UNUSED_VARIABLE(aContext);
+#endif
+    return ip6;
 }
 
 const char *Ip6::IpProtoToString(IpProto aIpProto)
