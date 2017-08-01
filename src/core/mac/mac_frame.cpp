@@ -40,16 +40,9 @@
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
-#include "net/ip6_address.hpp"
 
 namespace ot {
 namespace Mac {
-
-void ExtAddress::Set(const Ip6::Address &aIpAddress)
-{
-    memcpy(m8, aIpAddress.GetIid(), sizeof(m8));
-    m8[0] ^= 0x02;
-}
 
 const char *Address::ToString(char *aBuf, uint16_t aSize) const
 {
@@ -176,11 +169,12 @@ otError Frame::InitMacHeader(uint16_t aFcf, uint8_t aSecurityControl)
 otError Frame::ValidatePsdu(void)
 {
     otError error = OT_ERROR_PARSE;
-    uint8_t offset = 0;
-    uint16_t fcf;
+    uint8_t offset = kFcfSize + kDsnSize;
     uint8_t footerLength = kFcsSize;
+    uint16_t fcf;
 
-    VerifyOrExit((offset += kFcfSize + kDsnSize) <= GetPsduLength());
+    VerifyOrExit((offset + footerLength) <= GetPsduLength());
+
     fcf = static_cast<uint16_t>((GetPsdu()[1] << 8) | GetPsdu()[0]);
 
     // Destinatinon PAN + Address
@@ -228,6 +222,8 @@ otError Frame::ValidatePsdu(void)
     default:
         goto exit;
     }
+
+    VerifyOrExit((offset + footerLength) <= GetPsduLength());
 
     // Security Header
     if (fcf & Frame::kFcfSecurityEnabled)
@@ -865,6 +861,19 @@ otError Frame::SetCommandId(uint8_t aCommandId)
 
 exit:
     return error;
+}
+
+bool Frame::IsDataRequestCommand(void)
+{
+    bool isDataRequest = false;
+    uint8_t commandId = 0;
+
+    VerifyOrExit(GetType() == kFcfFrameMacCmd);
+    SuccessOrExit(GetCommandId(commandId));
+    isDataRequest = (commandId == kMacCmdDataRequest);
+
+exit:
+    return isDataRequest;
 }
 
 uint8_t Frame::GetHeaderLength(void)

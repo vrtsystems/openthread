@@ -201,6 +201,9 @@ const struct Command Interpreter::sCommands[] =
     { "state", &Interpreter::ProcessState },
     { "thread", &Interpreter::ProcessThread },
     { "txpowermax", &Interpreter::ProcessTxPowerMax },
+#ifndef OTDLL
+    { "udp", &Interpreter::ProcessUdp },
+#endif
     { "version", &Interpreter::ProcessVersion },
 };
 
@@ -244,10 +247,11 @@ Interpreter::Interpreter(otInstance *aInstance):
     mLength(8),
     mCount(1),
     mInterval(1000),
-    mPingTimer(aInstance->mIp6, &Interpreter::s_HandlePingTimer, this),
+    mPingTimer(*aInstance, &Interpreter::s_HandlePingTimer, this),
 #if OPENTHREAD_ENABLE_DNS_CLIENT
     mResolvingInProgress(0),
 #endif
+    mUdp(*this),
 #endif
     mInstance(aInstance)
 {
@@ -877,7 +881,7 @@ void Interpreter::ProcessExtAddress(int argc, char *argv[])
 
     if (argc == 0)
     {
-        otBufferPtr extAddress(otLinkGetExtendedAddress(mInstance));
+        otBufferPtr extAddress(reinterpret_cast<const uint8_t *>(otLinkGetExtendedAddress(mInstance)));
         OutputBytes(extAddress, OT_EXT_ADDRESS_SIZE);
         mServer->OutputFormat("\r\n");
     }
@@ -897,7 +901,7 @@ exit:
 #ifdef OPENTHREAD_EXAMPLES_POSIX
 void Interpreter::ProcessExit(int argc, char *argv[])
 {
-    exit(0);
+    exit(EXIT_SUCCESS);
     OT_UNUSED_VARIABLE(argc);
     OT_UNUSED_VARIABLE(argv);
 }
@@ -2486,6 +2490,15 @@ void Interpreter::ProcessVersion(int argc, char *argv[])
     OT_UNUSED_VARIABLE(argc);
     OT_UNUSED_VARIABLE(argv);
 }
+
+#ifndef OTDLL
+void Interpreter::ProcessUdp(int argc, char *argv[])
+{
+    otError error;
+    error = mUdp.Process(argc, argv);
+    AppendResult(error);
+}
+#endif
 
 #if OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
 

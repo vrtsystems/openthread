@@ -37,8 +37,10 @@
 #include "fsl_device_registers.h"
 #include "openthread-core-kw41z-config.h"
 #include "fsl_xcvr.h"
-#include "openthread/platform/radio.h"
-#include "openthread/platform/diag.h"
+
+#include <openthread/platform/alarm-milli.h>
+#include <openthread/platform/radio.h>
+#include <openthread/platform/diag.h>
 #include <utils/code_utils.h>
 
 #define DOUBLE_BUFFERING             (1)
@@ -149,14 +151,14 @@ void otPlatRadioSetPanId(otInstance *aInstance, uint16_t aPanId)
     ZLL->MACSHORTADDRS0 |= ZLL_MACSHORTADDRS0_MACPANID0(aPanId);
 }
 
-void otPlatRadioSetExtendedAddress(otInstance *aInstance, uint8_t *aExtendedAddress)
+void otPlatRadioSetExtendedAddress(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     (void) aInstance;
     uint32_t addrLo;
     uint32_t addrHi;
 
-    memcpy(&addrLo, aExtendedAddress, sizeof(addrLo));
-    memcpy(&addrHi, aExtendedAddress + sizeof(addrLo), sizeof(addrHi));
+    memcpy(&addrLo, aExtAddress->m8, sizeof(addrLo));
+    memcpy(&addrHi, aExtAddress->m8 + sizeof(addrLo), sizeof(addrHi));
 
     ZLL->MACLONGADDRS0_LSB = addrLo;
     ZLL->MACLONGADDRS0_MSB = addrHi;
@@ -270,10 +272,10 @@ otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, const uint16_t a
     return rf_add_addr_table_entry(checksum, false);
 }
 
-otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     (void) aInstance;
-    uint16_t checksum = rf_get_addr_checksum((uint8_t *)aExtAddress, true, sPanId);
+    uint16_t checksum = rf_get_addr_checksum((uint8_t *)aExtAddress->m8, true, sPanId);
 
     return rf_add_addr_table_entry(checksum, true);
 }
@@ -286,10 +288,10 @@ otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, const uint16_t
     return rf_remove_addr_table_entry(checksum);
 }
 
-otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     (void) aInstance;
-    uint16_t checksum = rf_get_addr_checksum((uint8_t *)aExtAddress, true, sPanId);
+    uint16_t checksum = rf_get_addr_checksum((uint8_t *)aExtAddress->m8, true, sPanId);
 
     return rf_remove_addr_table_entry(checksum);
 }
@@ -721,6 +723,12 @@ static bool rf_process_rx_frame(void)
 
     /* Check if frame is valid */
     otEXPECT_ACTION((IEEE802154_MIN_LENGTH <= temp) && (temp <= IEEE802154_MAX_LENGTH), status = false);
+
+#if OPENTHREAD_ENABLE_RAW_LINK_API
+    // Timestamp
+    sRxFrame.mMsec = otPlatAlarmMilliGetNow();
+    sRxFrame.mUsec = 0;  // Don't support microsecond timer for now.
+#endif
 
     sRxFrame.mLength = temp;
     temp = (ZLL->LQI_AND_RSSI & ZLL_LQI_AND_RSSI_LQI_VALUE_MASK) >> ZLL_LQI_AND_RSSI_LQI_VALUE_SHIFT;

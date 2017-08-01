@@ -297,6 +297,29 @@ NL_ENABLE_OPTIMIZATION([yes])
 
 AM_CONDITIONAL([OPENTHREAD_BUILD_OPTIMIZED], [test "${nl_cv_build_optimized}" = "yes"])
 
+# Fuzz Targets
+
+AC_MSG_CHECKING([whether to build fuzz targets])
+AC_ARG_ENABLE(fuzz-targets,
+    [AS_HELP_STRING([--enable-fuzz-targets],[Enable building of fuzz targets @<:@default=no@:>@.])],
+    [
+        case "${enableval}" in
+
+        no|yes)
+            enable_fuzz_targets=${enableval}
+            ;;
+
+        *)
+            AC_MSG_ERROR([Invalid value ${enableval} for --enable-fuzz-targets])
+            ;;
+
+        esac
+    ],
+    [enable_fuzz_targets=no])
+AC_MSG_RESULT(${enable_fuzz_targets})
+
+AM_CONDITIONAL([OPENTHREAD_ENABLE_FUZZ_TARGETS], [test "${enable_fuzz_targets}" = "yes"])
+
 # Address Sanitizer
 
 AC_MSG_CHECKING([whether to build with Address Sanitizer support])
@@ -746,7 +769,7 @@ AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_JAM_DETECTION],[${OPENTHREAD_ENABLE_JAM_DE
 #
 
 AC_ARG_ENABLE(mac_filter,
-              [AS_HELP_STRING([--enable-mac-filter],[Enable MAC filter support @<:@default=yes@:>@.])],
+              [AS_HELP_STRING([--enable-mac-filter],[Enable MAC filter support @<:@default=no@:>@.])],
     [
         case "${enableval}" in
 
@@ -1079,16 +1102,40 @@ AM_CONDITIONAL([OPENTHREAD_ENABLE_BORDER_ROUTER], [test "${enable_border_router}
 AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_BORDER_ROUTER],[${OPENTHREAD_ENABLE_BORDER_ROUTER}],[Define to 1 if you want to enable Border Router])
 
 #
+# Linker Map Output
+#
+
+AC_ARG_ENABLE(linker-map,
+    [AS_HELP_STRING([--enable-linker-map],[Enable linker map output @<:@default=no@:>@.])],
+    [
+        case "${enableval}" in
+
+        no|yes)
+            enable_linker_map=${enableval}
+            ;;
+
+        *)
+            AC_MSG_ERROR([Invalid value ${enable_linker_map} for --enable-linker-map])
+            ;;
+        esac
+    ],
+    [enable_linker_map=no])
+
+AC_MSG_CHECKING([whether to enable linker map output])
+AC_MSG_RESULT(${enable_linker_map})
+AM_CONDITIONAL([OPENTHREAD_ENABLE_LINKER_MAP], [test "${enable_linker_map}" = "yes"])
+
+#
 # Examples
 #
 
 AC_ARG_WITH(examples,
     [AS_HELP_STRING([--with-examples=TARGET],
-        [Specify the examples from one of: none, posix, cc2538, cc2650, da15000, efr32, emsk, gp712, kw41z, nrf52840 @<:@default=none@:>@.])],
+        [Specify the examples from one of: none, posix, cc2538, cc2650, cc2652, da15000, efr32, emsk, gp712, kw41z, nrf52840 @<:@default=none@:>@.])],
     [
         case "${with_examples}" in
 
-        none|posix|cc2538|cc2650|da15000|efr32|emsk|gp712|kw41z|nrf52840)
+        none|posix|cc2538|cc2650|cc2652|da15000|efr32|emsk|gp712|kw41z|nrf52840)
             ;;
         *)
             AC_MSG_ERROR([Invalid value ${with_examples} for --with-examples])
@@ -1114,6 +1161,11 @@ case ${with_examples} in
     cc2650)
         OPENTHREAD_EXAMPLES_CC2650=1
         AC_DEFINE_UNQUOTED([OPENTHREAD_EXAMPLES_CC2650],[${OPENTHREAD_EXAMPLES_CC2650}],[Define to 1 if you want to use cc2650 examples])
+        ;;
+
+    cc2652)
+        OPENTHREAD_EXAMPLES_CC2652=1
+        AC_DEFINE_UNQUOTED([OPENTHREAD_EXAMPLES_CC2652],[${OPENTHREAD_EXAMPLES_CC2652}],[Define to 1 if you want to use cc2652 examples])
         ;;
 
     da15000)
@@ -1162,6 +1214,9 @@ AM_CONDITIONAL([OPENTHREAD_EXAMPLES_CC2538], [test "${OPENTHREAD_EXAMPLES}" = "c
 
 AC_SUBST(OPENTHREAD_EXAMPLES_CC2650)
 AM_CONDITIONAL([OPENTHREAD_EXAMPLES_CC2650], [test "${OPENTHREAD_EXAMPLES}" = "cc2650"])
+
+AC_SUBST(OPENTHREAD_EXAMPLES_CC2652)
+AM_CONDITIONAL([OPENTHREAD_EXAMPLES_CC2652], [test "${OPENTHREAD_EXAMPLES}" = "cc2652"])
 
 AC_SUBST(OPENTHREAD_EXAMPLES_DA15000)
 AM_CONDITIONAL([OPENTHREAD_EXAMPLES_DA15000], [test "${OPENTHREAD_EXAMPLES}" = "da15000"])
@@ -1339,6 +1394,7 @@ examples/apps/ncp/Makefile
 examples/platforms/Makefile
 examples/platforms/cc2538/Makefile
 examples/platforms/cc2650/Makefile
+examples/platforms/cc2652/Makefile
 examples/platforms/da15000/Makefile
 examples/platforms/efr32/Makefile
 examples/platforms/emsk/Makefile
@@ -1352,6 +1408,7 @@ tools/harness-automation/Makefile
 tools/harness-thci/Makefile
 tools/spi-hdlc-adapter/Makefile
 tests/Makefile
+tests/fuzz/Makefile
 tests/scripts/Makefile
 tests/scripts/thread-cert/Makefile
 tests/unit/Makefile
@@ -1389,6 +1446,7 @@ AC_MSG_NOTICE([
   Lcov                                      : ${LCOV:--}
   Genhtml                                   : ${GENHTML:--}
   Build tests                               : ${nl_cv_build_tests}
+  Build fuzz targets                        : ${enable_fuzz_targets}
   Build tools                               : ${build_tools}
   OpenThread tests                          : ${with_tests}
   Prefix                                    : ${prefix}
@@ -1410,6 +1468,7 @@ AC_MSG_NOTICE([
   Assembler flags                           : ${CCASFLAGS:--}
   Link flags                                : ${LDFLAGS:--}
   Link libraries                            : ${LIBS}
+  Link maps                                 : ${enable_linker_map}
   Pretty                                    : ${PRETTY:--}
   Pretty args                               : ${PRETTY_ARGS:--}
   Pretty check                              : ${PRETTY_CHECK:--}

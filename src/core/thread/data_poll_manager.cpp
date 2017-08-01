@@ -51,7 +51,7 @@ namespace ot {
 
 DataPollManager::DataPollManager(MeshForwarder &aMeshForwarder):
     MeshForwarderLocator(aMeshForwarder),
-    mTimer(aMeshForwarder.GetNetif().GetIp6(), &DataPollManager::HandlePollTimer, this),
+    mTimer(aMeshForwarder.GetInstance(), &DataPollManager::HandlePollTimer, this),
     mTimerStartTime(0),
     mExternalPollPeriod(0),
     mPollPeriod(0),
@@ -108,7 +108,7 @@ otError DataPollManager::SendDataPoll(void)
         VerifyOrExit(message->GetType() != Message::kTypeMacDataPoll, error = OT_ERROR_ALREADY);
     }
 
-    message = meshForwarder.GetNetif().GetIp6().mMessagePool.New(Message::kTypeMacDataPoll, 0);
+    message = GetInstance().mMessagePool.New(Message::kTypeMacDataPoll, 0);
     VerifyOrExit(message != NULL, error = OT_ERROR_NO_BUFS);
 
     error = meshForwarder.SendMessage(*message);

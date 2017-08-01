@@ -28,6 +28,7 @@
 
 #include "platform-posix.h"
 
+#include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/diag.h>
 #include <openthread/platform/radio.h>
 
@@ -310,13 +311,13 @@ void otPlatRadioSetPanId(otInstance *aInstance, uint16_t panid)
     sPanid = panid;
 }
 
-void otPlatRadioSetExtendedAddress(otInstance *aInstance, uint8_t *address)
+void otPlatRadioSetExtendedAddress(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     (void)aInstance;
 
     for (size_t i = 0; i < sizeof(sExtendedAddress); i++)
     {
-        sExtendedAddress[i] = address[sizeof(sExtendedAddress) - 1 - i];
+        sExtendedAddress[i] = aExtAddress->m8[sizeof(sExtendedAddress) - 1 - i];
     }
 }
 
@@ -350,7 +351,7 @@ void platformRadioInit(void)
         if (*endptr != '\0')
         {
             fprintf(stderr, "Invalid PORT_OFFSET: %s\n", offset);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         sPortOffset *= WELLKNOWN_NODE_ID;
@@ -496,6 +497,12 @@ void radioReceive(otInstance *aInstance)
         exit(EXIT_FAILURE);
     }
 
+#if OPENTHREAD_ENABLE_RAW_LINK_API
+    // Timestamp
+    sReceiveFrame.mMsec = otPlatAlarmMilliGetNow();
+    sReceiveFrame.mUsec = 0;  // Don't support microsecond timer for now.
+#endif
+
     sReceiveFrame.mLength = (uint8_t)(rval - 1);
 
     if (sAckWait &&
@@ -581,21 +588,21 @@ void platformRadioProcess(otInstance *aInstance)
     }
 }
 
-void radioTransmit(struct RadioMessage *msg, const struct otRadioFrame *pkt)
+void radioTransmit(struct RadioMessage *aMessage, const struct otRadioFrame *aFrame)
 {
     uint32_t i;
     struct sockaddr_in sockaddr;
 
     uint16_t crc = 0;
-    uint16_t crc_offset = pkt->mLength - sizeof(uint16_t);
+    uint16_t crc_offset = aFrame->mLength - sizeof(uint16_t);
 
     for (i = 0; i < crc_offset; i++)
     {
-        crc = crc16_citt(crc, msg->mPsdu[i]);
+        crc = crc16_citt(crc, aMessage->mPsdu[i]);
     }
 
-    msg->mPsdu[crc_offset] = crc & 0xff;
-    msg->mPsdu[crc_offset + 1] = crc >> 8;
+    aMessage->mPsdu[crc_offset] = crc & 0xff;
+    aMessage->mPsdu[crc_offset + 1] = crc >> 8;
 
     memset(&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family = AF_INET;
@@ -611,7 +618,7 @@ void radioTransmit(struct RadioMessage *msg, const struct otRadioFrame *pkt)
         }
 
         sockaddr.sin_port = htons(9000 + sPortOffset + i);
-        rval = sendto(sSockFd, (const char *)msg, 1 + pkt->mLength,
+        rval = sendto(sSockFd, (const char *)aMessage, 1 + aFrame->mLength,
                       0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
 
         if (rval < 0)
@@ -712,7 +719,7 @@ otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, const uint16_t a
     return OT_ERROR_NONE;
 }
 
-otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     (void)aInstance;
     (void)aExtAddress;
@@ -726,7 +733,7 @@ otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, const uint16_t
     return OT_ERROR_NONE;
 }
 
-otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     (void)aInstance;
     (void)aExtAddress;

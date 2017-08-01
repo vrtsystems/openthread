@@ -36,6 +36,7 @@
 
 #include <openthread/types.h>
 #include <openthread/config.h>
+#include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/platform.h>
 #include <openthread/platform/radio.h>
 #include <openthread/platform/diag.h>
@@ -200,15 +201,15 @@ void otPlatRadioSetPanId(otInstance *aInstance, uint16_t aPanId)
     RAIL_IEEE802154_SetPanId(aPanId);
 }
 
-void otPlatRadioSetExtendedAddress(otInstance *aInstance, uint8_t *aAddress)
+void otPlatRadioSetExtendedAddress(otInstance *aInstance, const otExtAddress *aAddress)
 {
     (void)aInstance;
 
     otLogInfoPlat(sInstance, "ExtAddr=%X%X%X%X%X%X%X%X",
-                  aAddress[7], aAddress[6], aAddress[5], aAddress[4],
-                  aAddress[3], aAddress[2], aAddress[1], aAddress[0]);
+                  aAddress->m8[7], aAddress->m8[6], aAddress->m8[5], aAddress->m8[4],
+                  aAddress->m8[3], aAddress->m8[2], aAddress->m8[1], aAddress->m8[0]);
 
-    RAIL_IEEE802154_SetLongAddress(aAddress);
+    RAIL_IEEE802154_SetLongAddress(aAddress->m8);
 }
 
 void otPlatRadioSetShortAddress(otInstance *aInstance, uint16_t aAddress)
@@ -432,15 +433,15 @@ int8_t findSrcMatchShortEntry(const uint16_t aShortAddress)
     return entry;
 }
 
-int8_t findSrcMatchExtEntry(const uint8_t *aExtAddress)
+int8_t findSrcMatchExtEntry(const otExtAddress *aExtAddress)
 {
     int8_t entry = -1;
     uint16_t checksum = sPanId;
 
-    checksum += (uint16_t)aExtAddress[0] | (uint16_t)(aExtAddress[1] << 8);
-    checksum += (uint16_t)aExtAddress[2] | (uint16_t)(aExtAddress[3] << 8);
-    checksum += (uint16_t)aExtAddress[4] | (uint16_t)(aExtAddress[5] << 8);
-    checksum += (uint16_t)aExtAddress[6] | (uint16_t)(aExtAddress[7] << 8);
+    checksum += (uint16_t)aExtAddress->m8[0] | (uint16_t)(aExtAddress->m8[1] << 8);
+    checksum += (uint16_t)aExtAddress->m8[2] | (uint16_t)(aExtAddress->m8[3] << 8);
+    checksum += (uint16_t)aExtAddress->m8[4] | (uint16_t)(aExtAddress->m8[5] << 8);
+    checksum += (uint16_t)aExtAddress->m8[6] | (uint16_t)(aExtAddress->m8[7] << 8);
 
     for (uint8_t i = 0; i < RADIO_CONFIG_SRC_MATCH_EXT_ENTRY_NUM; i++)
     {
@@ -463,14 +464,14 @@ void addToSrcMatchShortIndirect(uint8_t entry, const uint16_t aShortAddress)
     srcMatchShortEntry[entry].allocated = true;
 }
 
-void addToSrcMatchExtIndirect(uint8_t entry, const uint8_t *aExtAddress)
+void addToSrcMatchExtIndirect(uint8_t entry, const otExtAddress *aExtAddress)
 {
     uint16_t checksum = sPanId;
 
-    checksum += (uint16_t)aExtAddress[0] | (uint16_t)(aExtAddress[1] << 8);
-    checksum += (uint16_t)aExtAddress[2] | (uint16_t)(aExtAddress[3] << 8);
-    checksum += (uint16_t)aExtAddress[4] | (uint16_t)(aExtAddress[5] << 8);
-    checksum += (uint16_t)aExtAddress[6] | (uint16_t)(aExtAddress[7] << 8);
+    checksum += (uint16_t)aExtAddress->m8[0] | (uint16_t)(aExtAddress->m8[1] << 8);
+    checksum += (uint16_t)aExtAddress->m8[2] | (uint16_t)(aExtAddress->m8[3] << 8);
+    checksum += (uint16_t)aExtAddress->m8[4] | (uint16_t)(aExtAddress->m8[5] << 8);
+    checksum += (uint16_t)aExtAddress->m8[6] | (uint16_t)(aExtAddress->m8[7] << 8);
 
     srcMatchExtEntry[entry].checksum = checksum;
     srcMatchExtEntry[entry].allocated = true;
@@ -523,7 +524,7 @@ exit:
     return error;
 }
 
-otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     otError error = OT_ERROR_NONE;
     int8_t entry = -1;
@@ -567,7 +568,7 @@ exit:
     return error;
 }
 
-otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     otError error = OT_ERROR_NONE;
     int8_t entry = -1;
@@ -686,6 +687,12 @@ void RAILCb_RxPacketReceived(void *aRxPacketHandle)
     otEXPECT(length >= IEEE802154_MIN_LENGTH && length <= IEEE802154_MAX_LENGTH);
 
     otLogInfoPlat(sInstance, "Received data:%d", rxPacketInfo->dataLength);
+
+#if OPENTHREAD_ENABLE_RAW_LINK_API
+    // Timestamp
+    sReceiveFrame.mMsec = otPlatAlarmMilliGetNow();
+    sReceiveFrame.mUsec = 0;  // Don't support microsecond timer for now.
+#endif
 
     memcpy(sReceiveFrame.mPsdu, rxPacketInfo->dataPtr + 1, rxPacketInfo->dataLength);
     sReceiveFrame.mPower = rxPacketInfo->appendedInfo.rssiLatch;

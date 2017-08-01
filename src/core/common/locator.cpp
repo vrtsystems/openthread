@@ -44,24 +44,19 @@ namespace ot {
 
 #if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
 
-otInstance *ThreadNetifLocator::GetInstance(void) const
+otInstance &ThreadNetifLocator::GetInstance(void) const
 {
-    return otInstanceFromThreadNetif(&GetNetif());
+    return *otInstanceFromThreadNetif(&GetNetif());
 }
 
-otInstance *MeshForwarderLocator::GetInstance(void) const
+otInstance &MeshForwarderLocator::GetInstance(void) const
 {
-    return otInstanceFromThreadNetif(&GetMeshForwarder().GetNetif());
+    return *otInstanceFromThreadNetif(&GetMeshForwarder().GetNetif());
 }
 
-otInstance *TaskletSchedulerLocator::GetInstance(void) const
+otInstance &Ip6Locator::GetInstance(void) const
 {
-    return otInstanceFromIp6(Ip6::Ip6FromTaskletScheduler(&GetTaskletScheduler()));
-}
-
-otInstance *Ip6Locator::GetInstance(void) const
-{
-    return otInstanceFromIp6(&GetIp6());
+    return *otInstanceFromIp6(&GetIp6());
 }
 
 #endif // #if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES

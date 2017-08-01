@@ -52,7 +52,7 @@ namespace Utils {
 
 ChildSupervisor::ChildSupervisor(ThreadNetif &aThreadNetif) :
     ThreadNetifLocator(aThreadNetif),
-    mTimer(aThreadNetif.GetIp6(), &ChildSupervisor::HandleTimer, this),
+    mTimer(aThreadNetif.GetInstance(), &ChildSupervisor::HandleTimer, this),
     mSupervisionInterval(kDefaultSupervisionInterval)
 {
 }
@@ -104,7 +104,7 @@ void ChildSupervisor::SendMessage(Child &aChild)
 
     VerifyOrExit(aChild.GetIndirectMessageCount() == 0);
 
-    message = netif.GetIp6().mMessagePool.New(Message::kTypeSupervision, sizeof(uint8_t));
+    message = netif.GetInstance().mMessagePool.New(Message::kTypeSupervision, sizeof(uint8_t));
     VerifyOrExit(message != NULL);
 
     // Supervision message is an empty payload 15.4 data frame.
@@ -183,7 +183,7 @@ ChildSupervisor &ChildSupervisor::GetOwner(const Context &aContext)
 
 SupervisionListener::SupervisionListener(ThreadNetif &aThreadNetif) :
     ThreadNetifLocator(aThreadNetif),
-    mTimer(aThreadNetif.GetIp6(), &SupervisionListener::HandleTimer, this),
+    mTimer(aThreadNetif.GetInstance(), &SupervisionListener::HandleTimer, this),
     mTimeout(0)
 {
     SetTimeout(kDefaultTimeout);

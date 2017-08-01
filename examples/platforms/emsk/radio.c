@@ -35,7 +35,8 @@
 #include "openthread/types.h"
 
 #include <utils/code_utils.h>
-#include "openthread/platform/radio.h"
+#include <openthread/platform/alarm-milli.h>
+#include <openthread/platform/radio.h>
 #include "platform-emsk.h"
 
 #include "device/device_hal/inc/dev_gpio.h"
@@ -242,10 +243,10 @@ void otPlatRadioSetPanId(otInstance *aInstance, uint16_t panid)
     mrf24j40_set_pan(pan);
 }
 
-void otPlatRadioSetExtendedAddress(otInstance *aInstance, uint8_t *address)
+void otPlatRadioSetExtendedAddress(otInstance *aInstance, const otExtAddress *address)
 {
     (void)aInstance;
-    mrf24j40_set_eui(address);
+    mrf24j40_set_eui(address->m8);
 }
 
 void otPlatRadioSetShortAddress(otInstance *aInstance, uint16_t address)
@@ -459,6 +460,12 @@ void readFrame(void)
 
     otEXPECT_ACTION(IEEE802154_MIN_LENGTH <= length && length <= IEEE802154_MAX_LENGTH, ;);
 
+#if OPENTHREAD_ENABLE_RAW_LINK_API
+    // Timestamp
+    sReceiveFrame.mMsec = otPlatAlarmMilliGetNow();
+    sReceiveFrame.mUsec = 0;  // Don't support microsecond timer for now.
+#endif
+
     /* Read PSDU */
     memcpy(sReceiveFrame.mPsdu, readBuffer, length - 2);
 
@@ -626,7 +633,7 @@ otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, const uint16_t a
     return OT_ERROR_NONE;
 }
 
-otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     (void)aInstance;
     (void)aExtAddress;
@@ -640,7 +647,7 @@ otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, const uint16_t
     return OT_ERROR_NONE;
 }
 
-otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     (void)aInstance;
     (void)aExtAddress;

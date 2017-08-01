@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <utils/code_utils.h>
 #include "cc2650_radio.h"
+#include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/radio.h>
 #include <openthread/platform/random.h> /* to seed the CSMA-CA funciton */
 
@@ -50,6 +51,7 @@
 
 enum
 {
+    IEEE802154_ACK_LENGTH = 5,
     CC2650_RECEIVE_SENSITIVITY = -100,  // dBm
 };
 
@@ -1466,7 +1468,7 @@ exit:
 /**
  * Function documented in platform/radio.h
  */
-otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     otError error = OT_ERROR_NONE;
     (void)aInstance;
@@ -1499,7 +1501,7 @@ exit:
 /**
  * Function documented in platform/radio.h
  */
-otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     otError error = OT_ERROR_NONE;
     (void)aInstance;
@@ -1694,7 +1696,7 @@ exit:
  * @note it is entirely possible for this function to fail, but there is no
  * valid way to return that error since the funciton prototype was changed.
  */
-void otPlatRadioSetExtendedAddress(otInstance *aInstance, uint8_t *aAddress)
+void otPlatRadioSetExtendedAddress(otInstance *aInstance, const otExtAddress *aAddress)
 {
     (void)aInstance;
 
@@ -1776,6 +1778,12 @@ static void readFrame(void)
 
             if (crcCorr->status.bCrcErr == 0 && (len - 2) < OT_RADIO_FRAME_MAX_SIZE)
             {
+#if OPENTHREAD_ENABLE_RAW_LINK_API
+                // Timestamp
+                sReceiveFrame.mMsec = otPlatAlarmMilliGetNow();
+                sReceiveFrame.mUsec = 0;  // Don't support microsecond timer for now.
+#endif
+
                 sReceiveFrame.mLength = len;
                 memcpy(sReceiveFrame.mPsdu, &(payload[1]), len - 2);
                 sReceiveFrame.mChannel = sReceiveCmd.channel;
@@ -1820,7 +1828,7 @@ void cc2650RadioProcess(otInstance *aInstance)
         }
     }
 
-    if (sState == cc2650_stateTransmitComplete || sTransmitError != OT_ERROR_NONE)
+    if (sState == cc2650_stateTransmitComplete || (sState == cc2650_stateTransmit && sTransmitError != OT_ERROR_NONE))
     {
         /* we are not looking for an ACK packet, or failed */
         sState = cc2650_stateReceive;
@@ -1833,7 +1841,23 @@ void cc2650RadioProcess(otInstance *aInstance)
         else
 #endif /* OPENTHREAD_ENABLE_DIAG */
         {
-            otPlatRadioTransmitDone(aInstance, &sTransmitFrame, sReceivedAckPendingBit, sTransmitError);
+            // TODO: pass received ACK frame instead of generating one.
+            otRadioFrame ackFrame;
+            uint8_t psdu[IEEE802154_ACK_LENGTH];
+
+            ackFrame.mPsdu = psdu;
+            ackFrame.mLength = IEEE802154_ACK_LENGTH;
+            ackFrame.mPsdu[0] = IEEE802154_FRAME_TYPE_ACK;
+
+            if (sReceivedAckPendingBit)
+            {
+                ackFrame.mPsdu[0] |= IEEE802154_FRAME_PENDING;
+            }
+
+            ackFrame.mPsdu[1] = 0;
+            ackFrame.mPsdu[2] = sTransmitFrame.mPsdu[IEEE802154_DSN_OFFSET];
+
+            otPlatRadioTxDone(aInstance, &sTransmitFrame, &ackFrame, sTransmitError);
         }
     }
 

@@ -66,7 +66,7 @@ ot::MeshForwarder &otGetMeshForwarder(void)
 
 ot::TaskletScheduler &otGetTaskletScheduler(void)
 {
-    return sInstance->mIp6.mTaskletScheduler;
+    return sInstance->mTaskletScheduler;
 }
 
 ot::Ip6::Ip6 &otGetIp6(void)
@@ -82,16 +82,22 @@ otInstance::otInstance(void) :
     mActiveScanCallbackContext(NULL),
     mEnergyScanCallback(NULL),
     mEnergyScanCallbackContext(NULL),
-    mThreadNetif(mIp6)
+    mTimerMilliScheduler(*this),
+#if OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
+    mTimerMicroScheduler(*this),
+#endif
+    mIp6(*this),
+    mThreadNetif(mIp6),
 #if OPENTHREAD_ENABLE_RAW_LINK_API
-    , mLinkRaw(*this)
+    mLinkRaw(*this),
 #endif // OPENTHREAD_ENABLE_RAW_LINK_API
 #if OPENTHREAD_ENABLE_APPLICATION_COAP
-    , mApplicationCoap(mThreadNetif)
+    mApplicationCoap(mThreadNetif),
 #endif // OPENTHREAD_ENABLE_APPLICATION_COAP
 #if OPENTHREAD_CONFIG_ENABLE_DYNAMIC_LOG_LEVEL
-    , mLogLevel(static_cast<otLogLevel>(OPENTHREAD_CONFIG_LOG_LEVEL))
+    mLogLevel(static_cast<otLogLevel>(OPENTHREAD_CONFIG_LOG_LEVEL)),
 #endif // OPENTHREAD_CONFIG_ENABLE_DYNAMIC_LOG_LEVEL
+    mMessagePool(*this)
 {
 }
 
@@ -143,12 +149,17 @@ otInstance *otInstanceInit(void *aInstanceBuffer, size_t *aInstanceBufferSize)
     // Execute post constructor operations
     otInstancePostConstructor(instance);
 
-    otLogInfoApi(instance, "otInstance Initialized");
+    otLogInfoApi(*instance, "otInstance Initialized");
 
 exit:
 
     otLogFuncExit();
     return instance;
+}
+
+bool otInstanceIsInitialized(otInstance *aInstance)
+{
+    return (aInstance != NULL);
 }
 
 #else // #if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
@@ -169,12 +180,17 @@ otInstance *otInstanceInitSingle(void)
     // Execute post constructor operations
     otInstancePostConstructor(sInstance);
 
-    otLogInfoApi(sInstance, "otInstance Initialized");
+    otLogInfoApi(*sInstance, "otInstance Initialized");
 
 exit:
 
     otLogFuncExit();
     return sInstance;
+}
+
+bool otInstanceIsInitialized(otInstance *aInstance)
+{
+    return (aInstance != NULL) && (aInstance == sInstance);
 }
 
 #endif // #if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES

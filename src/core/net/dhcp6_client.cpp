@@ -59,7 +59,7 @@ namespace Dhcp6 {
 
 Dhcp6Client::Dhcp6Client(ThreadNetif &aThreadNetif) :
     ThreadNetifLocator(aThreadNetif),
-    mTrickleTimer(aThreadNetif.GetIp6(), &Dhcp6Client::HandleTrickleTimer, NULL, this),
+    mTrickleTimer(aThreadNetif.GetInstance(), &Dhcp6Client::HandleTrickleTimer, NULL, this),
     mSocket(aThreadNetif.GetIp6().mUdp),
     mStartTime(0),
     mAddresses(NULL),
@@ -695,7 +695,7 @@ otError Dhcp6Client::ProcessIaAddress(Message &aMessage, uint16_t aOffset)
             address->mValidLifetime = option.GetValidLifetime();
             address->mAddress.mPreferred = address->mPreferredLifetime != 0;
             address->mAddress.mValid = address->mValidLifetime != 0;
-            otIp6AddUnicastAddress(GetNetif().GetInstance(), &address->mAddress);
+            otIp6AddUnicastAddress(&GetNetif().GetInstance(), &address->mAddress);
             break;
         }
     }

@@ -34,6 +34,7 @@
 
 #include "common/logging.hpp"
 #include "meshcop/dtls.hpp"
+#include "openthread-instance.h"
 #include "thread/thread_netif.hpp"
 
 #if OPENTHREAD_ENABLE_DTLS
@@ -53,7 +54,7 @@ CoapSecure::CoapSecure(ThreadNetif &aNetif):
     mTransportCallback(NULL),
     mTransportContext(NULL),
     mTransmitMessage(NULL),
-    mTransmitTask(aNetif.GetIp6().mTaskletScheduler, &CoapSecure::HandleUdpTransmit, this)
+    mTransmitTask(aNetif.GetInstance(), &CoapSecure::HandleUdpTransmit, this)
 {
 }
 
@@ -218,7 +219,7 @@ void CoapSecure::HandleDtlsReceive(uint8_t *aBuf, uint16_t aLength)
 
     otLogFuncEntry();
 
-    VerifyOrExit((message = GetNetif().GetIp6().mMessagePool.New(Message::kTypeIp6, 0)) != NULL);
+    VerifyOrExit((message = GetInstance().mMessagePool.New(Message::kTypeIp6, 0)) != NULL);
     SuccessOrExit(message->Append(aBuf, aLength));
 
     Coap::Receive(*message, mPeerAddress);
