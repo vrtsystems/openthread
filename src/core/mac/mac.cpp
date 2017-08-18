@@ -185,13 +185,13 @@ Mac::Mac(ThreadNetif &aThreadNetif):
 
     memset(&mCounters, 0, sizeof(otMacCounters));
 
+    otPlatRadioEnable(&GetInstance());
+
     SetExtendedPanId(sExtendedPanidInit);
     SetNetworkName(sNetworkNameInit);
     SetPanId(mPanId);
     SetExtAddress(mExtAddress);
     SetShortAddress(mShortAddress);
-
-    otPlatRadioEnable(&GetInstance());
 }
 
 otError Mac::ActiveScan(uint32_t aScanChannels, uint16_t aScanDuration, ActiveScanHandler aHandler, void *aContext)
@@ -1097,9 +1097,13 @@ otError Mac::RadioTransmit(Frame *aSendFrame)
 
     SuccessOrExit(error = otPlatRadioTransmit(&GetInstance(), static_cast<otRadioFrame *>(aSendFrame)));
 
-    otLogWarnMac(GetInstance(), "otPlatRadioTransmit() failed with error %s", otThreadErrorToString(error));
-
 exit:
+
+    if (error != OT_ERROR_NONE)
+    {
+        otLogWarnMac(GetInstance(), "otPlatRadioTransmit() failed with error %s", otThreadErrorToString(error));
+    }
+
     return error;
 }
 
@@ -1119,9 +1123,13 @@ otError Mac::RadioReceive(uint8_t aChannel)
 
     SuccessOrExit(error = otPlatRadioReceive(&GetInstance(), aChannel));
 
-    otLogWarnMac(GetInstance(), "otPlatRadioReceive() failed with error %s", otThreadErrorToString(error));
-
 exit:
+
+    if (error != OT_ERROR_NONE)
+    {
+        otLogWarnMac(GetInstance(), "otPlatRadioReceive() failed with error %s", otThreadErrorToString(error));
+    }
+
     return error;
 }
 
@@ -1146,11 +1154,16 @@ otError Mac::RadioSleep(void)
     }
 
 #endif
+
     SuccessOrExit(error = otPlatRadioSleep(&GetInstance()));
 
-    otLogWarnMac(GetInstance(), "otPlatRadioSleep() failed with error %s", otThreadErrorToString(error));
-
 exit:
+
+    if (error != OT_ERROR_NONE)
+    {
+        otLogWarnMac(GetInstance(), "otPlatRadioSleep() failed with error %s", otThreadErrorToString(error));
+    }
+
     return error;
 }
 

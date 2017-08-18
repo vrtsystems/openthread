@@ -182,7 +182,7 @@ public:
     /**
      * This method returns a reference to the dhcp server object.
      *
-     * @returns A reference to the the dhcp server object.
+     * @returns A reference to the dhcp server object.
      *
      */
     Dhcp6::Dhcp6Server &GetDhcp6Server(void) { return mDhcp6Server; }
@@ -483,19 +483,6 @@ private:
     AnnounceBeginServer mAnnounceBegin;
     PanIdQueryServer mPanIdQuery;
     EnergyScanServer mEnergyScan;
-};
-
-/**
- * This structure represents Thread-specific link information.
- *
- */
-struct ThreadMessageInfo
-{
-    uint16_t mPanId;         ///< Source PAN ID
-    uint8_t  mChannel;       ///< 802.15.4 Channel
-    int8_t   mRss;           ///< Received Signal Strength in dBm.
-    uint8_t  mLqi;           ///< Link Quality Indicator for a received message.
-    bool     mLinkSecurity;  ///< Indicates whether or not link security is enabled.
 };
 
 /**

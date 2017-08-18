@@ -38,6 +38,7 @@
 #include <openthread/types.h>
 
 namespace ot {
+namespace Ncp {
 
 
 /**
@@ -191,7 +192,7 @@ public:
      * `OT_ERROR_NO_BUFS`.
      *
      * In case of success, the passed-in message @p aMessage will be owned by the frame buffer instance and will be
-     * freed when either the the frame is removed or discarded. In case of failure @p aMessage remains unchanged.
+     * freed when either the frame is removed or discarded. In case of failure @p aMessage remains unchanged.
      *
      * @param[in] aMessage              A message to be added to current frame.
      *
@@ -626,6 +627,7 @@ private:
     uint8_t *        mReadMessageTail;           // Pointer to end of current part in mMessageBuffer.
 };
 
+}  // namespace Ncp
 }  // namespace ot
 
 #endif  // NCP_FRAME_BUFFER_HPP_

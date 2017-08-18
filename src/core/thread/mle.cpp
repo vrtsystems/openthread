@@ -1995,7 +1995,6 @@ void Mle::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageIn
     const uint8_t *mleKey;
     uint32_t frameCounter;
     uint8_t messageTag[4];
-    uint16_t messageTagLength;
     uint8_t nonce[13];
     Mac::ExtAddress macAddr;
     Crypto::AesCcm aesCcm;
@@ -2046,15 +2045,14 @@ void Mle::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageIn
         mleKey = netif.GetKeyManager().GetTemporaryMleKey(keySequence);
     }
 
+    VerifyOrExit(aMessage.GetOffset() + header.GetLength() + sizeof(messageTag) <= aMessage.GetLength());
     aMessage.MoveOffset(header.GetLength() - 1);
 
-    frameCounter = header.GetFrameCounter();
-
-    messageTagLength = aMessage.Read(aMessage.GetLength() - sizeof(messageTag), sizeof(messageTag), messageTag);
-    VerifyOrExit(messageTagLength == sizeof(messageTag));
+    aMessage.Read(aMessage.GetLength() - sizeof(messageTag), sizeof(messageTag), messageTag);
     SuccessOrExit(aMessage.SetLength(aMessage.GetLength() - sizeof(messageTag)));
 
     aMessageInfo.GetPeerAddr().ToExtAddress(macAddr);
+    frameCounter = header.GetFrameCounter();
     GenerateNonce(macAddr, frameCounter, Mac::Frame::kSecEncMic32, nonce);
 
     aesCcm.SetKey(mleKey, 16);
@@ -2073,13 +2071,17 @@ void Mle::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageIn
     {
         length = aMessage.Read(aMessage.GetOffset(), sizeof(buf), buf);
         aesCcm.Payload(buf, buf, length, false);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
         aMessage.Write(aMessage.GetOffset(), length, buf);
+#endif
         aMessage.MoveOffset(length);
     }
 
     tagLength = sizeof(tag);
     aesCcm.Finalize(tag, &tagLength);
-    VerifyOrExit(messageTagLength == tagLength && memcmp(messageTag, tag, tagLength) == 0);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    VerifyOrExit(memcmp(messageTag, tag, sizeof(tag)) == 0);
+#endif
 
     if (keySequence > netif.GetKeyManager().GetCurrentKeySequence())
     {
@@ -2542,7 +2544,7 @@ otError Mle::HandleParentResponse(const Message &aMessage, const Ip6::MessageInf
 {
     ThreadNetif &netif = GetNetif();
     otError error = OT_ERROR_NONE;
-    const ThreadMessageInfo *threadMessageInfo = static_cast<const ThreadMessageInfo *>(aMessageInfo.GetLinkInfo());
+    const otThreadLinkInfo *linkInfo = static_cast<const otThreadLinkInfo *>(aMessageInfo.GetLinkInfo());
     ResponseTlv response;
     SourceAddressTlv sourceAddress;
     LeaderDataTlv leaderData;
@@ -2575,7 +2577,7 @@ otError Mle::HandleParentResponse(const Message &aMessage, const Ip6::MessageInf
     SuccessOrExit(error = Tlv::GetTlv(aMessage, Tlv::kLinkMargin, sizeof(linkMarginTlv), linkMarginTlv));
     VerifyOrExit(linkMarginTlv.IsValid(), error = OT_ERROR_PARSE);
 
-    linkMargin = LinkQualityInfo::ConvertRssToLinkMargin(netif.GetMac().GetNoiseFloor(), threadMessageInfo->mRss);
+    linkMargin = LinkQualityInfo::ConvertRssToLinkMargin(netif.GetMac().GetNoiseFloor(), linkInfo->mRss);
 
     if (linkMargin > linkMarginTlv.GetLinkMargin())
     {
@@ -2660,7 +2662,7 @@ otError Mle::HandleParentResponse(const Message &aMessage, const Ip6::MessageInf
     mParentCandidate.SetDeviceMode(ModeTlv::kModeFFD | ModeTlv::kModeRxOnWhenIdle | ModeTlv::kModeFullNetworkData |
                                    ModeTlv::kModeSecureDataRequest);
     mParentCandidate.GetLinkInfo().Clear();
-    mParentCandidate.GetLinkInfo().AddRss(netif.GetMac().GetNoiseFloor(), threadMessageInfo->mRss);
+    mParentCandidate.GetLinkInfo().AddRss(netif.GetMac().GetNoiseFloor(), linkInfo->mRss);
     mParentCandidate.ResetLinkFailures();
     mParentCandidate.SetLinkQualityOut(LinkQualityInfo::ConvertLinkMarginToLinkQuality(linkMarginTlv.GetLinkMargin()));
     mParentCandidate.SetState(Neighbor::kStateValid);
@@ -3040,7 +3042,7 @@ exit:
 otError Mle::HandleDiscoveryResponse(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
     otError error = OT_ERROR_NONE;
-    const ThreadMessageInfo *threadMessageInfo = static_cast<const ThreadMessageInfo *>(aMessageInfo.GetLinkInfo());
+    const otThreadLinkInfo *linkInfo = static_cast<const otThreadLinkInfo *>(aMessageInfo.GetLinkInfo());
     Tlv tlv;
     MeshCoP::Tlv meshcopTlv;
     MeshCoP::DiscoveryResponseTlv discoveryResponse;
@@ -3064,10 +3066,10 @@ otError Mle::HandleDiscoveryResponse(const Message &aMessage, const Ip6::Message
     end = offset + tlv.GetLength();
 
     memset(&result, 0, sizeof(result));
-    result.mPanId = threadMessageInfo->mPanId;
-    result.mChannel = threadMessageInfo->mChannel;
-    result.mRssi = threadMessageInfo->mRss;
-    result.mLqi = threadMessageInfo->mLqi;
+    result.mPanId = linkInfo->mPanId;
+    result.mChannel = linkInfo->mChannel;
+    result.mRssi = linkInfo->mRss;
+    result.mLqi = linkInfo->mLqi;
     aMessageInfo.GetPeerAddr().ToExtAddress(*static_cast<Mac::ExtAddress *>(&result.mExtAddress));
 
     // process MeshCoP TLVs
@@ -3094,6 +3096,7 @@ otError Mle::HandleDiscoveryResponse(const Message &aMessage, const Ip6::Message
             aMessage.Read(offset, sizeof(networkName), &networkName);
             VerifyOrExit(networkName.IsValid(), error = OT_ERROR_PARSE);
             memcpy(&result.mNetworkName, networkName.GetNetworkName(), networkName.GetLength());
+            result.mNetworkName.m8[networkName.GetLength()] = '\0';
             break;
 
         case MeshCoP::Tlv::kSteeringData:
