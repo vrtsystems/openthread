@@ -33,10 +33,8 @@
  */
 
 #include <openthread/config.h>
-// NRF tools use #define PACKAGE - for other purposes
-// ie: the physical package the chip comes in
-// This conflicts with the GNU Autoconf "PACAKGE" define
-#undef PACKAGE
+#include <openthread/config.h>
+#include <openthread-core-config.h>
 
 #include <assert.h>
 #include <stdbool.h>
@@ -46,9 +44,10 @@
 
 #include <common/code_utils.hpp>
 #include <platform-config.h>
-#include <openthread/platform/logging.h>
-#include <openthread/platform/radio.h>
 #include <openthread/platform/diag.h>
+#include <openthread/platform/logging.h>
+#include <openthread/platform/platform.h>
+#include <openthread/platform/radio.h>
 
 #include "platform-nrf5.h"
 
@@ -142,6 +141,8 @@ static void setPendingEvent(RadioPendingEvents aEvent)
         pendingEvents |= bitToSet;
     }
     while (__STREXW(pendingEvents, (unsigned long volatile *)&sPendingEvents));
+
+    PlatformEventSignalPending();
 }
 
 static void resetPendingEvent(RadioPendingEvents aEvent)

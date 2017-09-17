@@ -32,6 +32,9 @@
  *
  */
 
+#include <openthread/config.h>
+#include <openthread-core-config.h>
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -40,6 +43,7 @@
 #include <openthread/platform/alarm-micro.h>
 #include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/diag.h>
+#include <openthread/platform/platform.h>
 
 #include "platform-config.h"
 #include "platform-nrf5.h"
@@ -177,6 +181,7 @@ static void HandleCompareMatch(AlarmIndex aIndex, bool aSkipCheck)
         nrf_rtc_int_disable(RTC_INSTANCE, sChannelData[aIndex].mCompareInt);
 
         sTimerData[aIndex].mFireAlarm = true;
+        PlatformEventSignalPending();
     }
 }
 

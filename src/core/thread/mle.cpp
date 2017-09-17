@@ -87,6 +87,9 @@ Mle::Mle(ThreadNetif &aThreadNetif) :
     mDiscoverContext(NULL),
     mIsDiscoverInProgress(false),
     mEnableEui64Filtering(false),
+#if OPENTHREAD_CONFIG_INFORM_PREVIOUS_PARENT_ON_REATTACH
+    mPreviousParentRloc(Mac::kShortAddrInvalid),
+#endif
     mAnnounceChannel(OT_RADIO_CHANNEL_MIN),
     mPreviousChannel(0),
     mPreviousPanId(Mac::kPanIdBroadcast)
@@ -315,6 +318,10 @@ otError Mle::Restore(void)
                               ModeTlv::kModeSecureDataRequest);
         mParent.SetRloc16(GetRloc16(GetRouterId(networkInfo.mRloc16)));
         mParent.SetState(Neighbor::kStateRestored);
+
+#if OPENTHREAD_CONFIG_INFORM_PREVIOUS_PARENT_ON_REATTACH
+        mPreviousParentRloc = mParent.GetRloc16();
+#endif
     }
     else
     {
@@ -626,6 +633,11 @@ otError Mle::SetStateChild(uint16_t aRloc16)
         mPreviousPanId = Mac::kPanIdBroadcast;
         netif.GetAnnounceBeginServer().SendAnnounce(1 << mPreviousChannel);
     }
+
+#if OPENTHREAD_CONFIG_INFORM_PREVIOUS_PARENT_ON_REATTACH
+    InformPreviousParent();
+    mPreviousParentRloc = mParent.GetRloc16();
+#endif
 
     otLogInfoMle(GetInstance(), "Mode -> Child");
     return OT_ERROR_NONE;
@@ -1061,7 +1073,9 @@ otError Mle::AppendLeaderData(Message &aMessage)
 
 void Mle::FillNetworkDataTlv(NetworkDataTlv &aTlv, bool aStableOnly)
 {
-    uint8_t length;
+    uint8_t length = sizeof(NetworkDataTlv) - sizeof(Tlv);     // sizeof( NetworkDataTlv::mNetworkData )
+
+    // Ignore result code, provided buffer must be enough
     GetNetif().GetNetworkDataLeader().GetNetworkData(aStableOnly, aTlv.GetNetworkData(), length);
     aTlv.SetLength(length);
 }
@@ -1284,8 +1298,7 @@ void Mle::HandleParentRequestTimer(void)
         break;
 
     case kParentSynchronize:
-        mParentRequestState = kParentIdle;
-        BecomeChild(kAttachAny);
+        SendChildUpdateRequest();
         break;
 
     case kParentRequestStart:
@@ -1941,7 +1954,7 @@ otError Mle::SendMessage(Message &aMessage, const Ip6::Address &aDestination)
     messageInfo.SetSockAddr(mLinkLocal64.GetAddress());
     messageInfo.SetPeerPort(kUdpPort);
     messageInfo.SetInterfaceId(netif.GetInterfaceId());
-    messageInfo.SetHopLimit(255);
+    messageInfo.SetHopLimit(kMleHopLimit);
 
     SuccessOrExit(error = mSocket.SendTo(aMessage, messageInfo));
 
@@ -2006,10 +2019,11 @@ void Mle::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageIn
     uint8_t command;
     Neighbor *neighbor;
 
+    VerifyOrExit(aMessageInfo.GetLinkInfo() != NULL);
+    VerifyOrExit(aMessageInfo.GetHopLimit() == kMleHopLimit);
+
     length = aMessage.Read(aMessage.GetOffset(), sizeof(header), &header);
     VerifyOrExit(header.IsValid() && header.GetLength() <= length);
-
-    assert(aMessageInfo.GetLinkInfo() != NULL);
 
     if (header.GetSecuritySuite() == Header::kNoSecurity)
     {
@@ -2258,12 +2272,26 @@ otError Mle::HandleAdvertisement(const Message &aMessage, const Ip6::MessageInfo
 
     otLogInfoMle(GetInstance(), "Received advertisement from %04x", sourceAddress.GetRloc16());
 
+    aMessageInfo.GetPeerAddr().ToExtAddress(macAddr);
+
     if (mRole != OT_DEVICE_ROLE_DETACHED)
     {
-        SuccessOrExit(error = netif.GetMle().HandleAdvertisement(aMessage, aMessageInfo));
+        if (mDeviceMode & ModeTlv::kModeFFD)
+        {
+            SuccessOrExit(error = netif.GetMle().HandleAdvertisement(aMessage, aMessageInfo));
+        }
+        else
+        {
+            // Remove stale parent.
+            if (GetNeighbor(macAddr) == static_cast<Neighbor *>(&mParent) &&
+                mParent.GetRloc16() != sourceAddress.GetRloc16())
+            {
+                BecomeDetached();
+                mParent.GetLinkInfo().Clear();
+                mParent.SetState(Neighbor::kStateInvalid);
+            }
+        }
     }
-
-    aMessageInfo.GetPeerAddr().ToExtAddress(macAddr);
 
     isNeighbor = false;
 
@@ -2359,7 +2387,6 @@ otError Mle::HandleLeaderData(const Message &aMessage, const Ip6::MessageInfo &a
     uint16_t pendingDatasetOffset = 0;
     bool dataRequest = false;
     Tlv tlv;
-    uint16_t delay;
 
     // Leader Data
     SuccessOrExit(error = Tlv::GetTlv(aMessage, Tlv::kLeaderData, sizeof(leaderData), leaderData));
@@ -2477,13 +2504,22 @@ otError Mle::HandleLeaderData(const Message &aMessage, const Ip6::MessageInfo &a
 
 exit:
 
-    OT_UNUSED_VARIABLE(aMessageInfo);
-
     if (dataRequest)
     {
         static const uint8_t tlvs[] = {Tlv::kNetworkData};
+        uint16_t delay;
 
-        delay = aMessageInfo.GetSockAddr().IsMulticast() ? (otPlatRandomGet() % kMleMaxResponseDelay) : 0;
+        if (aMessageInfo.GetSockAddr().IsMulticast())
+        {
+            delay = otPlatRandomGet() % kMleMaxResponseDelay;
+        }
+        else
+        {
+            // This method may have been called from an MLE request
+            // handler.  We add a minimum delay here so that the MLE
+            // response is enqueued before the MLE Data Request.
+            delay = 10;
+        }
 
         SendDataRequest(aMessageInfo.GetPeerAddr(), tlvs, sizeof(tlvs), delay);
     }
@@ -2807,14 +2843,12 @@ otError Mle::HandleChildUpdateRequest(const Message &aMessage, const Ip6::Messag
 {
     static const uint8_t kMaxResponseTlvs = 5;
 
-    ThreadNetif &netif = GetNetif();
     otError error = OT_ERROR_NONE;
     SourceAddressTlv sourceAddress;
     LeaderDataTlv leaderData;
     NetworkDataTlv networkData;
     ChallengeTlv challenge;
     TlvRequestTlv tlvRequest;
-    uint8_t dataRequestTlvs[] = {Tlv::kNetworkData};
     uint8_t tlvs[kMaxResponseTlvs] = {};
     uint8_t numTlvs = 0;
 
@@ -2825,31 +2859,8 @@ otError Mle::HandleChildUpdateRequest(const Message &aMessage, const Ip6::Messag
     VerifyOrExit(sourceAddress.IsValid(), error = OT_ERROR_PARSE);
     VerifyOrExit(mParent.GetRloc16() == sourceAddress.GetRloc16(), error = OT_ERROR_DROP);
 
-    // Leader Data
-    if (Tlv::GetTlv(aMessage, Tlv::kLeaderData, sizeof(leaderData), leaderData) == OT_ERROR_NONE)
-    {
-        VerifyOrExit(leaderData.IsValid(), error = OT_ERROR_PARSE);
-        SetLeaderData(leaderData.GetPartitionId(), leaderData.GetWeighting(), leaderData.GetLeaderRouterId());
-
-        if ((mDeviceMode & ModeTlv::kModeFullNetworkData &&
-             leaderData.GetDataVersion() != netif.GetNetworkDataLeader().GetVersion()) ||
-            ((mDeviceMode & ModeTlv::kModeFullNetworkData) == 0 &&
-             leaderData.GetStableDataVersion() != netif.GetNetworkDataLeader().GetStableVersion()))
-        {
-            mRetrieveNewNetworkData = true;
-        }
-
-        // Network Data
-        if (Tlv::GetTlv(aMessage, Tlv::kNetworkData, sizeof(networkData), networkData) == OT_ERROR_NONE)
-        {
-            VerifyOrExit(networkData.IsValid(), error = OT_ERROR_PARSE);
-            netif.GetNetworkDataLeader().SetNetworkData(leaderData.GetDataVersion(),
-                                                        leaderData.GetStableDataVersion(),
-                                                        (mDeviceMode & ModeTlv::kModeFullNetworkData) == 0,
-                                                        networkData.GetNetworkData(),
-                                                        networkData.GetLength());
-        }
-    }
+    // Leader Data, Network Data, Active Timestamp, Pending Timestamp
+    SuccessOrExit(error = HandleLeaderData(aMessage, aMessageInfo));
 
     // TLV Request
     if (Tlv::GetTlv(aMessage, Tlv::kTlvRequest, sizeof(tlvRequest), tlvRequest) == OT_ERROR_NONE)
@@ -2870,11 +2881,6 @@ otError Mle::HandleChildUpdateRequest(const Message &aMessage, const Ip6::Messag
     }
 
     SuccessOrExit(error = SendChildUpdateResponse(tlvs, numTlvs, challenge));
-
-    if (mRetrieveNewNetworkData)
-    {
-        SendDataRequest(aMessageInfo.GetPeerAddr(), dataRequestTlvs, sizeof(dataRequestTlvs), 0);
-    }
 
 exit:
     return error;
@@ -3272,6 +3278,44 @@ otError Mle::CheckReachability(uint16_t aMeshSource, uint16_t aMeshDest, Ip6::He
 exit:
     return error;
 }
+
+#if OPENTHREAD_CONFIG_INFORM_PREVIOUS_PARENT_ON_REATTACH
+otError Mle::InformPreviousParent(void)
+{
+    ThreadNetif &netif = GetNetif();
+    otError error = OT_ERROR_NONE;
+    Message *message = NULL;
+    Ip6::MessageInfo messageInfo;
+
+    VerifyOrExit((mPreviousParentRloc != Mac::kShortAddrInvalid)  && (mPreviousParentRloc != mParent.GetRloc16()));
+
+    VerifyOrExit((message = netif.GetIp6().NewMessage(0)) != NULL, error = OT_ERROR_NO_BUFS);
+    SuccessOrExit(error = message->SetLength(0));
+
+    messageInfo.SetSockAddr(GetMeshLocal64());
+    messageInfo.SetPeerAddr(GetMeshLocal16());
+    messageInfo.GetPeerAddr().mFields.m16[7] = HostSwap16(mPreviousParentRloc);
+    messageInfo.SetInterfaceId(netif.GetInterfaceId());
+
+    SuccessOrExit(error = netif.GetIp6().SendDatagram(*message, messageInfo, Ip6::kProtoNone));
+
+    otLogInfoMle(GetInstance(), "Sending message to inform previous parent 0x%04x", mPreviousParentRloc);
+
+exit:
+
+    if (error != OT_ERROR_NONE)
+    {
+        otLogWarnMle(GetInstance(), "Failed to inform previous parent, error:%s", otThreadErrorToString(error));
+
+        if (message != NULL)
+        {
+            message->Free();
+        }
+    }
+
+    return error;
+}
+#endif // OPENTHREAD_CONFIG_INFORM_PREVIOUS_PARENT_ON_REATTACH
 
 Mle &Mle::GetOwner(const Context &aContext)
 {

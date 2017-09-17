@@ -861,6 +861,38 @@ AM_CONDITIONAL([OPENTHREAD_ENABLE_LEGACY], [test "${enable_legacy}" = "yes"])
 AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_LEGACY],[${OPENTHREAD_ENABLE_LEGACY}],[Define to 1 if you want to use legacy network support])
 
 #
+# Vendor Specific Spinel Command Handler
+#
+
+AC_ARG_ENABLE(spinelvendor,
+    [AS_HELP_STRING([--enable-spinelvendor],[Enable Spinel vendor command support @<:@default=no@:>@.])],
+    [
+        case "${enableval}" in
+
+        no|yes)
+            enable_vendor=${enableval}
+            ;;
+
+        *)
+            AC_MSG_ERROR([Invalid value ${enable_vendor} for --enable-spinelvendor])
+            ;;
+        esac
+    ],
+    [enable_vendor=no])
+
+if test "$enable_vendor" = "yes"; then
+    OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT=1
+else
+    OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT=0
+fi
+
+AC_MSG_CHECKING([whether to enable spinel vendor command support])
+AC_MSG_RESULT(${enable_vendor})
+AC_SUBST(OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT)
+AM_CONDITIONAL([OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT], [test "${enable_vendor}" = "yes"])
+AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT],[${OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT}],[Define to 1 if you want to implement Spinel vendor command support])
+
+#
 # Child Supervision
 #
 
@@ -1046,7 +1078,7 @@ AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_APPLICATION_COAP],[${OPENTHREAD_ENABLE_APP
 #
 
 AC_ARG_ENABLE(raw_link_api,
-    [AS_HELP_STRING([--enable-raw-link-api],[Enable raw link-layer API support @<:@default=yes@:>@.])],
+    [AS_HELP_STRING([--enable-raw-link-api],[Enable raw link-layer API support @<:@default=no@:>@.])],
     [
         case "${enableval}" in
 
@@ -1059,7 +1091,7 @@ AC_ARG_ENABLE(raw_link_api,
             ;;
         esac
     ],
-    [enable_raw_link_api=yes])
+    [enable_raw_link_api=no])
 
 if test "$enable_raw_link_api" = "yes"; then
     OPENTHREAD_ENABLE_RAW_LINK_API=1
@@ -1473,6 +1505,7 @@ AC_MSG_NOTICE([
   OpenThread MAC Filter support             : ${enable_mac_filter}
   OpenThread Diagnostics support            : ${enable_diag}
   OpenThread Child Supervision support      : ${enable_child_supervision}
+  OpenThread Spinel vendor specific support : ${enable_vendor}
   OpenThread Legacy network support         : ${enable_legacy}
   OpenThread Certification log support      : ${enable_cert_log}
   OpenThread DHCPv6 Server support          : ${enable_dhcp6_server}

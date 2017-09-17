@@ -26,18 +26,35 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <openthread/config.h>
+#include <openthread-core-config.h>
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 
+#include "platform-nrf5.h"
+
+#include <hal/nrf_gpio.h>
+
+#include <openthread/cli.h>
 #include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/diag.h>
 #include <openthread/platform/radio.h>
+#include <openthread/platform/toolchain.h>
 
 #include <common/logging.hpp>
 #include <utils/code_utils.h>
+#include <drivers/radio/nrf_drv_radio802154.h>
+
+typedef enum
+{
+    kDiagTransmitModeIdle,
+    kDiagTransmitModePackets,
+    kDiagTransmitModeCarrier
+} DiagTrasmitMode;
 
 struct PlatformDiagCommand
 {
@@ -59,7 +76,7 @@ struct PlatformDiagMessage
  */
 static bool sDiagMode = false;
 static bool sListen = false;
-static bool sTransmitActive = false;
+static DiagTrasmitMode sTransmitMode = kDiagTransmitModeIdle;
 static uint8_t sChannel = 20;
 static int8_t sTxPower = 0;
 static uint32_t sTxPeriod = 1;
@@ -81,6 +98,14 @@ static void appendErrorResult(otError aError, char *aOutput, size_t aOutputMaxLe
     {
         snprintf(aOutput, aOutputMaxLen, "failed\r\nstatus %#x\r\n", aError);
     }
+}
+
+static bool startCarrierTransmision(void)
+{
+    nrf_drv_radio802154_channel_set(sChannel);
+    nrf_drv_radio802154_tx_power_set(sTxPower);
+
+    return nrf_drv_radio802154_continuous_carrier();
 }
 
 static void processListen(otInstance *aInstance, int argc, char *argv[], char *aOutput, size_t aOutputMaxLen)
@@ -150,20 +175,36 @@ static void processTransmit(otInstance *aInstance, int argc, char *argv[], char 
     }
     else if (strcmp(argv[0], "stop") == 0)
     {
+        otEXPECT_ACTION(sTransmitMode != kDiagTransmitModeIdle, error = OT_ERROR_INVALID_STATE);
+
         otPlatAlarmMilliStop(aInstance);
         snprintf(aOutput, aOutputMaxLen, "diagnostic message transmission is stopped\r\nstatus 0x%02x\r\n", error);
-        sTransmitActive = false;
+        sTransmitMode = kDiagTransmitModeIdle;
+        otPlatRadioReceive(aInstance, sChannel);
     }
     else if (strcmp(argv[0], "start") == 0)
     {
+        otEXPECT_ACTION(sTransmitMode == kDiagTransmitModeIdle, error = OT_ERROR_INVALID_STATE);
+
         otPlatAlarmMilliStop(aInstance);
-        sTransmitActive = true;
+        sTransmitMode = kDiagTransmitModePackets;
         sTxCount = sTxRequestedCount;
         uint32_t now = otPlatAlarmMilliGetNow();
         otPlatAlarmMilliStartAt(aInstance, now, sTxPeriod);
         snprintf(aOutput, aOutputMaxLen, "sending %" PRId32 " diagnostic messages with %" PRIu32
                  " ms interval\r\nstatus 0x%02x\r\n",
                  sTxRequestedCount, sTxPeriod, error);
+    }
+    else if (strcmp(argv[0], "carrier") == 0)
+    {
+        otEXPECT_ACTION(sTransmitMode == kDiagTransmitModeIdle, error = OT_ERROR_INVALID_STATE);
+
+        otEXPECT_ACTION(startCarrierTransmision(), error = OT_ERROR_FAILED);
+
+        sTransmitMode = kDiagTransmitModeCarrier;
+
+        snprintf(aOutput, aOutputMaxLen, "sending carrier on channel %d with tx power %d\r\nstatus 0x%02x\r\n",
+                 sChannel, sTxPower, error);
     }
     else if (strcmp(argv[0], "interval") == 0)
     {
@@ -191,6 +232,138 @@ static void processTransmit(otInstance *aInstance, int argc, char *argv[], char 
         snprintf(aOutput, aOutputMaxLen, "set diagnostic messages count to %" PRId32 "\r\nstatus 0x%02x\r\n", sTxRequestedCount,
                  error);
     }
+    else
+    {
+        error = OT_ERROR_INVALID_ARGS;
+    }
+
+exit:
+    appendErrorResult(error, aOutput, aOutputMaxLen);
+}
+
+static void processGpio(otInstance *aInstance, int argc, char *argv[],
+                        char *aOutput, size_t aOutputMaxLen)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    long pinnum;
+    otError error = OT_ERROR_NONE;
+
+    otEXPECT_ACTION(otPlatDiagModeGet(), error = OT_ERROR_INVALID_STATE);
+
+    if (argc == 1)
+    {
+        uint32_t value;
+
+        error = parseLong(argv[0], &pinnum);
+        otEXPECT(error == OT_ERROR_NONE);
+
+        value = nrf_gpio_pin_read(pinnum);
+
+        snprintf(aOutput, aOutputMaxLen, "gpio %d = %d\r\n",
+                 (uint8_t)pinnum, (uint8_t)value);
+    }
+    else if (strcmp(argv[0], "set") == 0)
+    {
+        otEXPECT_ACTION(argc == 2, error = OT_ERROR_INVALID_ARGS);
+        error = parseLong(argv[1], &pinnum);
+        otEXPECT(error == OT_ERROR_NONE);
+
+        nrf_gpio_pin_set(pinnum);
+
+        snprintf(aOutput, aOutputMaxLen, "gpio %d = 1\r\n", (uint8_t)pinnum);
+    }
+    else if (strcmp(argv[0], "clr") == 0)
+    {
+        otEXPECT_ACTION(argc == 2, error = OT_ERROR_INVALID_ARGS);
+        error = parseLong(argv[1], &pinnum);
+        otEXPECT(error == OT_ERROR_NONE);
+
+        nrf_gpio_pin_clear(pinnum);
+
+        snprintf(aOutput, aOutputMaxLen, "gpio %d = 0\r\n", (uint8_t)pinnum);
+    }
+    else if (strcmp(argv[0], "out") == 0)
+    {
+        otEXPECT_ACTION(argc == 2, error = OT_ERROR_INVALID_ARGS);
+        error = parseLong(argv[1], &pinnum);
+        otEXPECT(error == OT_ERROR_NONE);
+
+        nrf_gpio_cfg_output(pinnum);
+
+        snprintf(aOutput, aOutputMaxLen, "gpio %d: out\r\n", (uint8_t)pinnum);
+    }
+    else if (strcmp(argv[0], "in") == 0)
+    {
+        otEXPECT_ACTION(argc == 2, error = OT_ERROR_INVALID_ARGS);
+        error = parseLong(argv[1], &pinnum);
+        otEXPECT(error == OT_ERROR_NONE);
+
+        nrf_gpio_cfg_input(pinnum, NRF_GPIO_PIN_NOPULL);
+
+        snprintf(aOutput, aOutputMaxLen, "gpio %d: in no pull\r\n",
+                 (uint8_t)pinnum);
+    }
+    else
+    {
+        error = OT_ERROR_INVALID_ARGS;
+    }
+
+exit:
+    appendErrorResult(error, aOutput, aOutputMaxLen);
+}
+
+
+static void processTemp(otInstance *aInstance, int argc, char *argv[], char *aOutput, size_t aOutputMaxLen)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(argv);
+
+    otError error = OT_ERROR_NONE;
+
+    otEXPECT_ACTION(otPlatDiagModeGet(), error = OT_ERROR_INVALID_STATE);
+    otEXPECT_ACTION(argc == 0, error = OT_ERROR_INVALID_ARGS);
+
+    int32_t temperature = nrf5TempGet();
+
+    // Measurement resolution is 0.25 degrees Celsius
+    // Convert the temperature measurement to a decimal value, in degrees Celsius
+    snprintf(aOutput, aOutputMaxLen, "%" PRId32 ".%02" PRId32 "\r\n", temperature / 4, 25 * (temperature % 4));
+
+exit:
+    appendErrorResult(error, aOutput, aOutputMaxLen);
+}
+
+static void processCcaThreshold(otInstance *aInstance, int argc, char *argv[], char *aOutput, size_t aOutputMaxLen)
+{
+    (void) aInstance;
+
+    otError                       error = OT_ERROR_NONE;
+    nrf_drv_radio802154_cca_cfg_t ccaConfig;
+
+    otEXPECT_ACTION(otPlatDiagModeGet(), error = OT_ERROR_INVALID_STATE);
+
+    if (argc == 0)
+    {
+        nrf_drv_radio802154_cca_cfg_get(&ccaConfig);
+
+        snprintf(aOutput, aOutputMaxLen, "cca threshold: %u\r\n", ccaConfig.ed_threshold);
+    }
+    else
+    {
+        long value;
+        error = parseLong(argv[0], &value);
+        otEXPECT(error == OT_ERROR_NONE);
+        otEXPECT_ACTION(value >= 0 && value <= 0xFF, error = OT_ERROR_INVALID_ARGS);
+
+        memset(&ccaConfig, 0, sizeof(ccaConfig));
+        ccaConfig.mode         = NRF_RADIO_CCA_MODE_ED;
+        ccaConfig.ed_threshold = (uint8_t)value;
+
+        nrf_drv_radio802154_cca_cfg_set(&ccaConfig);
+        snprintf(aOutput, aOutputMaxLen, "set cca threshold to %u\r\nstatus 0x%02x\r\n",
+                 ccaConfig.ed_threshold, error);
+    }
 
 exit:
     appendErrorResult(error, aOutput, aOutputMaxLen);
@@ -198,9 +371,12 @@ exit:
 
 const struct PlatformDiagCommand sCommands[] =
 {
-    {"listen", &processListen },
-    {"transmit", &processTransmit },
-    {"id", &processID }
+    { "ccathreshold", &processCcaThreshold },
+    { "gpio", &processGpio },
+    { "id", &processID },
+    { "listen", &processListen },
+    { "temp", &processTemp },
+    { "transmit", &processTransmit },
 };
 
 void otPlatDiagProcess(otInstance *aInstance, int argc, char *argv[], char *aOutput, size_t aOutputMaxLen)
@@ -225,6 +401,17 @@ void otPlatDiagProcess(otInstance *aInstance, int argc, char *argv[], char *aOut
 void otPlatDiagModeSet(bool aMode)
 {
     sDiagMode = aMode;
+
+    if (!sDiagMode)
+    {
+        otPlatRadioReceive(NULL, sChannel);
+        otPlatRadioSleep(NULL);
+    }
+    else
+    {
+        // Reinit
+        sTransmitMode = kDiagTransmitModeIdle;
+    }
 }
 
 bool otPlatDiagModeGet()
@@ -277,7 +464,8 @@ void otPlatDiagRadioReceived(otInstance *aInstance, otRadioFrame *aFrame, otErro
 
 void otPlatDiagAlarmCallback(otInstance *aInstance)
 {
-    if (sTransmitActive)
+
+    if (sTransmitMode == kDiagTransmitModePackets)
     {
         if ((sTxCount > 0) || (sTxCount == -1))
         {
@@ -305,7 +493,7 @@ void otPlatDiagAlarmCallback(otInstance *aInstance)
         }
         else
         {
-            sTransmitActive = false;
+            sTransmitMode = kDiagTransmitModeIdle;
             otPlatAlarmMilliStop(aInstance);
             otPlatLog(OT_LOG_LEVEL_DEBG, OT_LOG_REGION_PLATFORM, "Transmit done");
         }

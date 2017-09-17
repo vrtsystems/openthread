@@ -114,8 +114,12 @@ public:
      * @param[out]    aData        A pointer to the data buffer.
      * @param[inout]  aDataLength  On entry, size of the data buffer pointed to by @p aData.
      *                             On exit, number of copied bytes.
+     *
+     * @retval OT_ERROR_NONE       Successfully copied full Thread Network Data.
+     * @retval OT_ERROR_NO_BUFS    Not enough space to fully copy Thread Network Data.
+     *
      */
-    void GetNetworkData(bool aStable, uint8_t *aData, uint8_t &aDataLength);
+    otError GetNetworkData(bool aStable, uint8_t *aData, uint8_t &aDataLength);
 
     /**
      * This method provides the next On Mesh prefix in the Thread Network Data.
@@ -350,19 +354,38 @@ protected:
 private:
     enum
     {
-        kDataResubmitDelay = 300000,  ///< DATA_RESUBMIT_DELAY (miliseconds)
+        kDataResubmitDelay = 300000,  ///< DATA_RESUBMIT_DELAY (milliseconds)
     };
 
     class NetworkDataIterator
     {
+    private:
+        enum
+        {
+            kTlvPoistion    = 0,
+            kSubTlvPosition = 1,
+            kEntryPosition  = 2,
+        };
+
     public:
         NetworkDataIterator(otNetworkDataIterator *aIterator):
             mIteratorBuffer(reinterpret_cast<uint8_t *>(aIterator)) { }
 
-        uint8_t GetTlvsIndex(void) const { return mIteratorBuffer[0]; }
-        uint8_t GetEntryIndex(void) const { return mIteratorBuffer[1]; }
-        void SetTlvsIndex(uint8_t aIndex) { mIteratorBuffer[0] = aIndex; }
-        void SetEntryIndex(uint8_t aIndex) { mIteratorBuffer[1] = aIndex; }
+        uint8_t GetTlvOffset(void) const         { return mIteratorBuffer[kTlvPoistion];       }
+        uint8_t GetSubTlvOffset(void) const      { return mIteratorBuffer[kSubTlvPosition];    }
+        uint8_t GetEntryIndex(void) const        { return mIteratorBuffer[kEntryPosition];     }
+        void    SetTlvOffset(uint8_t aOffset)    { mIteratorBuffer[kTlvPoistion] = aOffset;    }
+        void    SetSubTlvOffset(uint8_t aOffset) { mIteratorBuffer[kSubTlvPosition] = aOffset; }
+        void    SetEntryIndex(uint8_t aIndex)    { mIteratorBuffer[kEntryPosition]  = aIndex;  }
+
+        void SaveTlvOffset(const NetworkDataTlv *aTlv, const uint8_t *aTlvs) {
+            SetTlvOffset(static_cast<uint8_t>(reinterpret_cast<const uint8_t *>(aTlv) - aTlvs));
+        }
+
+        void SaveSubTlvOffset(const NetworkDataTlv *aSubTlv, const NetworkDataTlv *aSubTlvs) {
+            SetSubTlvOffset(static_cast<uint8_t>(reinterpret_cast<const uint8_t *>(aSubTlv) -
+                                                 reinterpret_cast<const uint8_t *>(aSubTlvs)));
+        }
 
     private:
         uint8_t *mIteratorBuffer;

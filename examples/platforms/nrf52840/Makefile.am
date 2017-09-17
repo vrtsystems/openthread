@@ -37,6 +37,7 @@ lib_LIBRARIES                                                                   
 COMMONCPPFLAGS                                                                                             = \
     -DCONFIG_GPIO_AS_PINRESET                                                                                \
     -DNRF52840_XXAA                                                                                          \
+    -DENABLE_FEM=1                                                                                           \
     -I$(top_srcdir)/include                                                                                  \
     -I$(top_srcdir)/examples/platforms                                                                       \
     -I$(top_srcdir)/src/core                                                                                 \
@@ -51,17 +52,20 @@ COMMONCPPFLAGS                                                                  
     -I$(top_srcdir)/third_party/NordicSemiconductor/segger_rtt                                               \
     $(NULL)
 
-PLATFORM_SOURCES                                                                                           = \
+PLATFORM_COMMON_SOURCES                                                                                    = \
     alarm.c                                                                                                  \
+    fem.c                                                                                                    \
     flash.c                                                                                                  \
     logging.c                                                                                                \
     misc.c                                                                                                   \
     platform.c                                                                                               \
     uart.c                                                                                                   \
     platform-config.h                                                                                        \
+    platform-fem.h                                                                                           \
     platform-nrf5.h                                                                                          \
     radio.c                                                                                                  \
     random.c                                                                                                 \
+    temp.c                                                                                                   \
     $(NULL)
 
 SINGLEPHY_SOURCES                                                                                          = \
@@ -69,6 +73,7 @@ SINGLEPHY_SOURCES                                                               
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_notification_direct.c   \
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_priority_drop_direct.c  \
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_request_direct.c        \
+    @top_builddir@/third_party/NordicSemiconductor/drivers/radio/fem/nrf_fem_control_direct.c                \
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/raal/single_phy/single_phy.c                \
     $(NULL)
 
@@ -84,6 +89,7 @@ SOFTDEVICE_SOURCES                                                              
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_priority_drop_swi.c     \
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_request_swi.c           \
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_swi.c                   \
+    @top_builddir@/third_party/NordicSemiconductor/drivers/radio/fem/nrf_fem_control_softdevice.c            \
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/raal/softdevice/nrf_raal_softdevice.c       \
     $(NULL)
 
@@ -95,9 +101,17 @@ SOFTDEVICE_CPPFLAGS                                                             
     -DRAAL_SOFTDEVICE=1                                                                                      \
     $(NULL)
 
+PLATFORM_DIAG_SOURCES                                                                                      = \
+    diag.c                                                                                                   \
+    $(NULL)
+
+PLATFORM_SOURCES                                                                                           = \
+    $(PLATFORM_COMMON_SOURCES)                                                                               \
+    $(NULL)
+
 if OPENTHREAD_ENABLE_DIAG
 PLATFORM_SOURCES                                                                                          += \
-    diag.c                                                                                                   \
+    $(PLATFORM_DIAG_SOURCES)                                                                                 \
     $(NULL)
 endif
 
@@ -111,6 +125,7 @@ NORDICSEMI_SOURCES                                                              
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_fsm.c                   \
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_pib.c                   \
     @top_builddir@/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_rx_buffer.c             \
+    @top_builddir@/third_party/NordicSemiconductor/drivers/radio/fem/nrf_fem_control_common.c                \
     @top_builddir@/third_party/NordicSemiconductor/segger_rtt/SEGGER_RTT.c                                   \
     @top_builddir@/third_party/NordicSemiconductor/segger_rtt/SEGGER_RTT_Conf.h                              \
     @top_builddir@/third_party/NordicSemiconductor/device/gcc_startup_nrf52840.S                             \
@@ -181,6 +196,9 @@ noinst_HEADERS                                                                  
     $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_procedures_duration.h    \
     $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_request.h                \
     $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/nrf_drv_radio802154_rx_buffer.h              \
+    $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/fem/nrf_fem_control_api.h                    \
+    $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/fem/nrf_fem_control_config.h                 \
+    $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/fem/nrf_fem_control_internal.h               \
     $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/raal/nrf_raal_api.h                          \
     $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/raal/nrf_raal_config.h                       \
     $(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/raal/softdevice/nrf_raal_softdevice.h        \
@@ -217,7 +235,8 @@ noinst_HEADERS                                                                  
     $(NULL)
 
 PRETTY_FILES                                                                                               = \
-    $(PLATFORM_SOURCES)                                                                                      \
+    $(PLATFORM_COMMON_SOURCES)                                                                               \
+    $(PLATFORM_DIAG_SOURCES)                                                                                 \
     $(NULL)
 
 Dash                                                                                                       = -
