@@ -34,6 +34,8 @@
 #ifndef THREAD_TLVS_HPP_
 #define THREAD_TLVS_HPP_
 
+#include "openthread-core-config.h"
+
 #include <openthread/types.h>
 
 #include "common/encoding.hpp"
@@ -484,7 +486,7 @@ public:
      * @retval TRUE  the TLV appears to be well-formed.
      *
      */
-    bool IsValid(void) const { return GetLength() <= sizeof(*this) - sizeof(ThreadTlv); }
+    bool IsValid(void) const { return true; }
 
     /**
      * This method returns a pointer to the Network Data TLVs.

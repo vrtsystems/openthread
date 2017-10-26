@@ -31,9 +31,6 @@
  *   This file implements Thread security material generation.
  */
 
-
-#include <openthread/config.h>
-
 #include "key_manager.hpp"
 
 #include "openthread-instance.h"
@@ -172,7 +169,7 @@ void KeyManager::SetCurrentKeySequence(uint32_t aKeySequence)
         mKeyRotationTimer.IsRunning() &&
         mKeySwitchGuardEnabled)
     {
-        VerifyOrExit(mHoursSinceKeyRotation < mKeySwitchGuardTime);
+        VerifyOrExit(mHoursSinceKeyRotation >= mKeySwitchGuardTime);
     }
 
     mKeySequence = aKeySequence;
