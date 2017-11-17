@@ -28,70 +28,57 @@
 
 /**
  * @file
- * @brief
- *  This file defines the getter functions for single instance OpenThread objects.
+ *   This file implements the OpenThread platform abstraction for the diagnostics.
+ *
  */
 
-#ifndef SINGLE_OPENTHREAD_INSTANCE_H_
-#define SINGLE_OPENTHREAD_INSTANCE_H_
+#include <stdio.h>
 
-#include "openthread-core-config.h"
-
-#include <openthread/types.h>
-
-
-#if !OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
-
-namespace ot {
-
-class ThreadNetif;
-class MeshForwarder;
-class TaskletScheduler;
-namespace Ip6 { class Ip6; }
-
-} // namespace ot
+#include <openthread/platform/diag.h>
 
 /**
- * This function returns a pointer to the single otInstance (if initialized and ready).
- *
- * @returns A pointer to single otInstance structure, or NULL if the instance is not ready, i.e. either it is not yet
- *          initialized (no call to `otInstanceInitSingle()`) or it is finalized (call to `otInstanceFinalize()`).
+ * Diagnostics mode variables.
  *
  */
-otInstance *otGetInstance(void);
+static bool sDiagMode = false;
 
-/**
- * This function returns a reference to the single thread network interface instance.
- *
- * @returns A reference to the thread network interface instance.
- *
- */
-ot::ThreadNetif &otGetThreadNetif(void);
+void otPlatDiagProcess(otInstance *aInstance, int argc, char *argv[], char *aOutput, size_t aOutputMaxLen)
+{
+    (void) argc;
+    (void) aInstance;
 
-/**
- * This function returns a reference to the single MeshForwarder instance.
- *
- * @returns A reference to the MeshForwarder instance.
- *
- */
-ot::MeshForwarder &otGetMeshForwarder(void);
+    // Add more plarform specific diagnostics features here.
+    snprintf(aOutput, aOutputMaxLen, "diag feature '%s' is not supported\r\n", argv[0]);
+}
 
-/**
- * This function returns a reference to the single TaskletShceduler instance.
- *
- * @returns A reference to the TaskletShceduler instance.
- *
- */
-ot::TaskletScheduler &otGetTaskletScheduler(void);
+void otPlatDiagModeSet(bool aMode)
+{
+    sDiagMode = aMode;
+}
 
-/**
- * This function returns a reference to the single Ip6 instance.
- *
- * @returns A reference to the Ip6 instance.
- *
- */
-ot::Ip6::Ip6 &otGetIp6(void);
+bool otPlatDiagModeGet()
+{
+    return sDiagMode;
+}
 
-#endif // #if !OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+void otPlatDiagChannelSet(uint8_t aChannel)
+{
+    (void) aChannel;
+}
 
-#endif  // SINGLE_OPENTHREAD_INSTANCE_H_
+void otPlatDiagTxPowerSet(int8_t aTxPower)
+{
+    (void) aTxPower;
+}
+
+void otPlatDiagRadioReceived(otInstance *aInstance, otRadioFrame *aFrame, otError aError)
+{
+    (void) aInstance;
+    (void) aFrame;
+    (void) aError;
+}
+
+void otPlatDiagAlarmCallback(otInstance *aInstance)
+{
+    (void) aInstance;
+}
