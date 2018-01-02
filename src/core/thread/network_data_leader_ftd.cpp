@@ -47,6 +47,7 @@
 #include "common/instance.hpp"
 #include "common/logging.hpp"
 #include "common/message.hpp"
+#include "common/owner-locator.hpp"
 #include "common/timer.hpp"
 #include "mac/mac_frame.hpp"
 #include "meshcop/meshcop.hpp"
@@ -100,12 +101,10 @@ void Leader::Stop(void)
 
 void Leader::IncrementVersion(void)
 {
-    ThreadNetif &netif = GetNetif();
-
-    if (netif.GetMle().GetRole() == OT_DEVICE_ROLE_LEADER)
+    if (GetNetif().GetMle().GetRole() == OT_DEVICE_ROLE_LEADER)
     {
         mVersion++;
-        netif.SetStateChangedFlags(OT_CHANGED_THREAD_NETDATA);
+        GetNotifier().SetFlags(OT_CHANGED_THREAD_NETDATA);
     }
 }
 
@@ -144,7 +143,7 @@ void Leader::RemoveBorderRouter(uint16_t aRloc16)
         mStableVersion++;
     }
 
-    GetNetif().SetStateChangedFlags(OT_CHANGED_THREAD_NETDATA);
+    GetNotifier().SetFlags(OT_CHANGED_THREAD_NETDATA);
 
 exit:
     return;
@@ -770,7 +769,7 @@ otError Leader::RegisterNetworkData(uint16_t aRloc16, uint8_t *aTlvs, uint8_t aT
         }
     }
 
-    GetNetif().SetStateChangedFlags(OT_CHANGED_THREAD_NETDATA);
+    GetNotifier().SetFlags(OT_CHANGED_THREAD_NETDATA);
 
 exit:
     return error;
@@ -1176,7 +1175,7 @@ otError Leader::FreeContext(uint8_t aContextId)
     mContextUsed &= ~(1 << aContextId);
     mVersion++;
     mStableVersion++;
-    GetNetif().SetStateChangedFlags(OT_CHANGED_THREAD_NETDATA);
+    GetNotifier().SetFlags(OT_CHANGED_THREAD_NETDATA);
     return OT_ERROR_NONE;
 }
 
@@ -1516,7 +1515,7 @@ otError Leader::RemoveContext(PrefixTlv &aPrefix, uint8_t aContextId)
 
 void Leader::HandleTimer(Timer &aTimer)
 {
-    GetOwner(aTimer).HandleTimer();
+    aTimer.GetOwner<Leader>().HandleTimer();
 }
 
 void Leader::HandleTimer(void)
@@ -1544,17 +1543,6 @@ void Leader::HandleTimer(void)
     {
         mTimer.Start(kStateUpdatePeriod);
     }
-}
-
-Leader &Leader::GetOwner(const Context &aContext)
-{
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
-    Leader &leader = *static_cast<Leader *>(aContext.GetContext());
-#else
-    Leader &leader = Instance::Get().GetThreadNetif().GetNetworkDataLeader();
-    OT_UNUSED_VARIABLE(aContext);
-#endif
-    return leader;
 }
 
 }  // namespace NetworkData

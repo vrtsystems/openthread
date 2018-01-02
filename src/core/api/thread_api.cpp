@@ -357,8 +357,7 @@ otError otThreadGetParentInfo(otInstance *aInstance, otRouterInfo *aParentInfo)
     VerifyOrExit(aParentInfo != NULL, error = OT_ERROR_INVALID_ARGS);
 
     parent = instance.GetThreadNetif().GetMle().GetParent();
-    memcpy(aParentInfo->mExtAddress.m8, &parent->GetExtAddress(), sizeof(aParentInfo->mExtAddress));
-
+    aParentInfo->mExtAddress      = parent->GetExtAddress();
     aParentInfo->mRloc16          = parent->GetRloc16();
     aParentInfo->mRouterId        = Mle::Mle::GetRouterId(parent->GetRloc16());
     aParentInfo->mNextHop         = parent->GetNextHop();
@@ -481,8 +480,6 @@ otError otThreadSetEnabled(otInstance *aInstance, bool aEnabled)
     otError error = OT_ERROR_NONE;
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    otLogFuncEntry();
-
     if (aEnabled)
     {
         VerifyOrExit(instance.GetThreadNetif().GetMac().GetPanId() != Mac::kPanIdBroadcast,
@@ -495,7 +492,6 @@ otError otThreadSetEnabled(otInstance *aInstance, bool aEnabled)
     }
 
 exit:
-    otLogFuncExitErr(error);
     return error;
 }
 

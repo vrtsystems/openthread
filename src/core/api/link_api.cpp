@@ -69,7 +69,7 @@ const otExtAddress *otLinkGetExtendedAddress(otInstance *aInstance)
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    return reinterpret_cast<const otExtAddress *>(instance.GetThreadNetif().GetMac().GetExtAddress());
+    return &instance.GetThreadNetif().GetMac().GetExtAddress();
 }
 
 otError otLinkSetExtendedAddress(otInstance *aInstance, const otExtAddress *aExtAddress)
@@ -92,21 +92,6 @@ exit:
 void otLinkGetFactoryAssignedIeeeEui64(otInstance *aInstance, otExtAddress *aEui64)
 {
     otPlatRadioGetIeeeEui64(aInstance, aEui64->m8);
-}
-
-int8_t otLinkGetMaxTransmitPower(otInstance *aInstance)
-{
-    Instance &instance = *static_cast<Instance *>(aInstance);
-
-    return instance.GetThreadNetif().GetMac().GetMaxTransmitPower();
-}
-
-void otLinkSetMaxTransmitPower(otInstance *aInstance, int8_t aPower)
-{
-    Instance &instance = *static_cast<Instance *>(aInstance);
-
-    instance.GetThreadNetif().GetMac().SetMaxTransmitPower(aPower);
-    otPlatRadioSetDefaultTxPower(aInstance, aPower);
 }
 
 otPanId otLinkGetPanId(otInstance *aInstance)

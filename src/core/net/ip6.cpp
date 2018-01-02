@@ -40,6 +40,7 @@
 #include "common/instance.hpp"
 #include "common/logging.hpp"
 #include "common/message.hpp"
+#include "common/owner-locator.hpp"
 #include "net/icmp6.hpp"
 #include "net/ip6_address.hpp"
 #include "net/ip6_routes.hpp"
@@ -407,7 +408,7 @@ exit:
 
 void Ip6::HandleSendQueue(Tasklet &aTasklet)
 {
-    GetOwner(aTasklet).HandleSendQueue();
+    aTasklet.GetOwner<Ip6>().HandleSendQueue();
 }
 
 void Ip6::HandleSendQueue(void)
@@ -705,13 +706,6 @@ otError Ip6::HandleDatagram(Message &aMessage, Netif *aNetif, int8_t aInterfaceI
     uint8_t hopLimit;
     int8_t forwardInterfaceId;
 
-    otLogFuncEntry();
-
-#if 0
-    uint8_t buf[1024];
-    aMessage.Read(0, sizeof(buf), buf);
-    dump("handle datagram", buf, aMessage.GetLength());
-#endif
 
     SuccessOrExit(error = header.Init(aMessage));
 
@@ -832,15 +826,12 @@ exit:
         aMessage.Free();
     }
 
-    otLogFuncExitErr(error);
     return error;
 }
 
 int8_t Ip6::FindForwardInterfaceId(const MessageInfo &aMessageInfo)
 {
     int8_t interfaceId;
-
-    otLogFuncEntry();
 
     if (aMessageInfo.GetSockAddr().IsMulticast())
     {
@@ -866,8 +857,6 @@ int8_t Ip6::FindForwardInterfaceId(const MessageInfo &aMessageInfo)
     {
         interfaceId = 0;
     }
-
-    otLogFuncExit();
 
     return interfaceId;
 }
@@ -1113,17 +1102,6 @@ int8_t Ip6::GetOnLinkNetif(const Address &aAddress)
 
 exit:
     return rval;
-}
-
-Ip6 &Ip6::GetOwner(const Context &aContext)
-{
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
-    Ip6 &ip6 = *static_cast<Ip6 *>(aContext.GetContext());
-#else
-    Ip6 &ip6 = Instance::Get().GetIp6();
-    OT_UNUSED_VARIABLE(aContext);
-#endif
-    return ip6;
 }
 
 const char *Ip6::IpProtoToString(IpProto aIpProto)

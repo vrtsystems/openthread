@@ -65,7 +65,7 @@ public:
      * @param[in]  aInstance     A reference to the OpenThread instance.
      *
      */
-    Commissioner(Instance &aInstance);
+    explicit Commissioner(Instance &aInstance);
 
     /**
      * This method starts the Commissioner service.
@@ -278,8 +278,6 @@ private:
     otError SendCommissionerSet(void);
     otError SendPetition(void);
     otError SendKeepAlive(void);
-
-    static Commissioner &GetOwner(const Context &aContext);
 
     otCommissionerState mState;
 

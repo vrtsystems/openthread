@@ -63,7 +63,7 @@ public:
      * @param[in]  aInstance     A reference to the OpenThread instance.
      *
      */
-    Joiner(Instance &aInstance);
+    explicit Joiner(Instance &aInstance);
 
     /**
      * This method starts the Joiner service.
@@ -156,8 +156,6 @@ private:
                                     const otMessageInfo *aMessageInfo);
     void HandleJoinerEntrust(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
     void SendJoinerEntrustResponse(const Coap::Header &aRequestHeader, const Ip6::MessageInfo &aRequestInfo);
-
-    static Joiner &GetOwner(const Context &aContext);
 
     otJoinerState mState;
 

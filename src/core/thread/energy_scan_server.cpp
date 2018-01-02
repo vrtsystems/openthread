@@ -42,6 +42,7 @@
 #include "common/debug.hpp"
 #include "common/instance.hpp"
 #include "common/logging.hpp"
+#include "common/owner-locator.hpp"
 #include "meshcop/meshcop.hpp"
 #include "meshcop/meshcop_tlvs.hpp"
 #include "thread/thread_netif.hpp"
@@ -59,11 +60,10 @@ EnergyScanServer::EnergyScanServer(Instance &aInstance) :
     mActive(false),
     mScanResultsLength(0),
     mTimer(aInstance, &EnergyScanServer::HandleTimer, this),
+    mNotifierCallback(&EnergyScanServer::HandleStateChanged, this),
     mEnergyScan(OT_URI_PATH_ENERGY_SCAN, &EnergyScanServer::HandleRequest, this)
 {
-    mNetifCallback.Set(&EnergyScanServer::HandleNetifStateChanged, this);
-    GetNetif().RegisterCallback(mNetifCallback);
-
+    aInstance.GetNotifier().RegisterCallback(mNotifierCallback);
     GetNetif().GetCoap().AddResource(mEnergyScan);
 }
 
@@ -120,7 +120,7 @@ exit:
 
 void EnergyScanServer::HandleTimer(Timer &aTimer)
 {
-    GetOwner(aTimer).HandleTimer();
+    aTimer.GetOwner<EnergyScanServer>().HandleTimer();
 }
 
 void EnergyScanServer::HandleTimer(void)
@@ -225,12 +225,12 @@ exit:
     return error;
 }
 
-void EnergyScanServer::HandleNetifStateChanged(uint32_t aFlags, void *aContext)
+void EnergyScanServer::HandleStateChanged(Notifier::Callback &aCallback, uint32_t aFlags)
 {
-    static_cast<EnergyScanServer *>(aContext)->HandleNetifStateChanged(aFlags);
+    aCallback.GetOwner<EnergyScanServer>().HandleStateChanged(aFlags);
 }
 
-void EnergyScanServer::HandleNetifStateChanged(uint32_t aFlags)
+void EnergyScanServer::HandleStateChanged(uint32_t aFlags)
 {
     if ((aFlags & OT_CHANGED_THREAD_NETDATA) != 0 &&
         !mActive &&
@@ -239,17 +239,6 @@ void EnergyScanServer::HandleNetifStateChanged(uint32_t aFlags)
         mActive = false;
         mTimer.Stop();
     }
-}
-
-EnergyScanServer &EnergyScanServer::GetOwner(const Context &aContext)
-{
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
-    EnergyScanServer &server = *static_cast<EnergyScanServer *>(aContext.GetContext());
-#else
-    EnergyScanServer &server = Instance::Get().GetThreadNetif().GetEnergyScanServer();
-    OT_UNUSED_VARIABLE(aContext);
-#endif
-    return server;
 }
 
 }  // namespace ot

@@ -227,17 +227,17 @@ otError NcpBase::GetPropertyHandler_PHY_RSSI(void)
 
 otError NcpBase::CommandHandler_NET_SAVE(uint8_t aHeader)
 {
-    return SendLastStatus(aHeader, SPINEL_STATUS_UNIMPLEMENTED);
+    return PrepareLastStatusResponse(aHeader, SPINEL_STATUS_UNIMPLEMENTED);
 }
 
 otError NcpBase::CommandHandler_NET_CLEAR(uint8_t aHeader)
 {
-    return SendLastStatus(aHeader, ThreadErrorToSpinelStatus(otInstanceErasePersistentInfo(mInstance)));
+    return PrepareLastStatusResponse(aHeader, ThreadErrorToSpinelStatus(otInstanceErasePersistentInfo(mInstance)));
 }
 
 otError NcpBase::CommandHandler_NET_RECALL(uint8_t aHeader)
 {
-    return SendLastStatus(aHeader, SPINEL_STATUS_UNIMPLEMENTED);
+    return PrepareLastStatusResponse(aHeader, SPINEL_STATUS_UNIMPLEMENTED);
 }
 
 otError NcpBase::GetPropertyHandler_NET_SAVED(void)
@@ -668,7 +668,7 @@ exit:
         // the state of these ports, so we need to report
         // those incomplete changes via an asynchronous
         // change event.
-        HandleCommandPropertyGet(SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0, SPINEL_PROP_THREAD_ASSISTING_PORTS);
+        WritePropertyValueIsFrame(SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0, SPINEL_PROP_THREAD_ASSISTING_PORTS);
     }
 
     return error;
@@ -1339,7 +1339,7 @@ otError NcpBase::SetPropertyHandler_STREAM_NET(void)
     OT_UNUSED_VARIABLE(metaPtr);
     OT_UNUSED_VARIABLE(metaLen);
 
-    SuccessOrExit(error = otMessageAppend(message, framePtr, static_cast<uint16_t>(frameLen)));
+    SuccessOrExit(error = otMessageAppend(message, framePtr, frameLen));
 
     error = otIp6Send(mInstance, message);
 
@@ -1396,17 +1396,7 @@ otError NcpBase::GetPropertyHandler_JAM_DETECT_BUSY(void)
 
 otError NcpBase::GetPropertyHandler_JAM_DETECT_HISTORY_BITMAP(void)
 {
-    otError error = OT_ERROR_NONE;
-    uint64_t historyBitmap = otJamDetectionGetHistoryBitmap(mInstance);
-
-    // History bitmap - bits 0-31
-    SuccessOrExit(error = mEncoder.WriteUint32(static_cast<uint32_t>(historyBitmap & 0xffffffff)));
-
-    // // History bitmap - bits 32-63
-    SuccessOrExit(error = mEncoder.WriteUint32(static_cast<uint32_t>(historyBitmap >> 32)));
-
-exit:
-    return error;
+    return mEncoder.WriteUint64(otJamDetectionGetHistoryBitmap(mInstance));
 }
 
 otError NcpBase::SetPropertyHandler_JAM_DETECT_ENABLE(void)
@@ -1854,7 +1844,7 @@ exit:
 
     if (error != OT_ERROR_NONE)
     {
-        HandleCommandPropertyGet(SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0, SPINEL_PROP_MAC_WHITELIST);
+        WritePropertyValueIsFrame(SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0, SPINEL_PROP_MAC_WHITELIST);
     }
 
     return error;
@@ -1912,7 +1902,7 @@ exit:
 
     if (error != OT_ERROR_NONE)
     {
-       HandleCommandPropertyGet(SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0, SPINEL_PROP_MAC_BLACKLIST);
+       WritePropertyValueIsFrame(SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0, SPINEL_PROP_MAC_BLACKLIST);
     }
 
     return error;
@@ -1975,7 +1965,7 @@ exit:
 
     if (error != OT_ERROR_NONE)
     {
-        HandleCommandPropertyGet(SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0, SPINEL_PROP_MAC_FIXED_RSS);
+        WritePropertyValueIsFrame(SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0, SPINEL_PROP_MAC_FIXED_RSS);
     }
 
     return error;
@@ -2058,7 +2048,7 @@ otError NcpBase::SetPropertyHandler_STREAM_NET_INSECURE(void)
     OT_UNUSED_VARIABLE(metaPtr);
     OT_UNUSED_VARIABLE(metaLen);
 
-    SuccessOrExit(error = otMessageAppend(message, framePtr, static_cast<uint16_t>(frameLen)));
+    SuccessOrExit(error = otMessageAppend(message, framePtr, frameLen));
 
     // Ensure the insecure message is forwarded using direct transmission.
     otMessageSetDirectTransmission(message, true);
@@ -2115,7 +2105,7 @@ otError NcpBase::SetPropertyHandler_NEST_STREAM_MFG(uint8_t aHeader)
 
     error = mDecoder.ReadUtf8(string);
 
-    VerifyOrExit(error == OT_ERROR_NONE, error = SendLastStatus(aHeader, ThreadErrorToSpinelStatus(error)));
+    VerifyOrExit(error == OT_ERROR_NONE, error = WriteLastStatusFrame(aHeader, ThreadErrorToSpinelStatus(error)));
 
     // All diagnostics related features are processed within diagnostics module
     output = otDiagProcessCmdLine(const_cast<char *>(string));
@@ -2695,13 +2685,20 @@ void NcpBase::HandleDatagramFromStack(otMessage *aMessage)
     VerifyOrExit(aMessage != NULL);
 
     SuccessOrExit(otMessageQueueEnqueue(&mMessageQueue, aMessage));
-    SuccessOrExit(SendQueuedDatagramMessages());
+
+    // If there is no queued spinel command response, try to write/send
+    // the datagram message immediately. If there is a queued response
+    // or if currently out of buffer space, the IPv6 datagram message
+    // will be sent from `HandleFrameRemovedFromNcpBuffer()` when buffer
+    //  space becomes available and after any pending spinel command
+    // response.
+
+    if (IsResponseQueueEmpty())
+    {
+        IgnoreReturnValue(SendQueuedDatagramMessages());
+    }
 
 exit:
-    // If the queued message can not be sent now (out of buffer),
-    // it will be sent once spinel buffer becomes available from
-    // `HandleFrameRemovedFromNcpBuffer()` callback.
-
     return;
 }
 
@@ -2766,7 +2763,7 @@ exit:
 // MARK: Property/Status Changed
 // ----------------------------------------------------------------------------
 
-void NcpBase::HandleNetifStateChanged(uint32_t aFlags, void *aContext)
+void NcpBase::HandleStateChanged(uint32_t aFlags, void *aContext)
 {
     NcpBase *ncp = static_cast<NcpBase *>(aContext);
 
@@ -2794,6 +2791,12 @@ void NcpBase::ProcessThreadChangedFlags(void)
         { OT_CHANGED_THREAD_CHILD_REMOVED,        SPINEL_PROP_THREAD_CHILD_TABLE             },
         { OT_CHANGED_IP6_MULTICAST_SUBSRCRIBED,   SPINEL_PROP_IPV6_MULTICAST_ADDRESS_TABLE   },
         { OT_CHANGED_IP6_MULTICAST_UNSUBSRCRIBED, SPINEL_PROP_IPV6_MULTICAST_ADDRESS_TABLE   },
+        { OT_CHANGED_THREAD_CHANNEL,              SPINEL_PROP_PHY_CHAN                       },
+        { OT_CHANGED_THREAD_PANID,                SPINEL_PROP_MAC_15_4_PANID                 },
+        { OT_CHANGED_THREAD_NETWORK_NAME,         SPINEL_PROP_NET_NETWORK_NAME               },
+        { OT_CHANGED_THREAD_EXT_PANID,            SPINEL_PROP_NET_XPANID                     },
+        { OT_CHANGED_MASTER_KEY,                  SPINEL_PROP_NET_MASTER_KEY                 },
+        { OT_CHANGED_PSKC,                        SPINEL_PROP_NET_PSKC                       },
     };
 
     VerifyOrExit(mThreadChangedFlags != 0);

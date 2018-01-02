@@ -747,10 +747,9 @@ public:
      * @param[in] aInstance      A reference to the OpenThread instance.
      *
      */
-    Coap(Instance &aInstance);
+    explicit Coap(Instance &aInstance);
 
 private:
-    static Coap &GetOwner(const Context &aContext);
     static void HandleRetransmissionTimer(Timer &aTimer);
     static void HandleResponsesQueueTimer(Timer &aTimer);
 };
@@ -770,10 +769,9 @@ public:
      * @param[in] aInstance      A reference to the OpenThread instance.
      *
      */
-    ApplicationCoap(Instance &aInstance);
+    explicit ApplicationCoap(Instance &aInstance);
 
 private:
-    static ApplicationCoap &GetOwner(const Context &aContext);
     static void HandleRetransmissionTimer(Timer &aTimer);
     static void HandleResponsesQueueTimer(Timer &aTimer);
 };

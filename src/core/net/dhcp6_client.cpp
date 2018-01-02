@@ -42,6 +42,7 @@
 #include "common/encoding.hpp"
 #include "common/instance.hpp"
 #include "common/logging.hpp"
+#include "common/owner-locator.hpp"
 #include "mac/mac.hpp"
 #include "net/dhcp6.hpp"
 #include "thread/thread_netif.hpp"
@@ -332,7 +333,7 @@ exit:
 
 bool Dhcp6Client::HandleTrickleTimer(TrickleTimer &aTrickleTimer)
 {
-    return GetOwner(aTrickleTimer).HandleTrickleTimer();
+    return aTrickleTimer.GetOwner<Dhcp6Client>().HandleTrickleTimer();
 }
 
 bool Dhcp6Client::HandleTrickleTimer(void)
@@ -608,7 +609,7 @@ otError Dhcp6Client::ProcessClientIdentifier(Message &aMessage, uint16_t aOffset
                    (option.GetLength() == (sizeof(option) - sizeof(Dhcp6Option))) &&
                    (option.GetDuidType() == kDuidLL) &&
                    (option.GetDuidHardwareType() == kHardwareTypeEui64)) &&
-                  (!memcmp(option.GetDuidLinkLayerAddress(), GetNetif().GetMac().GetExtAddress(),
+                  (!memcmp(option.GetDuidLinkLayerAddress(), &GetNetif().GetMac().GetExtAddress(),
                            sizeof(Mac::ExtAddress)))),
                  error = OT_ERROR_PARSE);
 exit:
@@ -714,17 +715,6 @@ otError Dhcp6Client::ProcessIaAddress(Message &aMessage, uint16_t aOffset)
 
 exit:
     return error;
-}
-
-Dhcp6Client &Dhcp6Client::GetOwner(const Context &aContext)
-{
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
-    Dhcp6Client &client = *static_cast<Dhcp6Client *>(aContext.GetContext());
-#else
-    Dhcp6Client &client = Instance::Get().GetThreadNetif().GetDhcp6Client();
-    OT_UNUSED_VARIABLE(aContext);
-#endif
-    return client;
 }
 
 }  // namespace Dhcp6

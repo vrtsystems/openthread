@@ -42,6 +42,7 @@ namespace ot {
 
 class Instance;
 class ThreadNetif;
+class Notifier;
 namespace Ip6 { class Ip6; }
 
 
@@ -54,7 +55,6 @@ namespace Ip6 { class Ip6; }
  * @{
  *
  */
-
 
 /**
  * This class implements a locator for an OpenThread Instance object.
@@ -98,6 +98,14 @@ public:
      */
     ThreadNetif &GetNetif(void) const;
 
+    /**
+     * This method returns a reference to the Notifier.
+     *
+     * @returns   A reference to the Notifier.
+     *
+     */
+    Notifier &GetNotifier(void) const;
+
 protected:
     /**
      * This constructor initializes the object.
@@ -116,6 +124,54 @@ protected:
 #if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
 private:
     Instance &mInstance;
+#endif
+};
+
+/**
+ * This class implements a locator for owner of an object.
+ *
+ * This is used as the base class for objects that provide a callback (e.g., `Timer` or `Tasklet`).
+ *
+ */
+class OwnerLocator
+{
+public:
+
+    /**
+     * This template method returns a reference to the owner object.
+     *
+     * The caller needs to provide the `OwnerType` as part of the template type.
+     *
+     * @returns A reference to the owner of this object.
+     *
+     */
+    template <typename OwnerType>
+    OwnerType &GetOwner(void)
+#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+    { return *static_cast<OwnerType *>(mOwner); }
+#else
+    // Implemented in `owner-locator.hpp`
+    ;
+#endif
+
+protected:
+    /**
+     * This constructor initializes the object
+     *
+     * @param[in]  aOwner   A pointer to the owner object (as `void *`).
+     *
+     */
+    OwnerLocator(void *aOwner)
+#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+        : mOwner(aOwner)
+#endif
+    {
+        OT_UNUSED_VARIABLE(aOwner);
+    }
+
+#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+private:
+    void *mOwner;
 #endif
 };
 

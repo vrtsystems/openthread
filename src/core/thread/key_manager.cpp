@@ -36,6 +36,7 @@
 #include "common/code_utils.hpp"
 #include "common/instance.hpp"
 #include "common/timer.hpp"
+#include "common/owner-locator.hpp"
 #include "crypto/hmac_sha256.hpp"
 #include "thread/mle_router.hpp"
 #include "thread/thread_netif.hpp"
@@ -83,7 +84,11 @@ const uint8_t *KeyManager::GetPSKc(void) const
 
 void KeyManager::SetPSKc(const uint8_t *aPSKc)
 {
-    memcpy(mPSKc, aPSKc, sizeof(mPSKc));
+    if (memcmp(mPSKc, aPSKc, sizeof(mPSKc)) != 0)
+    {
+        memcpy(mPSKc, aPSKc, sizeof(mPSKc));
+        GetNotifier().SetFlags(OT_CHANGED_PSKC);
+    }
 }
 #endif
 
@@ -131,7 +136,7 @@ otError KeyManager::SetMasterKey(const otMasterKey &aKey)
         children[i].SetMleFrameCounter(0);
     }
 
-    GetNetif().SetStateChangedFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER);
+    GetNotifier().SetFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER | OT_CHANGED_MASTER_KEY);
 
 exit:
     return error;
@@ -184,7 +189,7 @@ void KeyManager::SetCurrentKeySequence(uint32_t aKeySequence)
         StartKeyRotationTimer();
     }
 
-    GetNetif().SetStateChangedFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER);
+    GetNotifier().SetFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER);
 
 exit:
     return;
@@ -240,6 +245,15 @@ exit:
     return result;
 }
 
+void KeyManager::SetSecurityPolicyFlags(uint8_t aSecurityPolicyFlags)
+{
+    if (mSecurityPolicyFlags != aSecurityPolicyFlags)
+    {
+        mSecurityPolicyFlags = aSecurityPolicyFlags;
+        GetNotifier().SetFlags(OT_CHANGED_SECURITY_POLICY);
+    }
+}
+
 void KeyManager::StartKeyRotationTimer(void)
 {
     mHoursSinceKeyRotation = 0;
@@ -248,7 +262,7 @@ void KeyManager::StartKeyRotationTimer(void)
 
 void KeyManager::HandleKeyRotationTimer(Timer &aTimer)
 {
-    GetOwner(aTimer).HandleKeyRotationTimer();
+    aTimer.GetOwner<KeyManager>().HandleKeyRotationTimer();
 }
 
 void KeyManager::HandleKeyRotationTimer(void)
@@ -268,17 +282,6 @@ void KeyManager::HandleKeyRotationTimer(void)
     {
         SetCurrentKeySequence(mKeySequence + 1);
     }
-}
-
-KeyManager &KeyManager::GetOwner(const Context &aContext)
-{
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
-    KeyManager &keyManager = *static_cast<KeyManager *>(aContext.GetContext());
-#else
-    KeyManager &keyManager = Instance::Get().GetThreadNetif().GetKeyManager();
-    OT_UNUSED_VARIABLE(aContext);
-#endif
-    return keyManager;
 }
 
 }  // namespace ot
