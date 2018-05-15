@@ -60,7 +60,7 @@ extern "C" {
  * @param[in]  aContext  A pointer to application-specific context.
  *
  */
-typedef void (OTCALL *otHandleActiveScanResult)(otActiveScanResult *aResult, void *aContext);
+typedef void(OTCALL *otHandleActiveScanResult)(otActiveScanResult *aResult, void *aContext);
 
 /**
  * This function starts an IEEE 802.15.4 Active Scan
@@ -75,8 +75,11 @@ typedef void (OTCALL *otHandleActiveScanResult)(otActiveScanResult *aResult, voi
  * @retval OT_ERROR_BUSY  Already performing an Active Scan.
  *
  */
-OTAPI otError OTCALL otLinkActiveScan(otInstance *aInstance, uint32_t aScanChannels, uint16_t aScanDuration,
-                                      otHandleActiveScanResult aCallback, void *aCallbackContext);
+OTAPI otError OTCALL otLinkActiveScan(otInstance *             aInstance,
+                                      uint32_t                 aScanChannels,
+                                      uint16_t                 aScanDuration,
+                                      otHandleActiveScanResult aCallback,
+                                      void *                   aCallbackContext);
 
 /**
  * This function indicates whether or not an IEEE 802.15.4 Active Scan is currently in progress.
@@ -95,7 +98,7 @@ OTAPI bool OTCALL otLinkIsActiveScanInProgress(otInstance *aInstance);
  * @param[in]  aContext  A pointer to application-specific context.
  *
  */
-typedef void (OTCALL *otHandleEnergyScanResult)(otEnergyScanResult *aResult, void *aContext);
+typedef void(OTCALL *otHandleEnergyScanResult)(otEnergyScanResult *aResult, void *aContext);
 
 /**
  * This function starts an IEEE 802.15.4 Energy Scan
@@ -110,8 +113,11 @@ typedef void (OTCALL *otHandleEnergyScanResult)(otEnergyScanResult *aResult, voi
  * @retval OT_ERROR_BUSY  Could not start the energy scan.
  *
  */
-OTAPI otError OTCALL otLinkEnergyScan(otInstance *aInstance, uint32_t aScanChannels, uint16_t aScanDuration,
-                                      otHandleEnergyScanResult aCallback, void *aCallbackContext);
+OTAPI otError OTCALL otLinkEnergyScan(otInstance *             aInstance,
+                                      uint32_t                 aScanChannels,
+                                      uint16_t                 aScanDuration,
+                                      otHandleEnergyScanResult aCallback,
+                                      void *                   aCallbackContext);
 
 /**
  * This function indicates whether or not an IEEE 802.15.4 Energy Scan is currently in progress.
@@ -149,6 +155,18 @@ OTAPI otError OTCALL otLinkSendDataRequest(otInstance *aInstance);
  *
  */
 OTAPI bool OTCALL otLinkIsInTransmitState(otInstance *aInstance);
+
+/**
+ * This function enqueues an IEEE 802.15.4 out of band Frame for transmission.
+ *
+ * @param[in] aInstance  A pointer to an OpenThread instance.
+ * @param[in] aOobFrame  A pointer to the frame to transmit.
+ *
+ * @retval OT_ERROR_NONE           Successfully enqueued an IEEE 802.15.4 Data Request message.
+ * @retval OT_ERROR_ALREADY        An IEEE 802.15.4 out of band frame is already enqueued.
+ *
+ */
+OTAPI otError OTCALL otLinkOutOfBandTransmitRequest(otInstance *aInstance, otRadioFrame *aOobFrame);
 
 /**
  * Get the IEEE 802.15.4 channel.
@@ -273,6 +291,18 @@ OTAPI void OTCALL otLinkSetPollPeriod(otInstance *aInstance, uint32_t aPollPerio
  * @returns A pointer to the IEEE 802.15.4 Short Address.
  */
 OTAPI otShortAddress OTCALL otLinkGetShortAddress(otInstance *aInstance);
+
+/**
+ * Set the Short Address for address filtering.
+ *
+ * @param[in] aInstance      A pointer to an OpenThread instance.
+ * @param[in] aShortAddress  The IEEE 802.15.4 Short Address.
+ *
+ * @retval OT_ERROR_NONE             If successful.
+ * @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.
+ *
+ */
+OTAPI otError OTCALL otLinkSetShortAddress(otInstance *aInstance, uint16_t aShortAddress);
 
 /**
  * This function gets the address mode of MAC filter.
@@ -404,8 +434,9 @@ OTAPI void OTCALL otLinkFilterClearAddresses(otInstance *aInstance);
  * @sa otLinkFilterGetNextRssIn
  *
  */
-OTAPI otError OTCALL otLinkFilterGetNextAddress(otInstance *aInstance,
-                                                otMacFilterIterator *aIterator, otMacFilterEntry *aEntry);
+OTAPI otError OTCALL otLinkFilterGetNextAddress(otInstance *         aInstance,
+                                                otMacFilterIterator *aIterator,
+                                                otMacFilterEntry *   aEntry);
 
 /**
  * This method sets the received signal strength (in dBm) for the messages from the Extended Address.
@@ -500,8 +531,9 @@ OTAPI void OTCALL otLinkFilterClearRssIn(otInstance *aInstance);
  * @sa otLinkFilterClearRssIn
  *
  */
-OTAPI otError OTCALL otLinkFilterGetNextRssIn(otInstance *aInstance,
-                                              otMacFilterIterator *aIterator, otMacFilterEntry *aEntry);
+OTAPI otError OTCALL otLinkFilterGetNextRssIn(otInstance *         aInstance,
+                                              otMacFilterIterator *aIterator,
+                                              otMacFilterEntry *   aEntry);
 
 /**
  * This method converts received signal strength to link quality.
@@ -586,12 +618,49 @@ bool otLinkIsPromiscuous(otInstance *aInstance);
 otError otLinkSetPromiscuous(otInstance *aInstance, bool aPromiscuous);
 
 /**
+ * This function returns the current CCA (Clear Channel Assessment) failure rate.
+ *
+ * The rate is maintained over a window of (roughly) last `OPENTHREAD_CONFIG_CCA_FAILURE_RATE_AVERAGING_WINDOW`
+ * frame transmissions.
+ *
+ * @returns The CCA failure rate with maximum value `0xffff` corresponding to 100% failure rate.
+ *
+ */
+uint16_t otLinkGetCcaFailureRate(otInstance *aInstance);
+
+/**
+ * This function enables or disables the link layer.
+ *
+ * @note The link layer may only be enabled / disabled when the Thread Interface is disabled.
+ *
+ * @param[in]  aInstance     A pointer to an OpenThread instance.
+ * @param[in]  aEnable       true to enable the link layer, or false otherwise.
+ *
+ * @retval OT_ERROR_NONE          Successfully enabled / disabled the link layer.
+ * @retval OT_ERROR_INVALID_STATE Could not disable the link layer because
+ *                                the Thread interface is enabled.
+ *
+ */
+otError otLinkSetEnabled(otInstance *aInstance, bool aEnable);
+
+/**
+ * This function indicates whether or not the link layer is enabled.
+ *
+ * @param[in]  aInstance A pointer to an OpenThread instance.
+ *
+ * @retval true   Link layer is enabled.
+ * @retval false  Link layer is not enabled.
+ *
+ */
+bool otLinkIsEnabled(otInstance *aInstance);
+
+/**
  * @}
  *
  */
 
 #ifdef __cplusplus
-}  // extern "C"
+} // extern "C"
 #endif
 
-#endif  // OPENTHREAD_LINK_H_
+#endif // OPENTHREAD_LINK_H_

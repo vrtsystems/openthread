@@ -144,6 +144,9 @@
     <ClCompile Include="..\..\src\core\common\notifier.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\common\settings.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\core\common\tasklet.cpp">
       <Filter>Source Files\common</Filter>
     </ClCompile>
@@ -201,6 +204,9 @@
     <ClCompile Include="..\..\src\core\thread\address_resolver.cpp">
       <Filter>Source Files\thread</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\thread\child_table.cpp">
+      <Filter>Source Files\thread</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\core\thread\data_poll_manager.cpp">
       <Filter>Source Files\thread</Filter>
     </ClCompile>
@@ -217,6 +223,12 @@
       <Filter>Source Files\thread</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\thread\mesh_forwarder.cpp">
+      <Filter>Source Files\thread</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\thread\mesh_forwarder_ftd.cpp">
+      <Filter>Source Files\thread</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\thread\mesh_forwarder_mtd.cpp">
       <Filter>Source Files\thread</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\thread\mle.cpp">
@@ -241,6 +253,9 @@
       <Filter>Source Files\thread</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\thread\panid_query_server.cpp">
+      <Filter>Source Files\thread</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\thread\router_table.cpp">
       <Filter>Source Files\thread</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\thread\src_match_controller.cpp">
@@ -440,6 +455,9 @@
     <ClInclude Include="..\..\src\core\thread\address_resolver.hpp">
       <Filter>Header Files\thread</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\thread\child_table.hpp">
+      <Filter>Header Files\thread</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\thread\data_poll_manager.hpp">
       <Filter>Header Files\thread</Filter>
     </ClInclude>
@@ -489,6 +507,9 @@
       <Filter>Header Files\thread</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\thread\panid_query_server.hpp">
+      <Filter>Header Files\thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\thread\router_table.hpp">
       <Filter>Header Files\thread</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\thread\src_match_controller.hpp">

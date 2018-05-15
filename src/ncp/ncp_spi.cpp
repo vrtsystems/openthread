@@ -53,7 +53,7 @@
 namespace ot {
 namespace Ncp {
 
-#if OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT == 0
+#if OPENTHREAD_ENABLE_NCP_VENDOR_HOOK == 0
 
 static otDEFINE_ALIGNED_VAR(sNcpRaw, sizeof(NcpSpi), uint64_t);
 
@@ -330,7 +330,8 @@ void NcpSpi::PrepareTxFrame(void)
     case kTxStateHandlingSendDone:
         mTxState = kTxStateIdle;
 
-        // Fall-through to next case to prepare the next frame (if any).
+        // Fall through
+        // to next case to prepare the next frame (if any).
 
     case kTxStateIdle:
         PrepareNextSpiSendFrame();

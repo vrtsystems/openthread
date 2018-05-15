@@ -35,34 +35,54 @@
 
 #include "common/code_utils.hpp"
 #include "common/instance.hpp"
-#include "common/timer.hpp"
 #include "common/owner-locator.hpp"
+#include "common/timer.hpp"
 #include "crypto/hmac_sha256.hpp"
 #include "thread/mle_router.hpp"
 #include "thread/thread_netif.hpp"
 
 namespace ot {
 
-static const uint8_t kThreadString[] =
-{
+static const uint8_t kThreadString[] = {
     'T', 'h', 'r', 'e', 'a', 'd',
 };
 
-KeyManager::KeyManager(Instance &aInstance):
-    InstanceLocator(aInstance),
-    mKeySequence(0),
-    mMacFrameCounter(0),
-    mMleFrameCounter(0),
-    mStoredMacFrameCounter(0),
-    mStoredMleFrameCounter(0),
-    mHoursSinceKeyRotation(0),
-    mKeyRotationTime(kDefaultKeyRotationTime),
-    mKeySwitchGuardTime(kDefaultKeySwitchGuardTime),
-    mKeySwitchGuardEnabled(false),
-    mKeyRotationTimer(aInstance, &KeyManager::HandleKeyRotationTimer, this),
-    mKekFrameCounter(0),
-    mSecurityPolicyFlags(0xff)
+static const otMasterKey kDefaultMasterKey = {{
+    0x00,
+    0x11,
+    0x22,
+    0x33,
+    0x44,
+    0x55,
+    0x66,
+    0x77,
+    0x88,
+    0x99,
+    0xaa,
+    0xbb,
+    0xcc,
+    0xdd,
+    0xee,
+    0xff,
+}};
+
+KeyManager::KeyManager(Instance &aInstance)
+    : InstanceLocator(aInstance)
+    , mMasterKey(kDefaultMasterKey)
+    , mKeySequence(0)
+    , mMacFrameCounter(0)
+    , mMleFrameCounter(0)
+    , mStoredMacFrameCounter(0)
+    , mStoredMleFrameCounter(0)
+    , mHoursSinceKeyRotation(0)
+    , mKeyRotationTime(kDefaultKeyRotationTime)
+    , mKeySwitchGuardTime(kDefaultKeySwitchGuardTime)
+    , mKeySwitchGuardEnabled(false)
+    , mKeyRotationTimer(aInstance, &KeyManager::HandleKeyRotationTimer, this)
+    , mKekFrameCounter(0)
+    , mSecurityPolicyFlags(0xff)
 {
+    ComputeKey(mKeySequence, mKey);
 }
 
 void KeyManager::Start(void)
@@ -99,41 +119,36 @@ const otMasterKey &KeyManager::GetMasterKey(void) const
 
 otError KeyManager::SetMasterKey(const otMasterKey &aKey)
 {
-    otError error = OT_ERROR_NONE;
-    Router *routers;
-    Child *children;
-    uint8_t num;
+    Mle::MleRouter &mle   = GetNetif().GetMle();
+    otError         error = OT_ERROR_NONE;
+    Router *        routers;
 
     VerifyOrExit(memcmp(&mMasterKey, &aKey, sizeof(mMasterKey)) != 0);
 
-    mMasterKey = aKey;
+    mMasterKey   = aKey;
     mKeySequence = 0;
     ComputeKey(mKeySequence, mKey);
 
     // reset parent frame counters
-    routers = GetNetif().GetMle().GetParent();
+    routers = mle.GetParent();
     routers->SetKeySequence(0);
     routers->SetLinkFrameCounter(0);
     routers->SetMleFrameCounter(0);
 
     // reset router frame counters
-    routers = GetNetif().GetMle().GetRouters(&num);
-
-    for (uint8_t i = 0; i < num; i++)
+    for (RouterTable::Iterator iter(GetInstance()); !iter.IsDone(); iter.Advance())
     {
-        routers[i].SetKeySequence(0);
-        routers[i].SetLinkFrameCounter(0);
-        routers[i].SetMleFrameCounter(0);
+        iter.GetRouter()->SetKeySequence(0);
+        iter.GetRouter()->SetLinkFrameCounter(0);
+        iter.GetRouter()->SetMleFrameCounter(0);
     }
 
     // reset child frame counters
-    children = GetNetif().GetMle().GetChildren(&num);
-
-    for (uint8_t i = 0; i < num; i++)
+    for (ChildTable::Iterator iter(GetInstance(), ChildTable::kInStateAnyExceptInvalid); !iter.IsDone(); iter.Advance())
     {
-        children[i].SetKeySequence(0);
-        children[i].SetLinkFrameCounter(0);
-        children[i].SetMleFrameCounter(0);
+        iter.GetChild()->SetKeySequence(0);
+        iter.GetChild()->SetLinkFrameCounter(0);
+        iter.GetChild()->SetMleFrameCounter(0);
     }
 
     GetNotifier().SetFlags(OT_CHANGED_THREAD_KEY_SEQUENCE_COUNTER | OT_CHANGED_MASTER_KEY);
@@ -145,7 +160,7 @@ exit:
 otError KeyManager::ComputeKey(uint32_t aKeySequence, uint8_t *aKey)
 {
     Crypto::HmacSha256 hmac;
-    uint8_t keySequenceBytes[4];
+    uint8_t            keySequenceBytes[4];
 
     hmac.Start(mMasterKey.m8, sizeof(mMasterKey.m8));
 
@@ -169,9 +184,7 @@ void KeyManager::SetCurrentKeySequence(uint32_t aKeySequence)
     }
 
     // Check if the guard timer has expired if key rotation is requested.
-    if ((aKeySequence == (mKeySequence + 1)) &&
-        (mKeySwitchGuardTime != 0) &&
-        mKeyRotationTimer.IsRunning() &&
+    if ((aKeySequence == (mKeySequence + 1)) && (mKeySwitchGuardTime != 0) && mKeyRotationTimer.IsRunning() &&
         mKeySwitchGuardEnabled)
     {
         VerifyOrExit(mHoursSinceKeyRotation >= mKeySwitchGuardTime);
@@ -284,4 +297,4 @@ void KeyManager::HandleKeyRotationTimer(void)
     }
 }
 
-}  // namespace ot
+} // namespace ot

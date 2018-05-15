@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, Nordic Semiconductor ASA
+/* Copyright (c) 2017 - 2018, Nordic Semiconductor ASA
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,9 +42,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "platform/clock/nrf_drv_radio802154_clock.h"
+#include "platform/clock/nrf_802154_clock.h"
 
-static bool m_continuous;
+static bool          m_continuous;
+static volatile bool m_critical_section;
+static volatile bool m_started_pending;
 
 void nrf_raal_init(void)
 {
@@ -60,7 +62,7 @@ void nrf_raal_continuous_mode_enter(void)
 {
     assert(!m_continuous);
 
-    nrf_drv_radio802154_clock_hfclk_start();
+    nrf_802154_clock_hfclk_start();
     m_continuous = true;
 }
 
@@ -69,7 +71,7 @@ void nrf_raal_continuous_mode_exit(void)
     assert(m_continuous);
 
     m_continuous = false;
-    nrf_drv_radio802154_clock_hfclk_stop();
+    nrf_802154_clock_hfclk_stop();
 }
 
 bool nrf_raal_timeslot_request(uint32_t length_us)
@@ -81,6 +83,11 @@ bool nrf_raal_timeslot_request(uint32_t length_us)
     return true;
 }
 
+bool nrf_raal_timeslot_is_granted(void)
+{
+    return true;
+}
+
 uint32_t nrf_raal_timeslot_us_left_get(void)
 {
     return UINT32_MAX;
@@ -88,15 +95,28 @@ uint32_t nrf_raal_timeslot_us_left_get(void)
 
 void nrf_raal_critical_section_enter(void)
 {
-    // Intentionally empty.
+    m_critical_section = true;
 }
 
 void nrf_raal_critical_section_exit(void)
 {
-    // Intentionally empty.
+    m_critical_section = false;
+
+    if (m_started_pending)
+    {
+        nrf_raal_timeslot_started();
+        m_started_pending = false;
+    }
 }
 
-void nrf_drv_radio802154_clock_hfclk_ready(void)
+void nrf_802154_clock_hfclk_ready(void)
 {
-    nrf_raal_timeslot_started();
+    if (m_critical_section)
+    {
+        m_started_pending = true;
+    }
+    else
+    {
+        nrf_raal_timeslot_started();
+    }
 }

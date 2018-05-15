@@ -32,21 +32,37 @@
  *
  */
 
-#include <openthread/config.h>
 #include <openthread-core-config.h>
+#include <openthread/config.h>
 
 #include <openthread/platform/logging.h>
 
-#include <device/nrf.h>
-#include <drivers/clock/nrf_drv_clock.h>
 #include "platform-nrf5.h"
+#include <drivers/clock/nrf_drv_clock.h>
+#include <nrf.h>
 
 #include <openthread/config.h>
 
-void __cxa_pure_virtual(void) { while (1); }
+void __cxa_pure_virtual(void)
+{
+    while (1)
+        ;
+}
 
 void PlatformInit(int argc, char *argv[])
 {
+    extern bool gPlatformPseudoResetWasRequested;
+
+    if (gPlatformPseudoResetWasRequested)
+    {
+        nrf5AlarmDeinit();
+        nrf5AlarmInit();
+
+        gPlatformPseudoResetWasRequested = false;
+
+        return;
+    }
+
     (void)argc;
     (void)argv;
 
@@ -63,6 +79,9 @@ void PlatformInit(int argc, char *argv[])
     nrf5AlarmInit();
     nrf5RandomInit();
     nrf5UartInit();
+#ifndef SPIS_TRANSPORT_DISABLE
+    nrf5SpiSlaveInit();
+#endif
     nrf5MiscInit();
     nrf5CryptoInit();
     nrf5RadioInit();
@@ -75,6 +94,9 @@ void PlatformDeinit(void)
     nrf5RadioDeinit();
     nrf5CryptoDeinit();
     nrf5MiscDeinit();
+#ifndef SPIS_TRANSPORT_DISABLE
+    nrf5SpiSlaveDeinit();
+#endif
     nrf5UartDeinit();
     nrf5RandomDeinit();
     nrf5AlarmDeinit();
@@ -83,11 +105,21 @@ void PlatformDeinit(void)
 #endif
 }
 
+bool PlatformPseudoResetWasRequested(void)
+{
+    extern bool gPlatformPseudoResetWasRequested;
+    return gPlatformPseudoResetWasRequested;
+}
+
 void PlatformProcessDrivers(otInstance *aInstance)
 {
     nrf5AlarmProcess(aInstance);
     nrf5RadioProcess(aInstance);
     nrf5UartProcess();
+    nrf5TempProcess();
+#ifndef SPIS_TRANSPORT_DISABLE
+    nrf5SpiSlaveProcess();
+#endif
 }
 
 __WEAK void PlatformEventSignalPending(void)

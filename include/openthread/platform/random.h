@@ -32,8 +32,8 @@
  *   This file includes the platform abstraction for random number generation.
  */
 
-#ifndef RANDOM_H_
-#define RANDOM_H_
+#ifndef OPENTHREAD_PLATFORM_RANDOM_H_
+#define OPENTHREAD_PLATFORM_RANDOM_H_
 
 #include <stdint.h>
 
@@ -84,7 +84,7 @@ otError otPlatRandomGetTrue(uint8_t *aOutput, uint16_t aOutputLength);
  */
 
 #ifdef __cplusplus
-}  // end of extern "C"
+} // end of extern "C"
 #endif
 
-#endif  // RANDOM_H_
+#endif // OPENTHREAD_PLATFORM_RANDOM_H_

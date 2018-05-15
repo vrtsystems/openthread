@@ -30,15 +30,18 @@
  *   This file implements full thread device specified Spinel interface to the OpenThread stack.
  */
 
+#include <openthread/config.h>
 #include "ncp_base.hpp"
 
+#if OPENTHREAD_ENABLE_CHANNEL_MANAGER
+#include <openthread/channel_manager.h>
+#endif
 #include <openthread/dataset_ftd.h>
 #include <openthread/diag.h>
 #include <openthread/icmp6.h>
 #include <openthread/ncp.h>
 #include <openthread/openthread.h>
 #include <openthread/platform/misc.h>
-#include <openthread/platform/radio.h>
 #include <openthread/thread_ftd.h>
 
 #if OPENTHREAD_ENABLE_TMF_PROXY
@@ -51,7 +54,6 @@
 #if OPENTHREAD_ENABLE_COMMISSIONER
 #include "meshcop/commissioner.hpp"
 #endif
-#include "net/ip6.hpp"
 
 #if OPENTHREAD_FTD
 namespace ot {
@@ -215,7 +217,8 @@ otError NcpBase::GetPropertyHandler_THREAD_CHILD_TABLE_ADDRESSES(void)
     otError error = OT_ERROR_NONE;
     otChildInfo childInfo;
     uint8_t maxChildren;
-    const otIp6Address *ip6Address;
+    otIp6Address ip6Address;
+    otChildIp6AddressIterator iterator = OT_CHILD_IP6_ADDRESS_ITERATOR_INIT;
 
     maxChildren = otThreadGetMaxAllowedChildren(mInstance);
 
@@ -232,14 +235,11 @@ otError NcpBase::GetPropertyHandler_THREAD_CHILD_TABLE_ADDRESSES(void)
         SuccessOrExit(error = mEncoder.WriteEui64(childInfo.mExtAddress));
         SuccessOrExit(error = mEncoder.WriteUint16(childInfo.mRloc16));
 
-        ip6Address = childInfo.mIp6Addresses;
+        iterator = OT_CHILD_IP6_ADDRESS_ITERATOR_INIT;
 
-        for (uint8_t num = childInfo.mIp6AddressesLength; num > 0; num--, ip6Address++)
+        while (otThreadGetChildNextIp6Address(mInstance, childIndex, &iterator, &ip6Address) == OT_ERROR_NONE)
         {
-            if (!otIp6IsAddressUnspecified(ip6Address))
-            {
-                SuccessOrExit(error = mEncoder.WriteIp6Address(*ip6Address));
-            }
+            SuccessOrExit(error = mEncoder.WriteIp6Address(ip6Address));
         }
 
         SuccessOrExit(error = mEncoder.CloseStruct());
@@ -429,8 +429,6 @@ otError NcpBase::InsertPropertyHandler_THREAD_JOINERS(void)
     const char *aPSKd = NULL;
     uint32_t joinerTimeout = 0;
 
-    VerifyOrExit(mAllowLocalNetworkDataChange == true, error = OT_ERROR_INVALID_STATE);
-
     SuccessOrExit(error = mDecoder.ReadUtf8(aPSKd));
     SuccessOrExit(error = mDecoder.ReadUint32(joinerTimeout));
 
@@ -439,13 +437,11 @@ otError NcpBase::InsertPropertyHandler_THREAD_JOINERS(void)
         eui64 = NULL;
     }
 
-
     error = otCommissionerAddJoiner(mInstance, eui64, aPSKd, joinerTimeout);
 
 exit:
     return error;
 }
-
 #endif // OPENTHREAD_ENABLE_COMMISSIONER
 
 otError NcpBase::SetPropertyHandler_THREAD_LOCAL_LEADER_WEIGHT(void)
@@ -861,6 +857,131 @@ otError NcpBase::SetPropertyHandler_THREAD_MGMT_PENDING_DATASET(void)
 exit:
     return error;
 }
+
+#if OPENTHREAD_ENABLE_CHANNEL_MANAGER
+
+otError NcpBase::GetPropertyHandler_CHANNEL_MANAGER_NEW_CHANNEL(void)
+{
+    return mEncoder.WriteUint8(otChannelManagerGetRequestedChannel(mInstance));
+}
+
+otError NcpBase::SetPropertyHandler_CHANNEL_MANAGER_NEW_CHANNEL(void)
+{
+    uint8_t channel;
+    otError error = OT_ERROR_NONE;
+
+    SuccessOrExit(error = mDecoder.ReadUint8(channel));
+
+    otChannelManagerRequestChannelChange(mInstance, channel);
+
+exit:
+    return error;
+}
+
+otError NcpBase::GetPropertyHandler_CHANNEL_MANAGER_DELAY(void)
+{
+    return mEncoder.WriteUint16(otChannelManagerGetDelay(mInstance));
+}
+
+otError NcpBase::SetPropertyHandler_CHANNEL_MANAGER_DELAY(void)
+{
+    uint16_t delay;
+    otError error = OT_ERROR_NONE;
+
+    SuccessOrExit(error = mDecoder.ReadUint16(delay));
+
+    error = otChannelManagerSetDelay(mInstance, delay);
+
+exit:
+    return error;
+}
+
+otError NcpBase::GetPropertyHandler_CHANNEL_MANAGER_SUPPORTED_CHANNELS(void)
+{
+    return EncodeChannelMask(otChannelManagerGetSupportedChannels(mInstance));
+}
+
+otError NcpBase::SetPropertyHandler_CHANNEL_MANAGER_SUPPORTED_CHANNELS(void)
+{
+    uint32_t channelMask = 0;
+    otError error = OT_ERROR_NONE;
+
+    SuccessOrExit(error = DecodeChannelMask(channelMask));
+    otChannelManagerSetSupportedChannels(mInstance, channelMask);
+
+exit:
+    return error;
+}
+
+otError NcpBase::GetPropertyHandler_CHANNEL_MANAGER_FAVORED_CHANNELS(void)
+{
+    return EncodeChannelMask(otChannelManagerGetFavoredChannels(mInstance));
+}
+
+otError NcpBase::SetPropertyHandler_CHANNEL_MANAGER_FAVORED_CHANNELS(void)
+{
+    uint32_t channelMask = 0;
+    otError error = OT_ERROR_NONE;
+
+    SuccessOrExit(error = DecodeChannelMask(channelMask));
+    otChannelManagerSetFavoredChannels(mInstance, channelMask);
+
+exit:
+    return error;
+}
+
+otError NcpBase::GetPropertyHandler_CHANNEL_MANAGER_CHANNEL_SELECT(void)
+{
+    return mEncoder.WriteBool(false);
+}
+
+otError NcpBase::SetPropertyHandler_CHANNEL_MANAGER_CHANNEL_SELECT(void)
+{
+    bool skipQualityCheck = false;
+    otError error = OT_ERROR_NONE;
+
+    SuccessOrExit(error = mDecoder.ReadBool(skipQualityCheck));
+    error = otChannelManagerRequestChannelSelect(mInstance, skipQualityCheck);
+
+exit:
+    return error;
+}
+
+otError NcpBase::GetPropertyHandler_CHANNEL_MANAGER_AUTO_SELECT_ENABLED(void)
+{
+    return mEncoder.WriteBool(otChannelManagerGetAutoChannelSelectionEnabled(mInstance));
+}
+
+otError NcpBase::SetPropertyHandler_CHANNEL_MANAGER_AUTO_SELECT_ENABLED(void)
+{
+    bool enabled = false;
+    otError error = OT_ERROR_NONE;
+
+    SuccessOrExit(error = mDecoder.ReadBool(enabled));
+    otChannelManagerSetAutoChannelSelectionEnabled(mInstance, enabled);
+
+exit:
+    return error;
+}
+
+otError NcpBase::GetPropertyHandler_CHANNEL_MANAGER_AUTO_SELECT_INTERVAL(void)
+{
+    return mEncoder.WriteUint32(otChannelManagerGetAutoChannelSelectionInterval(mInstance));
+}
+
+otError NcpBase::SetPropertyHandler_CHANNEL_MANAGER_AUTO_SELECT_INTERVAL(void)
+{
+    uint32_t interval;
+    otError error = OT_ERROR_NONE;
+
+    SuccessOrExit(error = mDecoder.ReadUint32(interval));
+    error = otChannelManagerSetAutoChannelSelectionInterval(mInstance, interval);
+
+exit:
+    return error;
+}
+
+#endif // OPENTHREAD_ENABLE_CHANNEL_MANAGER
 
 }  // namespace Ncp
 }  // namespace ot

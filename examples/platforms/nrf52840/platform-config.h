@@ -35,9 +35,9 @@
 #ifndef PLATFORM_CONFIG_H_
 #define PLATFORM_CONFIG_H_
 
-#include "device/nrf.h"
+#include "nrf.h"
+#include "nrf_peripherals.h"
 #include "drivers/clock/nrf_drv_clock.h"
-#include "hal/nrf_peripherals.h"
 #include "hal/nrf_radio.h"
 #include "hal/nrf_uart.h"
 
@@ -55,7 +55,7 @@
  *
  */
 #ifndef UART_INSTANCE
-#define UART_INSTANCE  NRF_UART0
+#define UART_INSTANCE NRF_UART0
 #endif
 
 /**
@@ -69,7 +69,7 @@
  *
  */
 #ifndef UART_PARITY
-#define UART_PARITY  NRF_UART_PARITY_EXCLUDED
+#define UART_PARITY NRF_UART_PARITY_EXCLUDED
 #endif
 
 /**
@@ -83,7 +83,7 @@
  *
  */
 #ifndef UART_HWFC
-#define UART_HWFC  NRF_UART_HWFC_ENABLED
+#define UART_HWFC NRF_UART_HWFC_ENABLED
 #endif
 
 /**
@@ -111,7 +111,7 @@
  *
  */
 #ifndef UART_BAUDRATE
-#define UART_BAUDRATE  NRF_UART_BAUDRATE_115200
+#define UART_BAUDRATE NRF_UART_BAUDRATE_115200
 #endif
 
 /**
@@ -121,7 +121,7 @@
  *
  */
 #ifndef UART_IRQN
-#define UART_IRQN  UARTE0_UART0_IRQn
+#define UART_IRQN UARTE0_UART0_IRQn
 #endif
 
 /**
@@ -131,7 +131,7 @@
  *
  */
 #ifndef UART_IRQ_PRIORITY
-#define UART_IRQ_PRIORITY  6
+#define UART_IRQ_PRIORITY 6
 #endif
 
 /**
@@ -141,7 +141,7 @@
  *
  */
 #ifndef UART_RX_BUFFER_SIZE
-#define UART_RX_BUFFER_SIZE  256
+#define UART_RX_BUFFER_SIZE 256
 #endif
 
 /**
@@ -151,7 +151,7 @@
  *
  */
 #ifndef UART_PIN_TX
-#define UART_PIN_TX  6
+#define UART_PIN_TX 6
 #endif
 
 /**
@@ -161,7 +161,7 @@
  *
  */
 #ifndef UART_PIN_RX
-#define UART_PIN_RX  8
+#define UART_PIN_RX 8
 #endif
 
 /**
@@ -171,7 +171,7 @@
  *
  */
 #ifndef UART_PIN_CTS
-#define UART_PIN_CTS  7
+#define UART_PIN_CTS 7
 #endif
 
 /**
@@ -181,7 +181,7 @@
  *
  */
 #ifndef UART_PIN_RTS
-#define UART_PIN_RTS  5
+#define UART_PIN_RTS 5
 #endif
 
 /*******************************************************************************
@@ -195,7 +195,7 @@
  *
  */
 #ifndef RTC_INSTANCE
-#define RTC_INSTANCE  NRF_RTC2
+#define RTC_INSTANCE NRF_RTC2
 #endif
 
 /**
@@ -205,7 +205,7 @@
  *
  */
 #ifndef RTC_IRQ_HANDLER
-#define RTC_IRQ_HANDLER  RTC2_IRQHandler
+#define RTC_IRQ_HANDLER RTC2_IRQHandler
 #endif
 
 /**
@@ -215,7 +215,7 @@
  *
  */
 #ifndef RTC_IRQN
-#define RTC_IRQN  RTC2_IRQn
+#define RTC_IRQN RTC2_IRQn
 #endif
 
 /**
@@ -225,7 +225,7 @@
  *
  */
 #ifndef RTC_IRQ_PRIORITY
-#define RTC_IRQ_PRIORITY  6
+#define RTC_IRQ_PRIORITY 6
 #endif
 
 /*******************************************************************************
@@ -239,7 +239,7 @@
  *
  */
 #ifndef RNG_BUFFER_SIZE
-#define RNG_BUFFER_SIZE  64
+#define RNG_BUFFER_SIZE 64
 #endif
 
 /**
@@ -249,7 +249,7 @@
  *
  */
 #ifndef RNG_IRQ_PRIORITY
-#define RNG_IRQ_PRIORITY  6
+#define RNG_IRQ_PRIORITY 6
 #endif
 
 /*******************************************************************************
@@ -263,7 +263,7 @@
  *
  */
 #ifndef LOG_RTT_BUFFER_INDEX
-#define LOG_RTT_BUFFER_INDEX  0
+#define LOG_RTT_BUFFER_INDEX 0
 #endif
 
 /**
@@ -273,7 +273,7 @@
  *
  */
 #ifndef LOG_RTT_BUFFER_NAME
-#define LOG_RTT_BUFFER_NAME  "Terminal"
+#define LOG_RTT_BUFFER_NAME "Terminal"
 #endif
 
 /**
@@ -283,7 +283,7 @@
  *
  */
 #ifndef LOG_RTT_BUFFER_SIZE
-#define LOG_RTT_BUFFER_SIZE  256
+#define LOG_RTT_BUFFER_SIZE 256
 #endif
 
 /**
@@ -293,7 +293,7 @@
  *
  */
 #ifndef LOG_RTT_COLOR_ENABLE
-#define LOG_RTT_COLOR_ENABLE  1
+#define LOG_RTT_COLOR_ENABLE 1
 #endif
 
 /**
@@ -304,7 +304,7 @@
  *
  */
 #ifndef LOG_PARSE_BUFFER_SIZE
-#define LOG_PARSE_BUFFER_SIZE  128
+#define LOG_PARSE_BUFFER_SIZE 128
 #endif
 
 /**
@@ -314,18 +314,96 @@
  *
  */
 #ifndef LOG_TIMESTAMP_ENABLE
-#define LOG_TIMESTAMP_ENABLE  1
+#define LOG_TIMESTAMP_ENABLE 1
+#endif
+
+/*******************************************************************************
+ * @section SPI Slave configuration.
+ ******************************************************************************/
+
+/**
+ * @def SPIS Instance.
+ */
+#ifndef SPIS_INSTANCE
+#define SPIS_INSTANCE NRF_SPIS0
 #endif
 
 /**
- * @def USB_INITIAL_DELAY_MS
+ * @def SPIS mode.
  *
- * Init delay for USB driver, used when software reset was detected to help OS to re-enumerate the device.
- *
+ * @brief Possible values:
+ *         \ref NRF_SPIS_MODE_0 - SCK active high, sample on leading edge of clock.
+ *         \ref NRF_SPIS_MODE_1 - SCK active high, sample on trailing edge of clock.
+ *         \ref NRF_SPIS_MODE_2 - SCK active low, sample on leading edge of clock.
+ *         \ref NRF_SPIS_MODE_3 - SCK active low, sample on trailing edge of clock.
  */
-#ifndef USB_INITIAL_DELAY_MS
-#define USB_INITIAL_DELAY_MS  600
+#ifndef SPIS_MODE
+#define SPIS_MODE NRF_SPIS_MODE_0
 #endif
+
+/**
+ * @def SPIS bit orders.
+ *
+ * @brief Possible values:
+ *         \ref NRF_SPIS_BIT_ORDER_MSB_FIRST - Most significant bit shifted out first.
+ *         \ref NRF_SPIS_BIT_ORDER_LSB_FIRST - Least significant bit shifted out first.
+ */
+#ifndef SPIS_BIT_ORDER
+#define SPIS_BIT_ORDER NRF_SPIS_BIT_ORDER_MSB_FIRST
+#endif
+
+/**
+ * @def SPIS Interrupt number.
+ */
+#ifndef SPIS_IRQN
+#define SPIS_IRQN SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn
+#endif
+
+/**
+ * @def SPIS Interrupt priority.
+ */
+#ifndef SPIS_IRQ_PRIORITY
+#define SPIS_IRQ_PRIORITY 6
+#endif
+
+/**
+ * @def SPIS MOSI Pin.
+ */
+#ifndef SPIS_PIN_MOSI
+#define SPIS_PIN_MOSI 4
+#endif
+
+/**
+ * @def SPIS MISO Pin.
+ */
+#ifndef SPIS_PIN_MISO
+#define SPIS_PIN_MISO 28
+#endif
+
+/**
+ * @def SPIS SCK Pin.
+ */
+#ifndef SPIS_PIN_SCK
+#define SPIS_PIN_SCK 3
+#endif
+
+/**
+ * @def SPIS CSN Pin.
+ */
+#ifndef SPIS_PIN_CSN
+#define SPIS_PIN_CSN 29
+#endif
+
+/**
+ * @def SPIS Host IRQ Pin.
+ */
+#ifndef SPIS_PIN_HOST_IRQ
+#define SPIS_PIN_HOST_IRQ 30
+#endif
+
+/*******************************************************************************
+ * @section USB driver configuration.
+ ******************************************************************************/
 
 /**
  * @def USB_HOST_UART_CONFIG_DELAY_MS
@@ -344,7 +422,17 @@
  * Use USB CDC driver for serial communication.
  */
 #ifndef USB_CDC_AS_SERIAL_TRANSPORT
-#define USB_CDC_AS_SERIAL_TRANSPORT  0
+#define USB_CDC_AS_SERIAL_TRANSPORT 0
+#endif
+
+/**
+ * @def OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
+ *
+ * Reset the application, not the chip, when a software reset is requested.
+ * via `otPlatReset()`.
+ */
+#ifndef OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
+#define OPENTHREAD_PLATFORM_USE_PSEUDO_RESET USB_CDC_AS_SERIAL_TRANSPORT
 #endif
 
 /*******************************************************************************
@@ -352,23 +440,58 @@
  ******************************************************************************/
 
 /**
- * @def NRF_DRV_RADIO802154_PENDING_SHORT_ADDRESSES
+ * @def NRF_802154_PENDING_SHORT_ADDRESSES
  *
  * Number of slots containing short addresses of nodes for which pending data is stored.
  *
  */
-#ifndef NRF_DRV_RADIO802154_PENDING_SHORT_ADDRESSES
-#define NRF_DRV_RADIO802154_PENDING_SHORT_ADDRESSES  OPENTHREAD_CONFIG_MAX_CHILDREN
+#ifndef NRF_802154_PENDING_SHORT_ADDRESSES
+#define NRF_802154_PENDING_SHORT_ADDRESSES OPENTHREAD_CONFIG_MAX_CHILDREN
 #endif
 
 /**
- * @def NRF_DRV_RADIO802154_PENDING_EXTENDED_ADDRESSES
+ * @def NRF_802154_PENDING_EXTENDED_ADDRESSES
  *
  * Number of slots containing extended addresses of nodes for which pending data is stored.
  *
  */
-#ifndef NRF_DRV_RADIO802154_PENDING_EXTENDED_ADDRESSES
-#define NRF_DRV_RADIO802154_PENDING_EXTENDED_ADDRESSES  OPENTHREAD_CONFIG_MAX_CHILDREN
+#ifndef NRF_802154_PENDING_EXTENDED_ADDRESSES
+#define NRF_802154_PENDING_EXTENDED_ADDRESSES OPENTHREAD_CONFIG_MAX_CHILDREN
 #endif
 
-#endif  // PLATFORM_CONFIG_H_
+/**
+ * @def NRF_802154_CSMA_CA_ENABLED
+ *
+ * If CSMA-CA procedure should be enabled by the driver. Disabling CSMA-CA procedure improves
+ * driver performance.
+ *
+ */
+#ifndef NRF_802154_CSMA_CA_ENABLED
+#define NRF_802154_CSMA_CA_ENABLED 1
+#endif
+
+/**
+ * @def NRF_802154_ACK_TIMEOUT_ENABLED
+ *
+ * If ACK timeout feature should be enabled in the driver.
+ *
+ */
+#ifndef NRF_802154_ACK_TIMEOUT_ENABLED
+#define NRF_802154_ACK_TIMEOUT_ENABLED 1
+#endif
+
+/*******************************************************************************
+ * @section Temperature sensor driver configuration.
+ ******************************************************************************/
+
+/**
+ * @def TEMP_MEASUREMENT_INTERVAL
+ *
+ * Interval of consecutive temperature measurements [s].
+ *
+ */
+#ifndef TEMP_MEASUREMENT_INTERVAL
+#define TEMP_MEASUREMENT_INTERVAL 30
+#endif
+
+#endif // PLATFORM_CONFIG_H_
