@@ -42,6 +42,52 @@
 #include "common/logging.hpp"
 #include "utils/code_utils.h"
 
+#define RFCORE_RXTX_INT                         (141)
+
+#define RFCORE_XREG_RFIRQM0                     0x4008868C  // RF interrupt masks
+#define RFCORE_XREG_RFIRQM1                     0x40088690  // RF interrupt masks
+#define RFCORE_XREG_RFERRM                      0x40088694  // RF error interrupt mask
+
+#define RFCORE_SFR_RFIRQF0_RXMASKZERO           0x00000080  // RXENABLE is now completely clear
+#define RFCORE_SFR_RFIRQF0_RXPKTDONE            0x00000040  // A complete frame has been received
+#define RFCORE_SFR_RFIRQF0_FRAME_ACCEPTED       0x00000020  // Frame has passed frame filtering
+#define RFCORE_SFR_RFIRQF0_SRC_MATCH_FOUND      0x00000010  // Source match is found
+#define RFCORE_SFR_RFIRQF0_SRC_MATCH_DONE       0x00000008  // Source matching is complete
+#define RFCORE_SFR_RFIRQF0_FIFOP                0x00000004  // The number of bytes in the RX fifo is above threshold
+#define RFCORE_SFR_RFIRQF0_SFD                  0x00000002  // SFD has been received or transmitted
+#define RFCORE_SFR_RFIRQF0_ACT_UNUSED           0x00000001  // Reserved
+
+#define RFCORE_XREG_RFIRQM0_RXMASKZERO          0x00000080
+#define RFCORE_XREG_RFIRQM0_RXPKTDONE           0x00000040
+#define RFCORE_XREG_RFIRQM0_FRAME_ACCEPTED      0x00000020
+#define RFCORE_XREG_RFIRQM0_SRC_MATCH_FOUND     0x00000010
+#define RFCORE_XREG_RFIRQM0_SRC_MATCH_DONE      0x00000008
+#define RFCORE_XREG_RFIRQM0_FIFOP               0x00000004
+#define RFCORE_XREG_RFIRQM0_SFD                 0x00000002
+#define RFCORE_XREG_RFIRQM0_ACT_UNUSED          0x00000001
+
+#define RFCORE_SFR_RFIRQF1_CSP_WAIT             0x00000020
+#define RFCORE_SFR_RFIRQF1_CSP_STOP             0x00000010
+#define RFCORE_SFR_RFIRQF1_CSP_MANINT           0x00000008
+#define RFCORE_SFR_RFIRQF1_RF_IDLE              0x00000004
+#define RFCORE_SFR_RFIRQF1_TXDONE               0x00000002
+#define RFCORE_SFR_RFIRQF1_TXACKDONE            0x00000001
+
+#define RFCORE_XREG_RFIRQM1_CSP_WAIT            0x00000020
+#define RFCORE_XREG_RFIRQM1_CSP_STOP            0x00000010
+#define RFCORE_XREG_RFIRQM1_CSP_MANINT          0x00000008
+#define RFCORE_XREG_RFIRQM1_RF_IDLE             0x00000004
+#define RFCORE_XREG_RFIRQM1_TXDONE              0x00000002
+#define RFCORE_XREG_RFIRQM1_TXACKDONE           0x00000001
+
+#define RFCORE_XREG_RFERRM_STROBE_ERR           0x00000040
+#define RFCORE_XREG_RFERRM_TXUNDERF             0x00000020
+#define RFCORE_XREG_RFERRM_TXOVERF              0x00000010
+#define RFCORE_XREG_RFERRM_RXUNDERF             0x00000008
+#define RFCORE_XREG_RFERRM_RXOVERF              0x00000004
+#define RFCORE_XREG_RFERRM_RXABO                0x00000002
+#define RFCORE_XREG_RFERRM_NLOCK                0x00000001
+
 enum
 {
     IEEE802154_MIN_LENGTH      = 5,
@@ -255,6 +301,11 @@ void cc2538RadioInit(void)
     sTransmitFrame.mPsdu   = sTransmitPsdu;
     sReceiveFrame.mLength  = 0;
     sReceiveFrame.mPsdu    = sReceivePsdu;
+
+    // Enable interrupts for RX/TX, interrupt 141.
+    // That's NVIC index 5 bit 13.
+    HWREG(NVIC_EN0 + (5*4)) = (1 << 13);
+    HWREG(RFCORE_XREG_RFIRQM0) |= RFCORE_XREG_RFIRQM0_RXPKTDONE;
 
     // enable clock
     HWREG(SYS_CTRL_RCGCRFC) = SYS_CTRL_RCGCRFC_RFC0;
@@ -506,6 +557,7 @@ void readFrame(void)
 
     otEXPECT(sState == OT_RADIO_STATE_RECEIVE || sState == OT_RADIO_STATE_TRANSMIT);
     otEXPECT((HWREG(RFCORE_XREG_FSMSTAT1) & RFCORE_XREG_FSMSTAT1_FIFOP) != 0);
+    otEXPECT(sReceiveFrame.mLength == 0);
 
     // read length
     length = HWREG(RFCORE_SFR_RFDATA);
@@ -554,7 +606,9 @@ exit:
 
 void cc2538RadioProcess(otInstance *aInstance)
 {
+    HWREG(RFCORE_XREG_RFIRQM0) &= ~RFCORE_XREG_RFIRQM0_RXPKTDONE;
     readFrame();
+    HWREG(RFCORE_XREG_RFIRQM0) |= RFCORE_XREG_RFIRQM0_RXPKTDONE;
 
     if ((sState == OT_RADIO_STATE_RECEIVE && sReceiveFrame.mLength > 0) ||
         (sState == OT_RADIO_STATE_TRANSMIT && sReceiveFrame.mLength > IEEE802154_ACK_LENGTH))
@@ -617,6 +671,10 @@ void cc2538RadioProcess(otInstance *aInstance)
 
 void RFCoreRxTxIntHandler(void)
 {
+    if (HWREG(RFCORE_SFR_RFIRQF0) & RFCORE_SFR_RFIRQF0_RXPKTDONE)
+    {
+        readFrame();
+    }
     HWREG(RFCORE_SFR_RFIRQF0) = 0;
 }
 
