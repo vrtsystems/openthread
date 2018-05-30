@@ -690,6 +690,7 @@ static void readFrame(void)
 
     otEXPECT(sState == OT_RADIO_STATE_RECEIVE || sState == OT_RADIO_STATE_TRANSMIT);
     otEXPECT((HWREG(RFCORE_XREG_FSMSTAT1) & RFCORE_XREG_FSMSTAT1_FIFOP) != 0);
+    otEXPECT(sReceiveFrame.mLength == 0);
 
     // read length
     length = HWREG(RFCORE_SFR_RFDATA);
