@@ -143,6 +143,106 @@ __attribute__((section(".vectors"), used)) void (*const vectors[])(void) = {
     0,                                                      // 61 Reserved
     IntDefaultHandler,                                      // 62 uDMA
     IntDefaultHandler,                                      // 63 uDMA Error
+    0,                                      // 64 Reserved
+    0,                                      // 65 Reserved
+    0,                                      // 66 Reserved
+    0,                                      // 67 Reserved
+    0,                                      // 68 Reserved
+    0,                                      // 69 Reserved
+    0,                                      // 70 Reserved
+    0,                                      // 71 Reserved
+    0,                                      // 72 Reserved
+    0,                                      // 73 Reserved
+    0,                                      // 74 Reserved
+    0,                                      // 75 Reserved
+    0,                                      // 76 Reserved
+    0,                                      // 77 Reserved
+    0,                                      // 78 Reserved
+    0,                                      // 79 Reserved
+    0,                                      // 80 Reserved
+    0,                                      // 81 Reserved
+    0,                                      // 82 Reserved
+    0,                                      // 83 Reserved
+    0,                                      // 84 Reserved
+    0,                                      // 85 Reserved
+    0,                                      // 86 Reserved
+    0,                                      // 87 Reserved
+    0,                                      // 88 Reserved
+    0,                                      // 89 Reserved
+    0,                                      // 90 Reserved
+    0,                                      // 91 Reserved
+    0,                                      // 92 Reserved
+    0,                                      // 93 Reserved
+    0,                                      // 94 Reserved
+    0,                                      // 95 Reserved
+    0,                                      // 96 Reserved
+    0,                                      // 97 Reserved
+    0,                                      // 98 Reserved
+    0,                                      // 99 Reserved
+    0,                                      // 100 Reserved
+    0,                                      // 101 Reserved
+    0,                                      // 102 Reserved
+    0,                                      // 103 Reserved
+    0,                                      // 104 Reserved
+    0,                                      // 105 Reserved
+    0,                                      // 106 Reserved
+    0,                                      // 107 Reserved
+    0,                                      // 108 Reserved
+    0,                                      // 109 Reserved
+    0,                                      // 110 Reserved
+    0,                                      // 111 Reserved
+    0,                                      // 112 Reserved
+    0,                                      // 113 Reserved
+    0,                                      // 114 Reserved
+    0,                                      // 115 Reserved
+    0,                                      // 116 Reserved
+    0,                                      // 117 Reserved
+    0,                                      // 118 Reserved
+    0,                                      // 119 Reserved
+    0,                                      // 120 Reserved
+    0,                                      // 121 Reserved
+    0,                                      // 122 Reserved
+    0,                                      // 123 Reserved
+    0,                                      // 124 Reserved
+    0,                                      // 125 Reserved
+    0,                                      // 126 Reserved
+    0,                                      // 127 Reserved
+    0,                                      // 128 Reserved
+    0,                                      // 129 Reserved
+    0,                                      // 130 Reserved
+    0,                                      // 131 Reserved
+    0,                                      // 132 Reserved
+    0,                                      // 133 Reserved
+    0,                                      // 134 Reserved
+    0,                                      // 135 Reserved
+    0,                                      // 136 Reserved
+    0,                                      // 137 Reserved
+    0,                                      // 138 Reserved
+    0,                                      // 139 Reserved
+    0,                                      // 140 Reserved
+    0,                                      // 141 Reserved
+    0,                                      // 142 Reserved
+    0,                                      // 143 Reserved
+    0,                                      // 144 Reserved
+    0,                                      // 145 Reserved
+    0,                                      // 146 Reserved
+    0,                                      // 147 Reserved
+    0,                                      // 148 Reserved
+    0,                                      // 149 Reserved
+    0,                                      // 150 Reserved
+    0,                                      // 151 Reserved
+    0,                                      // 152 Reserved
+    0,                                      // 153 Reserved
+    0,                                      // 154 Reserved
+    0,                                      // 155 Reserved
+    0,                                      // 156 USB
+    RFCoreRxTxIntHandler,                   // 157 RF Core Rx/Tx
+    RFCoreErrIntHandler,                    // 158 RF Core Error
+    0,                                      // 159 AES
+    0,                                      // 160 PKA
+    0,                                      // 161 SM Timer
+    0,                                      // 162 MAC Timer
+    0,                                      // 163 Reserved
 };
 
 void IntDefaultHandler(void)
