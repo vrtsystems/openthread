@@ -189,12 +189,30 @@ void setTxPower(int8_t aTxPower)
 
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64)
 {
-    uint8_t *eui64 = (uint8_t *)IEEE_EUI64;
+    // EUI64 is in a mixed-endian format.  Split in two halves, each 32-bit
+    // half is in little-endian format (machine endian).  However, the
+    // most significant part of the EUI64 comes first, so we can't cheat
+    // with a uint64_t!
+    //
+    // See https://e2e.ti.com/support/wireless_connectivity/low_power_rf_tools/f/155/p/307344/1072252
+
+    volatile uint32_t *eui64 = &HWREG(IEEE_EUI64);
     (void)aInstance;
 
-    for (uint8_t i = 0; i < OT_EXT_ADDRESS_SIZE; i++)
+    // Read first 32-bits
+    uint32_t part = eui64[0];
+    for (uint8_t i = 0; i < (OT_EXT_ADDRESS_SIZE / 2); i++)
     {
-        aIeeeEui64[i] = eui64[7 - i];
+        aIeeeEui64[3 - i] = part;
+        part >>= 8;
+    }
+
+    // Read the last 32-bits
+    part = eui64[1];
+    for (uint8_t i = 0; i < (OT_EXT_ADDRESS_SIZE / 2); i++)
+    {
+        aIeeeEui64[7 - i] = part;
+        part >>= 8;
     }
 }
 
@@ -437,8 +455,8 @@ void readFrame(void)
 
 #if OPENTHREAD_ENABLE_RAW_LINK_API
     // Timestamp
-    sReceiveFrame.mMsec = otPlatAlarmMilliGetNow();
-    sReceiveFrame.mUsec = 0; // Don't support microsecond timer for now.
+    sReceiveFrame.mInfo.mRxInfo.mMsec = otPlatAlarmMilliGetNow();
+    sReceiveFrame.mInfo.mRxInfo.mUsec = 0; // Don't support microsecond timer for now.
 #endif
 
     // read psdu
@@ -447,13 +465,13 @@ void readFrame(void)
         sReceiveFrame.mPsdu[i] = HWREG(RFCORE_SFR_RFDATA);
     }
 
-    sReceiveFrame.mRssi = (int8_t)HWREG(RFCORE_SFR_RFDATA) - CC2538_RSSI_OFFSET;
-    crcCorr             = HWREG(RFCORE_SFR_RFDATA);
+    sReceiveFrame.mInfo.mRxInfo.mRssi = (int8_t)HWREG(RFCORE_SFR_RFDATA) - CC2538_RSSI_OFFSET;
+    crcCorr                           = HWREG(RFCORE_SFR_RFDATA);
 
     if (crcCorr & CC2538_CRC_BIT_MASK)
     {
-        sReceiveFrame.mLength = length;
-        sReceiveFrame.mLqi    = crcCorr & CC2538_LQI_BIT_MASK;
+        sReceiveFrame.mLength            = length;
+        sReceiveFrame.mInfo.mRxInfo.mLqi = crcCorr & CC2538_LQI_BIT_MASK;
     }
     else
     {

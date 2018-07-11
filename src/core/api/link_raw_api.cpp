@@ -51,7 +51,7 @@ LinkRaw::LinkRaw(Instance &aInstance)
     , mTimerReason(kTimerReasonNone)
 #if OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
     , mTimerMicro(aInstance, &LinkRaw::HandleTimer, this)
-#endif
+#endif // OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
 #endif // OPENTHREAD_LINKRAW_TIMER_REQUIRED
 #if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
     , mEnergyScanTask(aInstance, &LinkRaw::HandleEnergyScanTask, this)
@@ -69,11 +69,11 @@ otError LinkRaw::SetEnabled(bool aEnabled)
 {
     otError error = OT_ERROR_NONE;
 
-    otLogInfoPlat(mInstance, "LinkRaw Enabled=%d", aEnabled ? 1 : 0);
+    otLogInfoPlat(&mInstance, "LinkRaw Enabled=%d", aEnabled ? 1 : 0);
 
 #if OPENTHREAD_MTD || OPENTHREAD_FTD
     VerifyOrExit(!static_cast<Instance &>(mInstance).GetThreadNetif().IsUp(), error = OT_ERROR_INVALID_STATE);
-#endif
+#endif // OPENTHREAD_MTD || OPENTHREAD_FTD
 
     if (aEnabled)
     {
@@ -88,7 +88,7 @@ otError LinkRaw::SetEnabled(bool aEnabled)
 
 #if OPENTHREAD_MTD || OPENTHREAD_FTD
 exit:
-#endif
+#endif // OPENTHREAD_MTD || OPENTHREAD_FTD
     return error;
 }
 
@@ -170,6 +170,13 @@ otRadioCaps LinkRaw::GetCaps(void) const
     }
 #endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
 
+#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+    if ((RadioCaps & OT_RADIO_CAPS_CSMA_BACKOFF) == 0)
+    {
+        RadioCaps = static_cast<otRadioCaps>(RadioCaps | OT_RADIO_CAPS_CSMA_BACKOFF);
+    }
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+
 #if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
     if ((RadioCaps & OT_RADIO_CAPS_ENERGY_SCAN) == 0)
     {
@@ -218,17 +225,24 @@ otError LinkRaw::Transmit(otRadioFrame *aFrame, otLinkRawTransmitDone aCallback)
         mTransmitDoneCallback = aCallback;
 
 #if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
-        OT_UNUSED_VARIABLE(aFrame);
         mTransmitAttempts = 0;
         mCsmaAttempts     = 0;
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
 
-        // Start the transmission backlog logic
-        StartCsmaBackoff();
-        error = OT_ERROR_NONE;
-#else
-        // Let the hardware do the transmission logic
-        error = otPlatRadioTransmit(&mInstance, aFrame);
-#endif
+#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+        if (aFrame->mInfo.mTxInfo.mCsmaCaEnabled)
+        {
+            // Start the transmission backoff logic
+            StartCsmaBackoff();
+            error = OT_ERROR_NONE;
+        }
+        else
+        {
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+            error = otPlatRadioTransmit(&mInstance, aFrame);
+#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+        }
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
     }
 
     return error;
@@ -240,7 +254,7 @@ void LinkRaw::InvokeTransmitDone(otRadioFrame *aFrame, otRadioFrame *aAckFrame, 
 
 #if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
     mTimer.Stop();
-#endif
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
 
 #if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
 
@@ -249,7 +263,17 @@ void LinkRaw::InvokeTransmitDone(otRadioFrame *aFrame, otRadioFrame *aAckFrame, 
         if (mCsmaAttempts < Mac::kMaxCSMABackoffs)
         {
             mCsmaAttempts++;
+#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
             StartCsmaBackoff();
+#else
+            // Start the  transmit now
+            otError error = otPlatRadioTransmit(&mInstance, aFrame);
+
+            if (error != OT_ERROR_NONE)
+            {
+                InvokeTransmitDone(aFrame, NULL, error);
+            }
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
             goto exit;
         }
     }
@@ -260,15 +284,25 @@ void LinkRaw::InvokeTransmitDone(otRadioFrame *aFrame, otRadioFrame *aAckFrame, 
 
     if (aError == OT_ERROR_NO_ACK)
     {
-        if (mTransmitAttempts < aFrame->mMaxTxAttempts)
+        if (mTransmitAttempts < aFrame->mInfo.mTxInfo.mMaxTxAttempts)
         {
             mTransmitAttempts++;
+#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
             StartCsmaBackoff();
+#else
+            // Start the  transmit now
+            otError error = otPlatRadioTransmit(&mInstance, aFrame);
+
+            if (error != OT_ERROR_NONE)
+            {
+                InvokeTransmitDone(aFrame, NULL, error);
+            }
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
             goto exit;
         }
     }
 
-#endif
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
 
     // Transition back to receive state on previous channel
     otPlatRadioReceive(&mInstance, mReceiveChannel);
@@ -291,7 +325,7 @@ void LinkRaw::InvokeTransmitDone(otRadioFrame *aFrame, otRadioFrame *aAckFrame, 
 #if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
 exit:
     return;
-#endif
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
 }
 
 otError LinkRaw::EnergyScan(uint8_t aScanChannel, uint16_t aScanDuration, otLinkRawEnergyScanDone aCallback)
@@ -314,7 +348,7 @@ otError LinkRaw::EnergyScan(uint8_t aScanChannel, uint16_t aScanDuration, otLink
 #else
         // Do the HW offloaded energy scan
         error = otPlatRadioEnergyScan(&mInstance, aScanChannel, aScanDuration);
-#endif
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
     }
 
     return error;
@@ -338,14 +372,14 @@ void LinkRaw::TransmitStarted(otRadioFrame *aFrame)
     if (static_cast<Mac::Frame *>(aFrame)->GetAckRequest() &&
         !(otPlatRadioGetCaps(&mInstance) & OT_RADIO_CAPS_ACK_TIMEOUT))
     {
-        otLogDebgPlat(aInstance, "LinkRaw Starting AckTimeout Timer");
+        otLogDebgPlat(&mInstance, "LinkRaw Starting AckTimeout Timer");
         mTimerReason = kTimerReasonAckTimeout;
         mTimer.Start(Mac::kAckTimeout);
     }
 
 #else
     OT_UNUSED_VARIABLE(aFrame);
-#endif
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
 }
 
 #if OPENTHREAD_LINKRAW_TIMER_REQUIRED
@@ -376,9 +410,9 @@ void LinkRaw::HandleTimer(void)
 
 #endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
 
-#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
+#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
 
-    case kTimerReasonRetransmitTimeout:
+    case kTimerReasonCsmaBackoffComplete:
     {
         otRadioFrame *aFrame = otPlatRadioGetTransmitBuffer(&mInstance);
 
@@ -393,7 +427,7 @@ void LinkRaw::HandleTimer(void)
         break;
     }
 
-#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
 
 #if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
 
@@ -413,7 +447,7 @@ void LinkRaw::HandleTimer(void)
 
 #endif // OPENTHREAD_LINKRAW_TIMER_REQUIRED
 
-#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
+#if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
 
 void LinkRaw::StartCsmaBackoff(void)
 {
@@ -429,7 +463,7 @@ void LinkRaw::StartCsmaBackoff(void)
     backoff *= (static_cast<uint32_t>(Mac::kUnitBackoffPeriod) * OT_RADIO_SYMBOL_TIME);
 
     otLogDebgPlat(&mInstance, "LinkRaw Starting RetransmitTimeout Timer (%d ms)", backoff);
-    mTimerReason = kTimerReasonRetransmitTimeout;
+    mTimerReason = kTimerReasonCsmaBackoffComplete;
 
 #if OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
     mTimerMicro.Start(backoff);
@@ -438,7 +472,7 @@ void LinkRaw::StartCsmaBackoff(void)
 #endif // OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
 }
 
-#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
+#endif // OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
 
 #if OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
 
@@ -723,6 +757,15 @@ uint16_t otLinkGetShortAddress(otInstance *aInstance)
 {
     return static_cast<Instance *>(aInstance)->GetLinkRaw().GetShortAddress();
 }
+
+#if OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+void otPlatRadioFrameUpdated(otInstance *aInstance, otRadioFrame *aFrame)
+{
+    // Note: For now this functionality is not supported in Radio Only mode.
+    (void)aInstance;
+    (void)aFrame;
+}
+#endif
 
 #endif // OPENTHREAD_RADIO
 

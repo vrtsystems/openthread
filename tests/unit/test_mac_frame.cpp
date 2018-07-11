@@ -28,6 +28,7 @@
 
 #include <openthread/openthread.h>
 
+#include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "mac/mac.hpp"
 #include "mac/mac_frame.hpp"
@@ -45,30 +46,38 @@ void TestMacHeader(void)
         uint8_t  secCtl;
         uint8_t  headerLength;
     } tests[] = {
-        {Mac::Frame::kFcfDstAddrNone | Mac::Frame::kFcfSrcAddrNone, 0, 3},
-        {Mac::Frame::kFcfDstAddrNone | Mac::Frame::kFcfSrcAddrShort, 0, 7},
-        {Mac::Frame::kFcfDstAddrNone | Mac::Frame::kFcfSrcAddrExt, 0, 13},
-        {Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrNone, 0, 7},
-        {Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrNone, 0, 13},
-        {Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrShort, 0, 11},
-        {Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrExt, 0, 17},
-        {Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrShort, 0, 17},
-        {Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrExt, 0, 23},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrNone | Mac::Frame::kFcfSrcAddrNone, 0, 3},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrNone | Mac::Frame::kFcfSrcAddrShort, 0, 7},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrNone | Mac::Frame::kFcfSrcAddrExt, 0, 13},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrNone, 0, 7},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrNone, 0, 13},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrShort, 0, 11},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrExt, 0, 17},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrShort, 0, 17},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrExt, 0, 23},
 
-        {Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrShort | Mac::Frame::kFcfPanidCompression, 0, 9},
-        {Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrExt | Mac::Frame::kFcfPanidCompression, 0, 15},
-        {Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrShort | Mac::Frame::kFcfPanidCompression, 0, 15},
-        {Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrExt | Mac::Frame::kFcfPanidCompression, 0, 21},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrShort |
+             Mac::Frame::kFcfPanidCompression,
+         0, 9},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrExt |
+             Mac::Frame::kFcfPanidCompression,
+         0, 15},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrShort |
+             Mac::Frame::kFcfPanidCompression,
+         0, 15},
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrExt | Mac::Frame::kFcfSrcAddrExt |
+             Mac::Frame::kFcfPanidCompression,
+         0, 21},
 
-        {Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrShort | Mac::Frame::kFcfPanidCompression |
-             Mac::Frame::kFcfSecurityEnabled,
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrShort |
+             Mac::Frame::kFcfPanidCompression | Mac::Frame::kFcfSecurityEnabled,
          Mac::Frame::kSecMic32 | Mac::Frame::kKeyIdMode1, 15},
-        {Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrShort | Mac::Frame::kFcfPanidCompression |
-             Mac::Frame::kFcfSecurityEnabled,
+        {Mac::Frame::kFcfFrameVersion2006 | Mac::Frame::kFcfDstAddrShort | Mac::Frame::kFcfSrcAddrShort |
+             Mac::Frame::kFcfPanidCompression | Mac::Frame::kFcfSecurityEnabled,
          Mac::Frame::kSecMic32 | Mac::Frame::kKeyIdMode2, 19},
     };
 
-    for (unsigned i = 0; i < sizeof(tests) / sizeof(tests[0]); i++)
+    for (unsigned i = 0; i < OT_ARRAY_LENGTH(tests); i++)
     {
         uint8_t    psdu[Mac::Frame::kMTU];
         Mac::Frame frame;
@@ -120,6 +129,8 @@ void VerifyChannelMaskContent(const Mac::ChannelMask &aMask, uint8_t *aChannels,
     {
         VerifyOrQuit(!aMask.IsSingleChannel(), "ChannelMask.IsSingleChannel() failed\n");
     }
+
+    VerifyOrQuit(aLength == aMask.GetNumberOfChannels(), "ChannelMask.GetNumberOfChannels() failed\n");
 }
 
 void TestMacChannelMask(void)
@@ -133,16 +144,14 @@ void TestMacChannelMask(void)
     Mac::ChannelMask mask1;
     Mac::ChannelMask mask2(OT_RADIO_SUPPORTED_CHANNELS);
 
-    char stringBuffer[Mac::ChannelMask::kInfoStringSize];
-
     printf("Testing Mac::ChannelMask\n");
 
     VerifyOrQuit(mask1.IsEmpty(), "ChannelMask.IsEmpty failed\n");
-    printf("empty = %s\n", mask1.ToString(stringBuffer, sizeof(stringBuffer)));
+    printf("empty = %s\n", mask1.ToString().AsCString());
 
     VerifyOrQuit(!mask2.IsEmpty(), "ChannelMask.IsEmpty failed\n");
     VerifyOrQuit(mask2.GetMask() == OT_RADIO_SUPPORTED_CHANNELS, "ChannelMask.GetMask() failed\n");
-    printf("all_channels = %s\n", mask2.ToString(stringBuffer, sizeof(stringBuffer)));
+    printf("all_channels = %s\n", mask2.ToString().AsCString());
 
     mask1.SetMask(OT_RADIO_SUPPORTED_CHANNELS);
     VerifyOrQuit(!mask1.IsEmpty(), "ChannelMask.IsEmpty failed\n");
@@ -166,7 +175,7 @@ void TestMacChannelMask(void)
         mask1.AddChannel(channels1[index]);
     }
 
-    printf("channels1 = %s\n", mask1.ToString(stringBuffer, sizeof(stringBuffer)));
+    printf("channels1 = %s\n", mask1.ToString().AsCString());
 
     VerifyOrQuit(!mask1.IsEmpty(), "ChannelMask.IsEmpty failed\n");
     VerifyChannelMaskContent(mask1, channels1, sizeof(channels1));
@@ -178,7 +187,7 @@ void TestMacChannelMask(void)
         mask2.AddChannel(channels2[index]);
     }
 
-    printf("channels2 = %s\n", mask2.ToString(stringBuffer, sizeof(stringBuffer)));
+    printf("channels2 = %s\n", mask2.ToString().AsCString());
 
     VerifyOrQuit(!mask2.IsEmpty(), "ChannelMask.IsEmpty failed\n");
     VerifyChannelMaskContent(mask2, channels2, sizeof(channels2));
@@ -190,7 +199,18 @@ void TestMacChannelMask(void)
     mask2.AddChannel(channles4[0]);
     VerifyChannelMaskContent(mask2, channles4, sizeof(channles4));
 
-    printf("channels4 = %s\n", mask2.ToString(stringBuffer, sizeof(stringBuffer)));
+    printf("channels4 = %s\n", mask2.ToString().AsCString());
+
+    mask1.Clear();
+    mask2.Clear();
+    VerifyOrQuit(mask1 == mask2, "ChannelMask.operator== failed\n");
+
+    mask1.SetMask(OT_RADIO_SUPPORTED_CHANNELS);
+    mask2.SetMask(OT_RADIO_SUPPORTED_CHANNELS);
+    VerifyOrQuit(mask1 == mask2, "ChannelMask.operator== failed\n");
+
+    mask1.Clear();
+    VerifyOrQuit(mask1 != mask2, "ChannelMask.operator== failed\n");
 }
 
 } // namespace ot

@@ -55,7 +55,9 @@
 #endif
 #include "common/notifier.hpp"
 #include "common/settings.hpp"
+#include "meshcop/border_agent.hpp"
 #include "net/ip6.hpp"
+#include "thread/announce_sender.hpp"
 #include "thread/link_quality.hpp"
 #include "thread/thread_netif.hpp"
 #if OPENTHREAD_ENABLE_CHANNEL_MANAGER
@@ -193,7 +195,23 @@ public:
     void SetDynamicLogLevel(otLogLevel aLogLevel) { mLogLevel = aLogLevel; }
 #endif
 
-#if OPENTHREAD_MTD || OPENTHREAD_FTD
+    /**
+     * This method returns the active log level.
+     *
+     * @returns The log level.
+     *
+     */
+    otLogLevel GetLogLevel(void) const
+#if OPENTHREAD_CONFIG_ENABLE_DYNAMIC_LOG_LEVEL
+    {
+        return GetDynamicLogLevel();
+    }
+#else
+    {
+        return static_cast<otLogLevel>(OPENTHREAD_CONFIG_LOG_LEVEL);
+    }
+#endif
+
     /**
      * This method finalizes the OpenThread instance.
      *
@@ -202,6 +220,7 @@ public:
      */
     void Finalize(void);
 
+#if OPENTHREAD_MTD || OPENTHREAD_FTD
     /**
      * This method deletes all the settings stored in non-volatile memory, and then triggers a platform reset.
      *
@@ -329,6 +348,16 @@ public:
     Utils::ChannelManager &GetChannelManager(void) { return mChannelManager; }
 #endif
 
+#if OPENTHREAD_CONFIG_ENABLE_ANNOUNCE_SENDER
+    /**
+     * This method returns a reference to AnnounceSender object.
+     *
+     * @returns A reference to the AnnounceSender object.
+     *
+     */
+    AnnounceSender &GetAnnounceSender(void) { return mAnnounceSender; }
+#endif
+
     /**
      * This method returns a reference to message pool object.
      *
@@ -336,6 +365,10 @@ public:
      *
      */
     MessagePool &GetMessagePool(void) { return mMessagePool; }
+
+#if OPENTHREAD_ENABLE_BORDER_AGENT
+    MeshCoP::BorderAgent &GetBorderAgent(void) { return mBorderAgent; }
+#endif
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
 
     /**
@@ -391,6 +424,9 @@ private:
 
     Ip6::Ip6    mIp6;
     ThreadNetif mThreadNetif;
+#if OPENTHREAD_ENABLE_BORDER_AGENT
+    MeshCoP::BorderAgent mBorderAgent;
+#endif
 
 #if OPENTHREAD_ENABLE_APPLICATION_COAP
     Coap::ApplicationCoap mApplicationCoap;
@@ -402,6 +438,10 @@ private:
 
 #if OPENTHREAD_ENABLE_CHANNEL_MANAGER
     Utils::ChannelManager mChannelManager;
+#endif
+
+#if OPENTHREAD_CONFIG_ENABLE_ANNOUNCE_SENDER
+    AnnounceSender mAnnounceSender;
 #endif
 
     MessagePool mMessagePool;

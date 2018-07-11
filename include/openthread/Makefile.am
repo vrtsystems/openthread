@@ -72,12 +72,12 @@ openthread_headers                      = \
     message.h                             \
     ncp.h                                 \
     netdata.h                             \
+    network_time.h                        \
     openthread.h                          \
     server.h                              \
     tasklet.h                             \
     thread.h                              \
     thread_ftd.h                          \
-    tmf_proxy.h                           \
     types.h                               \
     udp.h                                 \
     $(NULL)

@@ -42,6 +42,10 @@ set -x
 
 [ $BUILD_TARGET != scan-build ] || {
     ./bootstrap || die
+
+    # avoids "third_party/mbedtls/repo/library/ssl_srv.c:2904:9: warning: Value stored to 'p' is never read"
+    export CPPFLAGS=-DMBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
+
     scan-build ./configure                \
         --enable-cli-app=all              \
         --enable-ncp-app=all              \
@@ -65,6 +69,56 @@ set -x
         --enable-service                  \
         --enable-tmf-proxy || die
     scan-build --status-bugs -analyze-headers -v make || die
+}
+
+[ $BUILD_TARGET != android-build ] || {
+    cd ..
+
+    # Android build system
+    (mkdir build && cd build && git init && git pull --depth 1 https://android.googlesource.com/platform/build 2db32730e79cafcf13e1f898a7bee7f82b0449d6)
+    ln -s build/core/main.mk Makefile
+
+    # Workarounds for java checking
+    export ANDROID_JAVA_HOME=/usr/lib/jvm/java-8-oracle
+    mkdir bin
+    cat > bin/java <<EOF
+#!/bin/sh
+echo java version \"1.6\"
+EOF
+
+    cat > bin/javac <<EOF
+echo javac \"1.6\"
+EOF
+    chmod a+x bin/java bin/javac
+    export PATH=$(pwd)/bin:$PATH
+
+    # Files for building ndk
+    mkdir -p system/core/include/arch/linux-arm
+    touch system/core/include/arch/linux-arm/AndroidConfig.h
+
+    ANDROID_NDK_PATH=$(dirname $(which sdkmanager))/../../ndk-bundle
+    mkdir -p bionic/libc/
+    cp -r $ANDROID_NDK_PATH/sysroot/usr/include bionic/libc/include
+    mv bionic/libc/include/arm-linux-androideabi/asm bionic/libc/include/asm
+
+    mkdir -p bionic/libstdc++
+    cp -r $ANDROID_NDK_PATH/sources/cxx-stl/gnu-libstdc++/4.9/include bionic/libc/libstdc++
+
+    mkdir -p out/target/product/generic/obj/
+    cp -r $ANDROID_NDK_PATH/platforms/android-27/arch-arm/usr/lib out/target/product/generic/obj/
+
+    # Build spec
+    cat > buildspec.mk <<EOF
+TARGET_PRODUCT := generic
+TARGET_BUILD_VARIANT := eng
+TARGET_BUILD_TYPE := release
+TARGET_TOOLS_PREFIX := $ANDROID_NDK_PATH/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-
+EOF
+    make showcommands ot-core
+    make showcommands ot-ncp
+    make showcommands ot-cli
+    test -f out/target/product/generic/obj/EXECUTABLES/ot-ncp_intermediates/LINKED/ot-ncp || die
+    test -f out/target/product/generic/obj/EXECUTABLES/ot-cli_intermediates/LINKED/ot-cli || die
 }
 
 [ $BUILD_TARGET != arm-gcc49 ] || {
@@ -100,11 +154,21 @@ set -x
     git checkout -- . || die
     git clean -xfd || die
     ./bootstrap || die
-    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-nrf52840 || die
+    BORDER_ROUTER=1 COAP=1 COMMISSIONER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 FULL_LOGS=1 JOINER=1 LINK_RAW=1 MAC_FILTER=1 MTD_NETDIAG=1 SERVICE=1 TMF_PROXY=1 make -f examples/Makefile-nrf52840 || die
     arm-none-eabi-size  output/nrf52840/bin/ot-cli-ftd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-cli-mtd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-ncp-ftd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-ncp-mtd || die
+    arm-none-eabi-size  output/nrf52840/bin/ot-ncp-radio || die
+
+    git checkout -- . || die
+    git clean -xfd || die
+    ./bootstrap || die
+    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-cc1352 || die
+    arm-none-eabi-size  output/cc1352/bin/ot-cli-ftd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-cli-mtd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-ncp-ftd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-ncp-mtd || die
 
     git checkout -- . || die
     git clean -xfd || die
@@ -168,11 +232,21 @@ set -x
     git checkout -- . || die
     git clean -xfd || die
     ./bootstrap || die
-    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-nrf52840 || die
+    BORDER_ROUTER=1 COAP=1 COMMISSIONER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 FULL_LOGS=1 JOINER=1 MAC_FILTER=1 MTD_NETDIAG=1 SERVICE=1 TMF_PROXY=1 make -f examples/Makefile-nrf52840 || die
     arm-none-eabi-size  output/nrf52840/bin/ot-cli-ftd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-cli-mtd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-ncp-ftd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-ncp-mtd || die
+    arm-none-eabi-size  output/nrf52840/bin/ot-ncp-radio || die
+
+    git checkout -- . || die
+    git clean -xfd || die
+    ./bootstrap || die
+    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-cc1352 || die
+    arm-none-eabi-size  output/cc1352/bin/ot-cli-ftd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-cli-mtd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-ncp-ftd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-ncp-mtd || die
 
     git checkout -- . || die
     git clean -xfd || die
@@ -215,14 +289,14 @@ set -x
     arm-none-eabi-size  output/cc2538/bin/ot-ncp-ftd || die
     arm-none-eabi-size  output/cc2538/bin/ot-ncp-mtd || die
 
-    # git checkout -- . || die
-    # git clean -xfd || die
-    # ./bootstrap || die
-    # COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-da15000 || die
-    # arm-none-eabi-size  output/da15000/bin/ot-cli-ftd || die
-    # arm-none-eabi-size  output/da15000/bin/ot-cli-mtd || die
-    # arm-none-eabi-size  output/da15000/bin/ot-ncp-ftd || die
-    # arm-none-eabi-size  output/da15000/bin/ot-ncp-mtd || die
+    git checkout -- . || die
+    git clean -xfd || die
+    ./bootstrap || die
+    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-da15000 || die
+    arm-none-eabi-size  output/da15000/bin/ot-cli-ftd || die
+    arm-none-eabi-size  output/da15000/bin/ot-cli-mtd || die
+    arm-none-eabi-size  output/da15000/bin/ot-ncp-ftd || die
+    arm-none-eabi-size  output/da15000/bin/ot-ncp-mtd || die
 
     git checkout -- . || die
     git clean -xfd || die
@@ -236,11 +310,21 @@ set -x
     git checkout -- . || die
     git clean -xfd || die
     ./bootstrap || die
-    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-nrf52840 || die
+    BORDER_ROUTER=1 COAP=1 COMMISSIONER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 FULL_LOGS=1 JOINER=1 MAC_FILTER=1 MTD_NETDIAG=1 SERVICE=1 TMF_PROXY=1 make -f examples/Makefile-nrf52840 || die
     arm-none-eabi-size  output/nrf52840/bin/ot-cli-ftd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-cli-mtd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-ncp-ftd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-ncp-mtd || die
+    arm-none-eabi-size  output/nrf52840/bin/ot-ncp-radio || die
+
+    git checkout -- . || die
+    git clean -xfd || die
+    ./bootstrap || die
+    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-cc1352 || die
+    arm-none-eabi-size  output/cc1352/bin/ot-cli-ftd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-cli-mtd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-ncp-ftd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-ncp-mtd || die
 
     git checkout -- . || die
     git clean -xfd || die
@@ -294,14 +378,14 @@ set -x
     arm-none-eabi-size  output/cc2538/bin/ot-ncp-ftd || die
     arm-none-eabi-size  output/cc2538/bin/ot-ncp-mtd || die
 
-    # git checkout -- . || die
-    # git clean -xfd || die
-    # ./bootstrap || die
-    # COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-da15000 || die
-    # arm-none-eabi-size  output/da15000/bin/ot-cli-ftd || die
-    # arm-none-eabi-size  output/da15000/bin/ot-cli-mtd || die
-    # arm-none-eabi-size  output/da15000/bin/ot-ncp-ftd || die
-    # arm-none-eabi-size  output/da15000/bin/ot-ncp-mtd || die
+    git checkout -- . || die
+    git clean -xfd || die
+    ./bootstrap || die
+    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-da15000 || die
+    arm-none-eabi-size  output/da15000/bin/ot-cli-ftd || die
+    arm-none-eabi-size  output/da15000/bin/ot-cli-mtd || die
+    arm-none-eabi-size  output/da15000/bin/ot-ncp-ftd || die
+    arm-none-eabi-size  output/da15000/bin/ot-ncp-mtd || die
 
     git checkout -- . || die
     git clean -xfd || die
@@ -315,11 +399,21 @@ set -x
     git checkout -- . || die
     git clean -xfd || die
     ./bootstrap || die
-    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-nrf52840 || die
+    BORDER_ROUTER=1 COAP=1 COMMISSIONER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 FULL_LOGS=1 JOINER=1 MAC_FILTER=1 MTD_NETDIAG=1 SERVICE=1 TMF_PROXY=1 make -f examples/Makefile-nrf52840 || die
     arm-none-eabi-size  output/nrf52840/bin/ot-cli-ftd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-cli-mtd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-ncp-ftd || die
     arm-none-eabi-size  output/nrf52840/bin/ot-ncp-mtd || die
+    arm-none-eabi-size  output/nrf52840/bin/ot-ncp-radio || die
+
+    git checkout -- . || die
+    git clean -xfd || die
+    ./bootstrap || die
+    COMMISSIONER=1 JOINER=1 DHCP6_CLIENT=1 DHCP6_SERVER=1 DNS_CLIENT=1 make -f examples/Makefile-cc1352 || die
+    arm-none-eabi-size  output/cc1352/bin/ot-cli-ftd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-cli-mtd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-ncp-ftd || die
+    arm-none-eabi-size  output/cc1352/bin/ot-ncp-mtd || die
 
     git checkout -- . || die
     git clean -xfd || die
@@ -424,6 +518,13 @@ set -x
     COVERAGE=1 CFLAGS=-m32 CXXFLAGS=-m32 LDFLAGS=-m32 make -f examples/Makefile-posix check || die
 }
 
+[ $BUILD_TARGET != posix-app-cli ] || {
+    ./bootstrap || die
+    make -f examples/Makefile-posix || die
+    make -f src/posix/Makefile-posix || die
+    OT_CLI_PATH="$(pwd)/$(ls output/posix/*/bin/ot-cli)" RADIO_DEVICE="$(pwd)/$(ls output/*/bin/ot-ncp-radio)" COVERAGE=1 make -f src/posix/Makefile-posix check || die
+}
+
 [ $BUILD_TARGET != posix-mtd ] || {
     ./bootstrap || die
     COVERAGE=1 CFLAGS=-m32 CXXFLAGS=-m32 LDFLAGS=-m32 USE_MTD=1 make -f examples/Makefile-posix check || die
@@ -432,6 +533,13 @@ set -x
 [ $BUILD_TARGET != posix-ncp-spi ] || {
     ./bootstrap || die
     make -f examples/Makefile-posix check configure_OPTIONS="--enable-ncp-app=ftd --with-ncp-bus=spi --with-examples=posix" || die
+}
+
+[ $BUILD_TARGET != posix-app-ncp ] || {
+    ./bootstrap || die
+    make -f examples/Makefile-posix || die
+    make -f src/posix/Makefile-posix || die
+    OT_NCP_PATH="$(pwd)/$(ls output/posix/*/bin/ot-ncp)" RADIO_DEVICE="$(pwd)/$(ls output/*/bin/ot-ncp-radio)" COVERAGE=1 NODE_TYPE=ncp-sim make -f src/posix/Makefile-posix check || die
 }
 
 [ $BUILD_TARGET != posix-ncp ] || {

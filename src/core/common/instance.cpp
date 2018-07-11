@@ -64,6 +64,9 @@ Instance::Instance(void)
     , mSettings(*this)
     , mIp6(*this)
     , mThreadNetif(*this)
+#if OPENTHREAD_ENABLE_BORDER_AGENT
+    , mBorderAgent(*this)
+#endif
 #if OPENTHREAD_ENABLE_APPLICATION_COAP
     , mApplicationCoap(*this)
 #endif
@@ -72,6 +75,9 @@ Instance::Instance(void)
 #endif
 #if OPENTHREAD_ENABLE_CHANNEL_MANAGER
     , mChannelManager(*this)
+#endif
+#if OPENTHREAD_CONFIG_ENABLE_ANNOUNCE_SENDER
+    , mAnnounceSender(*this)
 #endif
     , mMessagePool(*this)
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
@@ -165,21 +171,23 @@ void Instance::AfterInit(void)
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
 }
 
-#if OPENTHREAD_MTD || OPENTHREAD_FTD
 void Instance::Finalize(void)
 {
     VerifyOrExit(mIsInitialized == true);
 
     mIsInitialized = false;
 
+#if OPENTHREAD_MTD || OPENTHREAD_FTD
     IgnoreReturnValue(otThreadSetEnabled(this, false));
     IgnoreReturnValue(otIp6SetEnabled(this, false));
     IgnoreReturnValue(otLinkSetEnabled(this, false));
+#endif
 
 exit:
     return;
 }
 
+#if OPENTHREAD_MTD || OPENTHREAD_FTD
 void Instance::FactoryReset(void)
 {
     GetSettings().Wipe();
@@ -414,6 +422,20 @@ template <> Utils::ChannelMonitor &Instance::Get(void)
 template <> Utils::ChannelManager &Instance::Get(void)
 {
     return GetChannelManager();
+}
+#endif
+
+#if OPENTHREAD_ENABLE_BORDER_AGENT
+template <> MeshCoP::BorderAgent &Instance::Get(void)
+{
+    return mBorderAgent;
+}
+#endif
+
+#if OPENTHREAD_CONFIG_ENABLE_ANNOUNCE_SENDER
+template <> AnnounceSender &Instance::Get(void)
+{
+    return GetAnnounceSender();
 }
 #endif
 

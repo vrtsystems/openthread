@@ -132,10 +132,9 @@ void Uart::ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength)
 
             break;
 
-#ifdef OPENTHREAD_EXAMPLES_POSIX
+#if OPENTHREAD_POSIX
 
         case 0x04: // ASCII for Ctrl-D
-        case 0x03: // ASCII for Ctrl-C
             exit(EXIT_SUCCESS);
             break;
 #endif
@@ -201,7 +200,7 @@ otError Uart::ProcessCommand(void)
 #if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
         /* TODO: how exactly do we get the instance here? */
 #else
-    otLogInfoCli(&Instance::Get(), "execute command: %s", mRxBuffer);
+    otLogInfoCli(Instance::Get(), "execute command: %s", mRxBuffer);
 #endif
 #endif
     mInterpreter.ProcessLine(mRxBuffer, mRxLength, *this);

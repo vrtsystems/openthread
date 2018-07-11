@@ -374,6 +374,59 @@ NL_ENABLE_TESTS([yes])
 AM_CONDITIONAL([OPENTHREAD_BUILD_TESTS], [test "${nl_cv_build_tests}" = "yes"])
 
 #
+# Posix App
+#
+
+AC_ARG_ENABLE(
+    [posix-app],
+    [AS_HELP_STRING([--enable-posix-app],[Enable POSIX app(no|ncp|cli|all) @<:@default=no@:>@.])],
+    [
+        case "${enableval}" in
+        all|both|yes)
+            enable_posix_app=yes
+            OPENTHREAD_ENABLE_POSIX_APP=1
+            OPENTHREAD_ENABLE_POSIX_APP_NCP=1
+            OPENTHREAD_ENABLE_POSIX_APP_CLI=1
+            ;;
+        no)
+            enable_posix_app=no
+            OPENTHREAD_ENABLE_POSIX_APP=0
+            OPENTHREAD_ENABLE_POSIX_APP_NCP=0
+            OPENTHREAD_ENABLE_POSIX_APP_CLI=0
+            ;;
+        ncp)
+            enable_posix_app=yes
+            OPENTHREAD_ENABLE_POSIX_APP=1
+            OPENTHREAD_ENABLE_POSIX_APP_NCP=1
+            OPENTHREAD_ENABLE_POSIX_APP_CLI=0
+            ;;
+        cli)
+            enable_posix_app=yes
+            OPENTHREAD_ENABLE_POSIX_APP=1
+            OPENTHREAD_ENABLE_POSIX_APP_NCP=0
+            OPENTHREAD_ENABLE_POSIX_APP_CLI=1
+            ;;
+        *)
+            AC_MSG_ERROR([Invalid value ${enableval} for --enable-posix-app])
+            ;;
+        esac
+    ],
+    [
+     enable_posix_app=no
+     OPENTHREAD_ENABLE_POSIX_APP=0
+     OPENTHREAD_ENABLE_POSIX_APP_NCP=0
+     OPENTHREAD_ENABLE_POSIX_APP_CLI=0])
+
+AC_MSG_CHECKING([posix-app])
+AC_MSG_RESULT(${enable_posix_app})
+AM_CONDITIONAL([OPENTHREAD_ENABLE_POSIX_APP],     [test "${OPENTHREAD_ENABLE_POSIX_APP}" == "1"])
+AM_CONDITIONAL([OPENTHREAD_ENABLE_POSIX_APP_NCP], [test "${OPENTHREAD_ENABLE_POSIX_APP_NCP}" == "1"])
+AM_CONDITIONAL([OPENTHREAD_ENABLE_POSIX_APP_CLI], [test "${OPENTHREAD_ENABLE_POSIX_APP_CLI}" == "1"])
+AC_SUBST(OPENTHREAD_ENABLE_POSIX_APP)
+AC_SUBST(OPENTHREAD_ENABLE_POSIX_APP_NCP)
+AC_SUBST(OPENTHREAD_ENABLE_POSIX_APP_CLI)
+
+#
 # CLI Library
 #
 AC_ARG_ENABLE(cli-app,
@@ -413,9 +466,9 @@ AC_ARG_ENABLE(cli-app,
 
 AC_MSG_CHECKING([cli-app modes])
 AC_MSG_RESULT(${enable_cli_app})
-AM_CONDITIONAL([OPENTHREAD_ENABLE_CLI],     [test "${enable_cli_app}" == "yes"])
+AM_CONDITIONAL([OPENTHREAD_ENABLE_CLI],     [test "${enable_cli_app}" == "yes" -o "${OPENTHREAD_ENABLE_POSIX_APP_CLI}" == "1"])
 AM_CONDITIONAL([OPENTHREAD_ENABLE_CLI_MTD], [test "${enable_cli_app_mtd}" == "yes"])
-AM_CONDITIONAL([OPENTHREAD_ENABLE_CLI_FTD], [test "${enable_cli_app_ftd}" == "yes"])
+AM_CONDITIONAL([OPENTHREAD_ENABLE_CLI_FTD], [test "${enable_cli_app_ftd}" == "yes" -o "${OPENTHREAD_ENABLE_POSIX_APP_CLI}" == "1"])
 AC_SUBST(OPENTHREAD_ENABLE_CLI)
 AC_SUBST(OPENTHREAD_ENABLE_CLI_FTD)
 AC_SUBST(OPENTHREAD_ENABLE_CLI_MTD)
@@ -496,9 +549,9 @@ AC_SUBST(OPENTHREAD_ENABLE_NCP_MTD)
 AC_SUBST(OPENTHREAD_ENABLE_NCP_FTD)
 AC_SUBST(OPENTHREAD_ENABLE_NCP_RADIO)
 
-AM_CONDITIONAL([OPENTHREAD_ENABLE_NCP],         [test "${enable_ncp_app}" == "yes"])
+AM_CONDITIONAL([OPENTHREAD_ENABLE_NCP],         [test "${enable_ncp_app}" == "yes" -o "${OPENTHREAD_ENABLE_POSIX_APP_NCP}" == "1"])
 AM_CONDITIONAL([OPENTHREAD_ENABLE_NCP_MTD],     [test "${enable_ncp_app_mtd}" == "yes"])
-AM_CONDITIONAL([OPENTHREAD_ENABLE_NCP_FTD],     [test "${enable_ncp_app_ftd}" == "yes"])
+AM_CONDITIONAL([OPENTHREAD_ENABLE_NCP_FTD],     [test "${enable_ncp_app_ftd}" == "yes" -o "${OPENTHREAD_ENABLE_POSIX_APP_NCP}" == "1"])
 AM_CONDITIONAL([OPENTHREAD_ENABLE_NCP_RADIO],   [test "${enable_ncp_app_radio}" == "yes"])
 
 #
@@ -541,7 +594,7 @@ AC_MSG_RESULT([${OPENTHREAD_ENABLE_SPI}])
 AC_SUBST(OPENTHREAD_ENABLE_NCP_UART)
 AM_CONDITIONAL([OPENTHREAD_ENABLE_NCP_UART], [test "${with_ncp_bus}"  = "uart"])
 AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_NCP_UART],[${OPENTHREAD_ENABLE_NCP_UART}],[Define to 1 to enable the NCP UART interface.])
-AC_MSG_CHECKING([sould NCP support UART])
+AC_MSG_CHECKING([should NCP support UART])
 AC_MSG_RESULT([${OPENTHREAD_ENABLE_UART}])
 
 #
@@ -597,8 +650,8 @@ AC_ARG_ENABLE(builtin-mbedtls,
 
 if test "$enable_builtin_mbedtls" = "yes" -a ! "${MBEDTLS_CPPFLAGS}"; then
     MBEDTLS_CPPFLAGS="-I\${abs_top_srcdir}/third_party/mbedtls"
-    MBEDTLS_CPPFLAGS="${MBEDTLS_CPPFLAGS} -I\${abs_top_srcdir}/third_party/mbedtls/repo.patched/include"
-    MBEDTLS_CPPFLAGS="${MBEDTLS_CPPFLAGS} -I\${abs_top_srcdir}/third_party/mbedtls/repo.patched/include/mbedtls"
+    MBEDTLS_CPPFLAGS="${MBEDTLS_CPPFLAGS} -I\${abs_top_srcdir}/third_party/mbedtls/repo/include"
+    MBEDTLS_CPPFLAGS="${MBEDTLS_CPPFLAGS} -I\${abs_top_srcdir}/third_party/mbedtls/repo/include/mbedtls"
     MBEDTLS_CPPFLAGS="${MBEDTLS_CPPFLAGS} -DMBEDTLS_CONFIG_FILE=\\\"mbedtls-config.h\\\""
 fi
 AC_MSG_CHECKING([whether mbed TLS should be enabled])
@@ -606,36 +659,68 @@ AC_MSG_RESULT(${enable_builtin_mbedtls})
 AM_CONDITIONAL([OPENTHREAD_ENABLE_BUILTIN_MBEDTLS], [test "${enable_builtin_mbedtls}" = "yes"])
 
 #
-# Thread TMF Proxy
+# Thread UDP Proxy
 #
 
-AC_MSG_CHECKING([whether to enable TMF proxy])
-AC_ARG_ENABLE(tmf_proxy,
-    [AS_HELP_STRING([--enable-tmf-proxy],[Enable TMF proxy support @<:@default=no@:>@.])],
+AC_MSG_CHECKING([whether to enable UDP proxy])
+AC_ARG_ENABLE(udp_proxy,
+    [AS_HELP_STRING([--enable-udp-proxy], [Enable UDP proxy support @<:@default=no@:>@.])],
     [
         case "${enableval}" in
 
         no|yes)
-            enable_tmf_proxy=${enableval}
+            enable_udp_proxy=${enableval}
             ;;
 
         *)
-            AC_MSG_ERROR([Invalid value ${enable_tmf_proxy} for --enable-tmf-proxy])
+            AC_MSG_ERROR([Invalid value ${enable_udp_proxy} for --enable-udp-proxy])
             ;;
         esac
     ],
-    [enable_tmf_proxy=no])
+    [enable_udp_proxy=no])
 
-if test "$enable_tmf_proxy" = "yes"; then
-    OPENTHREAD_ENABLE_TMF_PROXY=1
+if test "$enable_udp_proxy" = "yes"; then
+    OPENTHREAD_ENABLE_UDP_PROXY=1
 else
-    OPENTHREAD_ENABLE_TMF_PROXY=0
+    OPENTHREAD_ENABLE_UDP_PROXY=0
 fi
 
-AC_MSG_RESULT(${enable_tmf_proxy})
-AC_SUBST(OPENTHREAD_ENABLE_TMF_PROXY)
-AM_CONDITIONAL([OPENTHREAD_ENABLE_TMF_PROXY], [test "${enable_tmf_proxy}" = "yes"])
-AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_TMF_PROXY],[${OPENTHREAD_ENABLE_TMF_PROXY}],[Define to 1 to enable the TMF proxy feature.])
+AC_MSG_RESULT(${enable_udp_proxy})
+AC_SUBST(OPENTHREAD_ENABLE_UDP_PROXY)
+AM_CONDITIONAL([OPENTHREAD_ENABLE_UDP_PROXY], [test "${enable_udp_proxy}" = "yes"])
+AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_UDP_PROXY], [${OPENTHREAD_ENABLE_UDP_PROXY}], [Define to 1 to enable the UDP proxy feature.])
+
+#
+# Thread Border Agent
+#
+
+AC_MSG_CHECKING([whether to enable border agent])
+AC_ARG_ENABLE(border_agent,
+    [AS_HELP_STRING([--enable-border-agent], [Enable border agent support @<:@default=no@:>@.])],
+    [
+        case "${enableval}" in
+
+        no|yes)
+            enable_border_agent=${enableval}
+            ;;
+
+        *)
+            AC_MSG_ERROR([Invalid value ${enable_border_agent} for --enable-border-agent])
+            ;;
+        esac
+    ],
+    [enable_border_agent=no])
+
+if test "${enable_border_agent}" = "yes"; then
+    OPENTHREAD_ENABLE_BORDER_AGENT=1
+else
+    OPENTHREAD_ENABLE_BORDER_AGENT=0
+fi
+
+AC_MSG_RESULT(${enable_border_agent})
+AC_SUBST(OPENTHREAD_ENABLE_BORDER_AGENT)
+AM_CONDITIONAL([OPENTHREAD_ENABLE_BORDER_AGENT], [test "${enable_border_agent}" = "yes"])
+AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_BORDER_AGENT], [${OPENTHREAD_ENABLE_BORDER_AGENT}], [Define to 1 to enable the border agent feature.])
 
 #
 # Thread Network Diagnostic for MTD
@@ -733,7 +818,7 @@ AC_SUBST(OPENTHREAD_ENABLE_JOINER)
 AM_CONDITIONAL([OPENTHREAD_ENABLE_JOINER], [test "${enable_joiner}" = "yes"])
 AC_DEFINE_UNQUOTED([OPENTHREAD_ENABLE_JOINER],[${OPENTHREAD_ENABLE_JOINER}],[Define to 1 to enable the joiner role.])
 
-if test "${enable_commissioner}" = "yes" -o "${enable_joiner}" = "yes"; then
+if test "${enable_commissioner}" = "yes" -o "${enable_joiner}" = "yes" -o "${enable_border_agent}" = "yes"; then
     enable_dtls="yes"
     OPENTHREAD_ENABLE_DTLS=1
 else
@@ -1296,11 +1381,15 @@ AM_CONDITIONAL([OPENTHREAD_ENABLE_LINKER_MAP], [test "${enable_linker_map}" = "y
 
 AC_ARG_WITH(examples,
     [AS_HELP_STRING([--with-examples=TARGET],
-        [Specify the examples from one of: none, posix, cc2538, cc2650, cc2652, da15000, efr32, emsk, gp712, kw41z, nrf52840, samr21 @<:@default=none@:>@.])],
+        [Specify the examples from one of: none, posix, cc1352, cc2538, cc2650, cc2652, da15000, efr32, emsk, gp712, kw41z, nrf52840, samr21 @<:@default=none@:>@.])],
     [
         case "${with_examples}" in
-
-        none|posix|cc2538|cc2650|cc2652|da15000|efr32|emsk|gp712|kw41z|nrf52840|samr21)
+        none)
+            ;;
+        posix|cc1352|cc2538|cc2650|cc2652|da15000|efr32|emsk|gp712|kw41z|nrf52840|samr21)
+            if test ${enable_posix_app} = "yes"; then
+                AC_MSG_ERROR([--with-examples must be none when POSIX apps are enabled by --enable-posix-app])
+            fi
             ;;
         *)
             AC_MSG_ERROR([Invalid value ${with_examples} for --with-examples])
@@ -1316,6 +1405,11 @@ case ${with_examples} in
     posix)
         OPENTHREAD_EXAMPLES_POSIX=1
         AC_DEFINE_UNQUOTED([OPENTHREAD_EXAMPLES_POSIX],[${OPENTHREAD_EXAMPLES_POSIX}],[Define to 1 if you want to use posix examples])
+        ;;
+
+    cc1352)
+        OPENTHREAD_EXAMPLES_CC1352=1
+        AC_DEFINE_UNQUOTED([OPENTHREAD_EXAMPLES_CC1352],[${OPENTHREAD_EXAMPLES_CC1352}],[Define to 1 if you want to use cc1352 examples])
         ;;
 
     cc2538)
@@ -1379,6 +1473,9 @@ AC_DEFINE_UNQUOTED([OPENTHREAD_EXAMPLES],[${OPENTHREAD_EXAMPLES}],[OpenThread ex
 
 AC_SUBST(OPENTHREAD_EXAMPLES_POSIX)
 AM_CONDITIONAL([OPENTHREAD_EXAMPLES_POSIX], [test "${OPENTHREAD_EXAMPLES}" = "posix"])
+
+AC_SUBST(OPENTHREAD_EXAMPLES_CC1352)
+AM_CONDITIONAL([OPENTHREAD_EXAMPLES_CC1352], [test "${OPENTHREAD_EXAMPLES}" = "cc1352"])
 
 AC_SUBST(OPENTHREAD_EXAMPLES_CC2538)
 AM_CONDITIONAL([OPENTHREAD_EXAMPLES_CC2538], [test "${OPENTHREAD_EXAMPLES}" = "cc2538"])
@@ -1445,6 +1542,8 @@ AM_CONDITIONAL([OPENTHREAD_BUILD_TOOLS], [test "${build_tools}" = "yes"])
 NL_ENABLE_DOCS([auto],[NO])
 
 AM_CONDITIONAL(OPENTHREAD_BUILD_DOCS, [test "${nl_cv_build_docs}" = "yes"])
+
+AM_CONDITIONAL(OPENTHREAD_POSIX, [test "${OPENTHREAD_ENABLE_POSIX_APP}" = "1" -o "${OPENTHREAD_EXAMPLES_POSIX}" = "1"])
 
 #
 # Checks for libraries and packages.
@@ -1541,6 +1640,8 @@ src/cli/Makefile
 src/ncp/Makefile
 src/core/Makefile
 src/diag/Makefile
+src/posix/Makefile
+src/posix/platform/Makefile
 third_party/Makefile
 third_party/mbedtls/Makefile
 examples/Makefile
@@ -1548,6 +1649,7 @@ examples/apps/Makefile
 examples/apps/cli/Makefile
 examples/apps/ncp/Makefile
 examples/platforms/Makefile
+examples/platforms/cc1352/Makefile
 examples/platforms/cc2538/Makefile
 examples/platforms/cc2650/Makefile
 examples/platforms/cc2652/Makefile
@@ -1642,7 +1744,7 @@ AC_MSG_NOTICE([
   OpenThread Multiple Instances support     : ${enable_multiple_instances}
   OpenThread MTD Network Diagnostic support : ${enable_mtd_network_diagnostic}
   OpenThread builtin mbedtls support        : ${enable_builtin_mbedtls}
-  OpenThread TMF Proxy support              : ${enable_tmf_proxy}
+  OpenThread UDP Proxy support              : ${enable_udp_proxy}
   OpenThread Commissioner support           : ${enable_commissioner}
   OpenThread Joiner support                 : ${enable_joiner}
   OpenThread DTLS support                   : ${enable_dtls}
@@ -1659,6 +1761,7 @@ AC_MSG_NOTICE([
   OpenThread DNS Client support             : ${enable_dns_client}
   OpenThread Application CoAP support       : ${enable_application_coap}
   OpenThread Raw Link-Layer support         : ${enable_raw_link_api}
+  OpenThread Border Agent support           : ${enable_border_agent}
   OpenThread Border Router support          : ${enable_border_router}
   OpenThread Service support                : ${enable_service}
   OpenThread examples                       : ${OPENTHREAD_EXAMPLES}

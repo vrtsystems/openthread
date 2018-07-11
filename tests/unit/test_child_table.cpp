@@ -32,6 +32,7 @@
 #include <openthread/openthread.h>
 
 #include "test_util.h"
+#include "common/code_utils.hpp"
 #include "common/instance.hpp"
 #include "thread/child_table.hpp"
 
@@ -96,7 +97,7 @@ static bool StateMatchesFilter(Child::State aState, ChildTable::StateFilter aFil
         rval = child.IsStateValidOrAttaching();
         break;
 
-    case ChildTable::kInStateAnyExceptValidOrRestoing:
+    case ChildTable::kInStateAnyExceptValidOrRestoring:
         rval = !child.IsStateValidOrRestoring();
         break;
     }
@@ -109,7 +110,7 @@ void VerifyChildTableContent(ChildTable &aTable, uint8_t aChildListLength, const
 {
     printf("Test ChildTable with %d entries", aChildListLength);
 
-    for (uint8_t k = 0; k < sizeof(kAllFilters) / sizeof(kAllFilters[0]); k++)
+    for (uint8_t k = 0; k < OT_ARRAY_LENGTH(kAllFilters); k++)
     {
         ChildTable::StateFilter filter = kAllFilters[k];
 
@@ -174,14 +175,14 @@ void VerifyChildTableContent(ChildTable &aTable, uint8_t aChildListLength, const
                     VerifyOrQuit(iter.GetChild() == startingChild,
                                  "Iterator failed to start from the given child entry");
 
-                    iter.Advance();
+                    iter++;
                     iter.Reset();
                     VerifyOrQuit(iter.GetChild() == startingChild, "iterator Reset() failed");
                 }
 
                 // Use the iterator and verify that each returned `Child` entry is in the expected list.
 
-                for (; !iter.IsDone(); iter.Advance())
+                for (; !iter.IsDone(); iter++)
                 {
                     Child * child   = iter.GetChild();
                     bool    didFind = false;
@@ -211,7 +212,7 @@ void VerifyChildTableContent(ChildTable &aTable, uint8_t aChildListLength, const
 
                 VerifyOrQuit(iter.GetChild() == NULL, "iterator GetChild() failed");
 
-                iter.Advance();
+                iter++;
                 VerifyOrQuit(iter.IsDone(), "iterator Advance() (after iterator is done) failed");
                 VerifyOrQuit(iter.GetChild() == NULL, "iterator GetChild() failed");
 
@@ -296,7 +297,7 @@ void TestChildTable(void)
         },
     };
 
-    const uint8_t testListLength = sizeof(testChildList) / sizeof(testChildList[0]);
+    const uint8_t testListLength = OT_ARRAY_LENGTH(testChildList);
 
     uint8_t testNumAllowedChildren = 2;
 
@@ -314,7 +315,7 @@ void TestChildTable(void)
     VerifyOrQuit(table->GetMaxChildrenAllowed() == table->GetMaxChildren(),
                  "GetMaxChildrenAllowed() initial value is incorrect ");
 
-    for (uint8_t i = 0; i < sizeof(kAllFilters) / sizeof(kAllFilters[0]); i++)
+    for (uint8_t i = 0; i < OT_ARRAY_LENGTH(kAllFilters); i++)
     {
         ChildTable::StateFilter filter = kAllFilters[i];
 

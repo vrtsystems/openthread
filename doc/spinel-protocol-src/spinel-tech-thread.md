@@ -32,10 +32,17 @@ The IPv6 address of the leader. (Note: May change to long and short address of l
 
 ### PROP 81: PROP_THREAD_PARENT
 * Type: Read-Only
-* Packed-Encoding: `ES`
-* LADDR, SADDR
+* Packed-Encoding: `ESLccCC`
 
-The long address and short address of the parent of this node.
+Information about parent of this node.
+
+*  `E`: Extended address
+*  `S`: RLOC16
+*  `L`: Age (seconds since last heard from)
+*  `c`: Average RSS (in dBm)
+*  `c`: Last RSSI (in dBm)
+*  `C`: Link Quality In
+*  `C`: Link Quality Out
 
 ### PROP 82: PROP_THREAD_CHILD_TABLE
 * Type: Read-Only
@@ -562,3 +569,17 @@ Data per item is:
 * `S`: Message error rate (0 -> 0%, 0xffff -> 100%)
 * `c`: Average RSSI (in dBm)
 * `c`: Last RSSI (in dBm)
+
+
+### PROP 5411: SPINEL_PROP_THREAD_ADDRESS_CACHE_TABLE (#prop-thread-address-cache-table)
+
+* Type: Read-Only
+* Packing-Encoding: `A(t(6SC))`
+
+This property provides Thread EID IPv6 address cache table.
+
+Data per item is:
+
+* `6` : Target IPv6 address
+* `S` : RLOC16 of target
+* `C` : Age (order of use, 0 indicates most recently used entry)

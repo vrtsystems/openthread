@@ -29,6 +29,7 @@
 
 import sys
 import time
+import re
 import random
 import weakref
 import subprocess
@@ -62,36 +63,36 @@ WPAN_IP6_MESH_LOCAL_PREFIX                     = "IPv6:MeshLocalPrefix"
 WPAN_IP6_ALL_ADDRESSES                         = "IPv6:AllAddresses"
 WPAN_IP6_MULTICAST_ADDRESSES                   = "IPv6:MulticastAddresses"
 
-WPAN_THREAD_RLOC16                             =  "Thread:RLOC16"
-WPAN_THREAD_ROUTER_ID                          =  "Thread:RouterID"
-WPAN_THREAD_LEADER_ADDRESS                     =  "Thread:Leader:Address"
-WPAN_THREAD_LEADER_ROUTER_ID                   =  "Thread:Leader:RouterID"
-WPAN_THREAD_LEADER_WEIGHT                      =  "Thread:Leader:Weight"
-WPAN_THREAD_LEADER_LOCAL_WEIGHT                =  "Thread:Leader:LocalWeight"
-WPAN_THREAD_LEADER_NETWORK_DATA                =  "Thread:Leader:NetworkData"
-WPAN_THREAD_STABLE_LEADER_NETWORK_DATA         =  "Thread:Leader:StableNetworkData"
-WPAN_THREAD_NETWORK_DATA                       =  "Thread:NetworkData"
-WPAN_THREAD_CHILD_TABLE                        =  "Thread:ChildTable"
-WPAN_THREAD_CHILD_TABLE_ASVALMAP               =  "Thread:ChildTable:AsValMap"
-WPAN_THREAD_CHILD_TABLE_ADDRESSES              =  "Thread:ChildTable:Addresses"
-WPAN_THREAD_NEIGHBOR_TABLE                     =  "Thread:NeighborTable"
-WPAN_THREAD_NEIGHBOR_TABLE_ASVALMAP            =  "Thread:NeighborTable:AsValMap"
-WPAN_THREAD_ROUTER_TABLE                       =  "Thread:RouterTable"
-WPAN_THREAD_ROUTER_TABLE_ASVALMAP              =  "Thread:RouterTable:AsValMap"
-WPAN_THREAD_NETWORK_DATA_VERSION               =  "Thread:NetworkDataVersion"
-WPAN_THREAD_STABLE_NETWORK_DATA                =  "Thread:StableNetworkData"
-WPAN_THREAD_STABLE_NETWORK_DATA_VERSION        =  "Thread:StableNetworkDataVersion"
-WPAN_THREAD_PREFERRED_ROUTER_ID                =  "Thread:PreferredRouterID"
-WPAN_THREAD_COMMISSIONER_ENABLED               =  "Thread:Commissioner:Enabled"
-WPAN_THREAD_DEVICE_MODE                        =  "Thread:DeviceMode"
-WPAN_THREAD_OFF_MESH_ROUTES                    =  "Thread:OffMeshRoutes"
-WPAN_THREAD_ON_MESH_PREFIXES                   =  "Thread:OnMeshPrefixes"
-WPAN_THREAD_ROUTER_ROLE_ENABLED                =  "Thread:RouterRole:Enabled"
-WPAN_THREAD_CONFIG_FILTER_RLOC_ADDRESSES       =  "Thread:Config:FilterRLOCAddresses"
-WPAN_THREAD_ACTIVE_DATASET                     =  "Thread:ActiveDataset"
-WPAN_THREAD_ACTIVE_DATASET_ASVALMAP            =  "Thread:ActiveDataset:AsValMap"
-WPAN_THREAD_PENDING_DATASET                    =  "Thread:PendingDataset"
-WPAN_THREAD_PENDING_DATASET_ASVALMAP           =  "Thread:PendingDataset:AsValMap"
+WPAN_THREAD_RLOC16                             = "Thread:RLOC16"
+WPAN_THREAD_ROUTER_ID                          = "Thread:RouterID"
+WPAN_THREAD_LEADER_ADDRESS                     = "Thread:Leader:Address"
+WPAN_THREAD_LEADER_ROUTER_ID                   = "Thread:Leader:RouterID"
+WPAN_THREAD_LEADER_WEIGHT                      = "Thread:Leader:Weight"
+WPAN_THREAD_LEADER_LOCAL_WEIGHT                = "Thread:Leader:LocalWeight"
+WPAN_THREAD_LEADER_NETWORK_DATA                = "Thread:Leader:NetworkData"
+WPAN_THREAD_STABLE_LEADER_NETWORK_DATA         = "Thread:Leader:StableNetworkData"
+WPAN_THREAD_NETWORK_DATA                       = "Thread:NetworkData"
+WPAN_THREAD_CHILD_TABLE                        = "Thread:ChildTable"
+WPAN_THREAD_CHILD_TABLE_ASVALMAP               = "Thread:ChildTable:AsValMap"
+WPAN_THREAD_CHILD_TABLE_ADDRESSES              = "Thread:ChildTable:Addresses"
+WPAN_THREAD_NEIGHBOR_TABLE                     = "Thread:NeighborTable"
+WPAN_THREAD_NEIGHBOR_TABLE_ASVALMAP            = "Thread:NeighborTable:AsValMap"
+WPAN_THREAD_ROUTER_TABLE                       = "Thread:RouterTable"
+WPAN_THREAD_ROUTER_TABLE_ASVALMAP              = "Thread:RouterTable:AsValMap"
+WPAN_THREAD_NETWORK_DATA_VERSION               = "Thread:NetworkDataVersion"
+WPAN_THREAD_STABLE_NETWORK_DATA                = "Thread:StableNetworkData"
+WPAN_THREAD_STABLE_NETWORK_DATA_VERSION        = "Thread:StableNetworkDataVersion"
+WPAN_THREAD_PREFERRED_ROUTER_ID                = "Thread:PreferredRouterID"
+WPAN_THREAD_COMMISSIONER_ENABLED               = "Thread:Commissioner:Enabled"
+WPAN_THREAD_DEVICE_MODE                        = "Thread:DeviceMode"
+WPAN_THREAD_OFF_MESH_ROUTES                    = "Thread:OffMeshRoutes"
+WPAN_THREAD_ON_MESH_PREFIXES                   = "Thread:OnMeshPrefixes"
+WPAN_THREAD_ROUTER_ROLE_ENABLED                = "Thread:RouterRole:Enabled"
+WPAN_THREAD_CONFIG_FILTER_RLOC_ADDRESSES       = "Thread:Config:FilterRLOCAddresses"
+WPAN_THREAD_ACTIVE_DATASET                     = "Thread:ActiveDataset"
+WPAN_THREAD_ACTIVE_DATASET_ASVALMAP            = "Thread:ActiveDataset:AsValMap"
+WPAN_THREAD_PENDING_DATASET                    = "Thread:PendingDataset"
+WPAN_THREAD_PENDING_DATASET_ASVALMAP           = "Thread:PendingDataset:AsValMap"
 
 WPAN_OT_LOG_LEVEL                              = "OpenThread:LogLevel"
 WPAN_OT_STEERING_DATA_ADDRESS                  = "OpenThread:SteeringData:Address"
@@ -355,20 +356,39 @@ class Node(object):
                             (' {}'.format(port) if port is not None else '') +
                             traffic_type)
 
-    def config_gateway(self, prefix, default_route=False):
+    def config_gateway(self, prefix, default_route=False, priority=None):
         return self.wpanctl('config-gateway ' + prefix +
-                            (' -d' if default_route else ''))
+                            (' -d' if default_route else '') +
+                            (' -P {}'.format(priority) if priority is not None else ''))
 
-    def add_route(self, route_prefix, prefix_len_in_bytes=None, priority=None):
+    def add_prefix(self, prefix, prefix_len=None, priority=None, stable=True, on_mesh=False, slaac=False, dhcp=False,
+            configure=False, default_route=False, preferred=False):
+        return self.wpanctl('add-prefix ' + prefix +
+                            (' -l {}'.format(prefix_len) if prefix_len is not None else '') +
+                            (' -P {}'.format(priority) if priority is not None else '') +
+                            (' -s' if stable else '') +
+                            (' -f' if preferred else '') +
+                            (' -a' if slaac else '') +
+                            (' -d' if dhcp else '') +
+                            (' -c' if configure else '') +
+                            (' -r' if default_route else '') +
+                            (' -o' if on_mesh else ''))
+
+    def remove_prefix(self, prefix, prefix_len=None):
+        return self.wpanctl('remove-prefix ' + prefix +
+                            (' -l {}'.format(prefix_len) if prefix_len is not None else ''))
+
+    def add_route(self, route_prefix, prefix_len=None, priority=None, stable=True):
         """route priority [(>0 for high, 0 for medium, <0 for low)]"""
         return self.wpanctl('add-route ' + route_prefix +
-                            (' -l {}'.format(prefix_len_in_bytes) if prefix_len_in_bytes is not None else '') +
-                            (' -p {}'.format(priority) if priority is not None else ''))
+                            (' -l {}'.format(prefix_len) if prefix_len is not None else '') +
+                            (' -p {}'.format(priority) if priority is not None else '') +
+                            ('' if stable else '-n'))
 
-    def remove_route(self, route_prefix, prefix_len_in_bytes=None, priority=None):
+    def remove_route(self, route_prefix, prefix_len=None, priority=None, stable=True):
         """route priority [(>0 for high, 0 for medium, <0 for low)]"""
         return self.wpanctl('remove-route ' + route_prefix +
-                            (' -l {}'.format(prefix_len_in_bytes) if prefix_len_in_bytes is not None else '') +
+                            (' -l {}'.format(prefix_len) if prefix_len is not None else '') +
                             (' -p {}'.format(priority) if priority is not None else ''))
 
     #------------------------------------------------------------------------------------------------------------------
@@ -422,6 +442,43 @@ class Node(object):
 
         return False
 
+    def find_ip6_address_with_prefix(self, prefix):
+        """Find an IPv6 address on node matching a given prefix.
+           `prefix` should be an string containing the prefix.
+           Returns a string containing the IPv6 address matching the prefix or empty string if no address found.
+        """
+        if len(prefix) > 2 and prefix[-1] == ':' and prefix[-2] == ':':
+            prefix = prefix[:-1]
+        all_addrs = parse_list(self.get(WPAN_IP6_ALL_ADDRESSES))
+        matched_addr = [addr for addr in all_addrs if addr.startswith(prefix)]
+        return matched_addr[0] if len(matched_addr) >= 1 else ''
+
+    def add_ip6_address_on_interface(self, address, prefix_len=64):
+        """Adds an IPv6 interface on the network interface.
+           `address` should be string containing the IPv6 address.
+           `prefix_len` is an `int` specifying the prefix length.
+           NOTE: this method uses linux `ip` command.
+        """
+        cmd = 'ip -6 addr add '+ address + '/{} dev '.format(prefix_len) + self.interface_name
+        if self._verbose:
+            _log('$ Node{} \'{}\')'.format(self._index, cmd))
+
+        result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+        return result
+
+    def remove_ip6_address_on_interface(self, address, prefix_len=64):
+        """Removes an IPv6 interface on the network interface.
+           `address` should be string containing the IPv6 address.
+           `prefix_len` is an `int` specifying the prefix length.
+           NOTE: this method uses linux `ip` command.
+        """
+        cmd = 'ip -6 addr del '+ address + '/{} dev '.format(prefix_len) + self.interface_name
+        if self._verbose:
+            _log('$ Node{} \'{}\')'.format(self._index, cmd))
+
+        result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+        return result
+
     #------------------------------------------------------------------------------------------------------------------
     # class methods
 
@@ -436,7 +493,8 @@ class Node(object):
                 try:
                     node.leave()
                 except subprocess.CalledProcessError as e:
-                    _log(' -> \'{}\' exit code: {}'.format(e.output, e.returncode))
+                    if (node._verbose):
+                        _log(' -> \'{}\' exit code: {}'.format(e.output, e.returncode))
                     if time.time() - start_time > wait_time:
                         print 'Took too long to init all nodes ({}>{} sec)'.format(time.time() - start_time, wait_time)
                         raise
@@ -456,7 +514,7 @@ class Node(object):
     #------------------------------------------------------------------------------------------------------------------
     # IPv6 message Sender and Receiver class
 
-    class _NodeError(BaseException):
+    class _NodeError(Exception):
         pass
 
     def prepare_tx(self, src, dst, data=40, count=1):
@@ -508,7 +566,7 @@ class Node(object):
         return receiver
 
     def _remove_recver(self, recvr):
-        # Removes a receiver from weak dictionary - called when the receiver is done and its scoket is closed
+        # Removes a receiver from weak dictionary - called when the receiver is done and its socket is closed
         local_port = recvr.local_port
         if local_port in self._recvers:
             del self._recvers[local_port]
@@ -540,7 +598,7 @@ def _is_ipv6_addr_link_local(ip_addr):
 
 def _create_socket_address(ip_address, port):
     """Convert a given IPv6 address (string) and port number into a socket address"""
-    # `socket.getaddrinfo() returns a list of `(family, socktype, proto, canonname, sockaddr)` where `sockaddr`
+    # `socket.getaddrinfo()` returns a list of `(family, socktype, proto, canonname, sockaddr)` where `sockaddr`
     # (at index 4) can be used as input in socket methods (like `sendto()`, `bind()`, etc.).
     return socket.getaddrinfo(ip_address, port)[0][4]
 
@@ -741,18 +799,50 @@ class AsyncReceiver(asyncore.dispatcher):
         self._node._remove_recver(self)
 
 #-----------------------------------------------------------------------------------------------------------------------
+class VerifyError(Exception):
+    pass
+
+_is_in_verify_within = False
 
 def verify(condition):
-    """Verifies that a `condition` is true, otherwise exits"""
+    """Verifies that a `condition` is true, otherwise raises a VerifyError"""
+    global _is_in_verify_within
     if not condition:
         calling_frame = inspect.currentframe().f_back
-        print 'verify() failed at line {} in "{}"'.format(calling_frame.f_lineno, calling_frame.f_code.co_filename)
-        exit(1)
+        error_message = 'verify() failed at line {} in "{}"'.format(calling_frame.f_lineno, calling_frame.f_code.co_filename)
+        if not _is_in_verify_within:
+            print error_message
+        raise VerifyError(error_message)
 
+def verify_within(condition_checker_func, wait_time, delay_time=0.1):
+    """Verifies that a given function `condition_checker_func` passes successfully within a given wait timeout.
+       `wait_time` is maximum time waiting for condition_checker to pass (in seconds).
+       `delay_time` specifies a delay interval added between failed attempts (in seconds).
+    """
+    global _is_in_verify_within
+    start_time = time.time()
+    old_is_in_verify_within = _is_in_verify_within
+    _is_in_verify_within = True
+    while True:
+        try:
+            condition_checker_func()
+        except VerifyError as e:
+            if time.time() - start_time > wait_time:
+                print 'Took too long to pass the condition ({}>{} sec)'.format(time.time() - start_time, wait_time)
+                print e.message
+                raise e
+        except:
+            raise
+        else:
+            break
+        if delay_time != 0:
+            time.sleep(delay_time)
+    _is_in_verify_within = old_is_in_verify_within
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Parsing `wpanctl` output
 
+#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 class ScanResult(object):
     """ This object encapsulates a scan result (active/discover/energy scan)"""
 
@@ -829,4 +919,146 @@ def parse_scan_result(scan_result):
     """ Parses scan result string and returns an array of `ScanResult` objects"""
     return [ ScanResult(item) for item in scan_result.split('\n')[2:] ]  # skip first two lines which are table headers
 
+def parse_list(list_string):
+    """
+    Parses IPv6/prefix/route list string (output of wpanctl get for properties WPAN_IP6_ALL_ADDRESSES,
+    IP6_MULTICAST_ADDRESSES, WPAN_THREAD_ON_MESH_PREFIXES, ...)
+    Returns an array of strings each containing an IPv6/prefix/route entry.
+    """
+    # List string example (get(WPAN_IP6_ALL_ADDRESSES) output):
+    #
+    # '[\n
+    # \t"fdf4:5632:4940:0:8798:8701:85d4:e2be     prefix_len:64   origin:ncp      valid:forever   preferred:forever"\n
+    # \t"fe80::2092:9358:97ea:71c6                prefix_len:64   origin:ncp      valid:forever   preferred:forever"\n
+    # ]'
+    #
+    # We split the lines ('\n' as separator) and skip the first and last lines which are '['  and ']'.
+    # For each line, skip the first two characters (which are '\t"') and last character ('"'), then split the string
+    # using whitespace as separator. The first entry is the IPv6 address.
+    #
+    return [line[2:-1].split()[0] for line in list_string.split('\n')[1:-1]]
 
+#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+class OnMeshPrefix(object):
+    """ This object encapsulates an on-mesh prefix"""
+
+    def __init__(self, text):
+
+        # Example of expected text:
+        #
+        # '\t"fd00:abba:cafe::       prefix_len:64   origin:user     stable:yes flags:0x31'
+        # ' [on-mesh:1 def-route:0 config:0 dhcp:0 slaac:1 pref:1 prio:med]"'
+
+        m = re.match('\t"([0-9a-fA-F:]+)\s*prefix_len:(\d+)\s+origin:(\w*)\s+stable:(\w*).*' +
+                    '\[on-mesh:(\d)\s+def-route:(\d)\s+config:(\d)\s+dhcp:(\d)\s+slaac:(\d)\s+pref:(\d)\s+prio:(\w*)\]',
+                     text)
+        verify(m is not None)
+        data = m.groups()
+
+        self._prefix     = data[0]
+        self._prefix_len = data[1]
+        self._origin     = data[2]
+        self._stable     = (data[3] == 'yes')
+        self._on_mesh    = (data[4] == '1')
+        self._def_route  = (data[5] == '1')
+        self._config     = (data[6] == '1')
+        self._dhcp       = (data[7] == '1')
+        self._slaac      = (data[8] == '1')
+        self._preferred  = (data[9] == '1')
+        self._priority   = (data[10])
+
+    @property
+    def prefix(self):
+        return self._prefix
+
+    @property
+    def prefix_len(self):
+        return self._prefix_len
+
+    @property
+    def origin(self):
+        return self._origin
+
+    @property
+    def priority(self):
+        return self._priority
+
+    def is_stable(self):
+        return self._stable
+
+    def is_on_mesh(self):
+        return self._on_mesh
+
+    def is_def_route(self):
+        return self._def_route
+
+    def is_config(self):
+        return self._config
+
+    def is_dhcp(self):
+        return self._dhcp
+
+    def is_slaac(self):
+        return self._slaac
+
+    def is_preferred(self):
+        return self._preferred
+
+    def __repr__(self):
+        return 'OnMeshPrefix({})'.format(self.__dict__)
+
+def parse_on_mesh_prefix_result(on_mesh_prefix_list):
+    """ Parses on-mesh prefix list string and returns an array of `OnMeshPrefix` objects"""
+    return [ OnMeshPrefix(item) for item in on_mesh_prefix_list.split('\n')[1:-1] ]
+
+#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+class ChildEntry(object):
+    """ This object encapsulates an child entry"""
+
+    def __init__(self, text):
+
+        # Example of expected text:
+        #
+        # `\t"E24C5F67F4B8CBB9, RLOC16:d402, NetDataVer:175, LQIn:3, AveRssi:-20, LastRssi:-20, Timeout:120, Age:0, `
+        # `RxOnIdle:no, FFD:no, SecDataReq:yes, FullNetData:yes"`
+        #
+
+        # We get rid of the first two chars `\t"' and last char '"', split the rest using whitespace as seperator.
+        # Then remove any ',' at end of items in the list.
+        items = [item[:-1] if item[-1] ==',' else item for item in text[2:-1].split()]
+
+        # First item in the extended address
+        self._ext_address = items[0]
+
+        # Convert the rest into a dictionary by splitting using ':' as seperator
+        dict = {item.split(':')[0] : item.split(':')[1] for item in items[1:]}
+
+        self._rloc16     = dict['RLOC16']
+        self._timeout    = dict['Timeout']
+        self._rx_on_idle = (dict['RxOnIdle'] == 'yes')
+        self._ffd        = (dict['FFD'] == 'yes')
+
+    @property
+    def ext_address(self):
+        return self._ext_address
+
+    @property
+    def rloc16(self):
+        return self._rloc16
+
+    @property
+    def timeout(self):
+        return self._timeout
+
+    def is_rx_on_when_idle(self):
+        return self._rx_on_idle
+
+    def is_ffd(self):
+        return self._ffd
+
+    def __repr__(self):
+        return 'ChildEntry({})'.format(self.__dict__)
+
+def parse_child_table_result(child_table_list):
+    """ Parses child table list string and returns an array of `ChildEntry` objects"""
+    return [ ChildEntry(item) for item in child_table_list.split('\n')[1:-1] ]

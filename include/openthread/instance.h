@@ -163,7 +163,7 @@ OTAPI uint32_t OTCALL otGetCompartmentId(otInstance *aInstance);
 /**
  * This function initializes the OpenThread library.
  *
- * This function initializes OpenThread and prepares it for subsequent OpenThread API calls.  This function must be
+ * This function initializes OpenThread and prepares it for subsequent OpenThread API calls. This function must be
  * called before any other calls to OpenThread.
  *
  * This function is available and can only be used when support for multiple OpenThread instances is enabled.
@@ -182,7 +182,7 @@ otInstance *otInstanceInit(void *aInstanceBuffer, size_t *aInstanceBufferSize);
 /**
  * This function initializes the static single instance of the OpenThread library.
  *
- * This function initializes OpenThread and prepares it for subsequent OpenThread API calls.  This function must be
+ * This function initializes OpenThread and prepares it for subsequent OpenThread API calls. This function must be
  * called before any other calls to OpenThread.
  *
  * This function is available and can only be used when support for multiple OpenThread instances is disabled.
@@ -248,7 +248,15 @@ enum
     OT_CHANGED_PSKC                        = 1 << 21, ///< PSKc changed
     OT_CHANGED_SECURITY_POLICY             = 1 << 22, ///< Security Policy changed
     OT_CHANGED_CHANNEL_MANAGER_NEW_CHANNEL = 1 << 23, ///< Channel Manager new pending Thread channel changed
+    OT_CHANGED_SUPPORTED_CHANNEL_MASK      = 1 << 24, ///< Supported channel mask changed
 };
+
+/**
+ * This type represents a bit-field indicating specific state/configuration that has changed. See `OT_CHANGED_*`
+ * definitions.
+ *
+ */
+typedef uint32_t otChangedFlags;
 
 /**
  * This function pointer is called to notify certain configuration or state changes within OpenThread.
@@ -257,7 +265,7 @@ enum
  * @param[in]  aContext  A pointer to application-specific context.
  *
  */
-typedef void(OTCALL *otStateChangedCallback)(uint32_t aFlags, void *aContext);
+typedef void(OTCALL *otStateChangedCallback)(otChangedFlags aFlags, void *aContext);
 
 /**
  * This function registers a callback to indicate when certain configuration or state changes within OpenThread.

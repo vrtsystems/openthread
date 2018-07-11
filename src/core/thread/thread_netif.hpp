@@ -42,10 +42,6 @@
 #include "coap/coap_secure.hpp"
 #include "mac/mac.hpp"
 
-#if OPENTHREAD_ENABLE_TMF_PROXY && OPENTHREAD_FTD
-#include "thread/tmf_proxy.hpp"
-#endif // OPENTHREAD_ENABLE_TMF_PROXY && OPENTHREAD_FTD
-
 #if OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
 #include "meshcop/commissioner.hpp"
 #endif // OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
@@ -78,6 +74,7 @@
 #include "thread/network_data_local.hpp"
 #include "thread/network_diagnostic.hpp"
 #include "thread/panid_query_server.hpp"
+#include "thread/time_sync_service.hpp"
 #include "utils/child_supervision.hpp"
 
 #if OPENTHREAD_ENABLE_JAM_DETECTION
@@ -370,16 +367,6 @@ public:
     Utils::JamDetector &GetJamDetector(void) { return mJamDetector; }
 #endif // OPENTHREAD_ENABLE_JAM_DETECTION
 
-#if OPENTHREAD_ENABLE_TMF_PROXY && OPENTHREAD_FTD
-    /**
-     * This method returns the TMF proxy object.
-     *
-     * @returns Reference to the TMF proxy object.
-     *
-     */
-    TmfProxy &GetTmfProxy(void) { return mTmfProxy; }
-#endif // OPENTHREAD_ENABLE_TMF_PROXY && OPENTHREAD_FTD
-
     /**
      * This method returns a reference to the child supervisor object.
      *
@@ -411,6 +398,16 @@ public:
      *
      */
     PanIdQueryServer &GetPanIdQueryServer(void) { return mPanIdQuery; }
+
+#if OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+    /**
+     * This method returns a reference to the Time Synchronization Service object.
+     *
+     * @returns A reference to the Time Synchronization Service object.
+     *
+     */
+    TimeSync &GetTimeSync(void) { return mTimeSync; }
+#endif
 
     /**
      * This method returns whether Thread Management Framework Addressing Rules are met.
@@ -468,10 +465,6 @@ private:
     Utils::JamDetector mJamDetector;
 #endif // OPENTHREAD_ENABLE_JAM_DETECTION
 
-#if OPENTHREAD_ENABLE_TMF_PROXY && OPENTHREAD_FTD
-    TmfProxy mTmfProxy;
-#endif // OPENTHREAD_ENABLE_TMF_PROXY && OPENTHREAD_FTD
-
 #if OPENTHREAD_FTD
     MeshCoP::JoinerRouter mJoinerRouter;
     MeshCoP::Leader       mLeader;
@@ -483,6 +476,9 @@ private:
     AnnounceBeginServer        mAnnounceBegin;
     PanIdQueryServer           mPanIdQuery;
     EnergyScanServer           mEnergyScan;
+#if OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+    TimeSync mTimeSync;
+#endif
 };
 
 /**

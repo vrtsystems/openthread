@@ -90,7 +90,9 @@
  * Define to prepend the log level to all log messages
  *
  */
+#ifndef OPENTHREAD_CONFIG_LOG_PREPEND_LEVEL
 #define OPENTHREAD_CONFIG_LOG_PREPEND_LEVEL                     0
+#endif
 
  /**
   * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
@@ -98,7 +100,7 @@
   * Define to 1 if you want to enable software ACK timeout logic.
   *
   */
-#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT           1
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT           0
 
  /**
   * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
@@ -107,6 +109,14 @@
   *
   */
 #define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT            1
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+ *
+ * Define to 1 if you want to enable software CSMA-CA backoff logic.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF          0
 
 /**
  * @def OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
@@ -141,20 +151,45 @@
 #define SETTINGS_CONFIG_PAGE_NUM                                4
 
 /**
- * @def OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE
+ * @def OPENTHREAD_CONFIG_HEAP_SIZE
  *
- * The size of mbedTLS heap buffer when DTLS is enabled.
+ * The size of heap buffer when DTLS is enabled.
  *
  */
-#define OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE                     (4096 * sizeof(void *))
+#define OPENTHREAD_CONFIG_HEAP_SIZE                             (4096 * sizeof(void *))
 
 /**
- * @def OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE_NO_DTLS
+ * @def OPENTHREAD_CONFIG_HEAP_SIZE_NO_DTLS
  *
- * The size of mbedTLS heap buffer when DTLS is disabled.
+ * The size of heap buffer when DTLS is disabled.
  *
  */
-#define OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE_NO_DTLS             2048
+#define OPENTHREAD_CONFIG_HEAP_SIZE_NO_DTLS                     2048
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+ *
+ * Define as 1 to enable the time synchronization service feature.
+ *
+ * @note If it's enabled, plaforms must support interrupt context and concurrent access AES.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_TIME_SYNC                      0
+
+/**
+ * @def NRF_MBEDTLS_AES_ALT_INTERRUPT_CONTEXT
+ *
+ * Define as 1 to enable AES usage in interrupt context and AES-256, by introducing a software AES under platform layer.
+ *
+ * @note This feature must be enabled to support AES-256 used by Commissioner and Joiner, and AES usage in interrupt context
+ *       used by time synchronization service.
+ *
+ */
+#if OPENTHREAD_ENABLE_COMMISSIONER || OPENTHREAD_ENABLE_JOINER || OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+#define NRF_MBEDTLS_AES_ALT_INTERRUPT_CONTEXT                   1
+#else
+#define NRF_MBEDTLS_AES_ALT_INTERRUPT_CONTEXT                   0
+#endif
 
 /*
  * Suppress the ARMCC warning on unreachable statement,
