@@ -97,6 +97,14 @@ void otCliConsoleInit(otInstance *aInstance, otCliConsoleOutputCallback aCallbac
 void otCliConsoleInputLine(char *aBuf, uint16_t aBufLength);
 
 /**
+ * Enable or disable line echo on the CLI UART module.
+ *
+ * @param[in]  aEnable  A flag indicating whether line echo should be enabled.
+ *
+ */
+void otCliUartEnableLineEcho(bool aEnable);
+
+/**
  * Initialize the CLI UART module.
  *
  * @param[in]  aInstance  The OpenThread instance structure.
