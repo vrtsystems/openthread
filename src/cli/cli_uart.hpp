@@ -62,6 +62,13 @@ public:
     Uart(Instance *aInstance);
 
     /**
+     * This method turns on or off echoing of characters back to the client.
+     *
+     * @param[in]  enable      Whether or not to enable line echo.
+     */
+    void EnableLineEcho(bool aEnable);
+
+    /**
      * This method delivers raw characters to the client.
      *
      * @param[in]  aBuf        A pointer to a buffer.
@@ -126,6 +133,8 @@ private:
     uint16_t mTxLength;
 
     uint16_t mSendLength;
+
+    bool     mEnableLineEcho;
 
     Interpreter mInterpreter;
 
