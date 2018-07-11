@@ -111,10 +111,11 @@ extern "C" void otCliUartInit(otInstance *aInstance)
 Uart::Uart(Instance *aInstance)
     : Server(aInstance)
 {
-    mRxLength   = 0;
-    mTxHead     = 0;
-    mTxLength   = 0;
-    mSendLength = 0;
+    mRxLength       = 0;
+    mTxHead         = 0;
+    mTxLength       = 0;
+    mSendLength     = 0;
+    mEnableLineEcho = true;
 
     otPlatUartEnable();
 }
@@ -122,6 +123,11 @@ Uart::Uart(Instance *aInstance)
 extern "C" void otPlatUartReceived(const uint8_t *aBuf, uint16_t aBufLength)
 {
     static_cast<Uart *>(Server::sServer)->ReceiveTask(aBuf, aBufLength);
+}
+
+void Uart::EnableLineEcho(bool aEnable)
+{
+    mEnableLineEcho = aEnable;
 }
 
 void Uart::ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength)
@@ -177,7 +183,10 @@ void Uart::ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength)
             if (mRxLength < kRxBufferSize - 1)
             {
 #if !OPENTHREAD_CONFIG_UART_CLI_RAW
-                Output(reinterpret_cast<const char *>(aBuf), 1);
+                if (mEnableLineEcho)
+                {
+                    Output(reinterpret_cast<const char *>(aBuf), 1);
+                }
 #endif
                 mRxBuffer[mRxLength++] = static_cast<char>(*aBuf);
             }
