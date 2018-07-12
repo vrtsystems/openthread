@@ -104,6 +104,11 @@ namespace Cli {
 
 static OT_DEFINE_ALIGNED_VAR(sCliUartRaw, sizeof(Uart), uint64_t);
 
+extern "C" bool otCliUartGetLineEchoEnabled()
+{
+    return Uart::sUartServer->GetLineEchoEnabled();
+}
+
 extern "C" void otCliUartEnableLineEcho(bool aEnable)
 {
     Uart::sUartServer->EnableLineEcho(aEnable);
