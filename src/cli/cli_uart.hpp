@@ -62,6 +62,11 @@ public:
     Uart(Instance *aInstance);
 
     /**
+     * This method returns whether line echoing is enabled or not.
+     */
+    bool GetLineEchoEnabled();
+
+    /**
      * This method turns on or off echoing of characters back to the client.
      *
      * @param[in]  enable      Whether or not to enable line echo.
