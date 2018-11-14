@@ -33,21 +33,41 @@
 
 #define WPP_NAME "tasklet_api.tmh"
 
+#include "openthread-core-config.h"
+
 #include <openthread/tasklet.h>
 
-#include "openthread-instance.h"
+#include "common/code_utils.hpp"
+#include "common/instance.hpp"
 #include "common/logging.hpp"
 
 using namespace ot;
 
 void otTaskletsProcess(otInstance *aInstance)
 {
-    otLogFuncEntry();
-    aInstance->mIp6.mTaskletScheduler.ProcessQueuedTasklets();
-    otLogFuncExit();
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    VerifyOrExit(otInstanceIsInitialized(aInstance));
+    instance.GetTaskletScheduler().ProcessQueuedTasklets();
+
+exit:
+    return;
 }
 
 bool otTaskletsArePending(otInstance *aInstance)
 {
-    return aInstance->mIp6.mTaskletScheduler.AreTaskletsPending();
+    bool      retval   = false;
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    VerifyOrExit(otInstanceIsInitialized(aInstance));
+    retval = instance.GetTaskletScheduler().AreTaskletsPending();
+
+exit:
+    return retval;
 }
+
+#ifndef _MSC_VER
+OT_TOOL_WEAK void otTaskletsSignalPending(otInstance *)
+{
+}
+#endif

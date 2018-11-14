@@ -27,29 +27,20 @@
  */
 
 /**
-* @file alarm.c
-* Platform abstraction for the alarm
-*/
+ * @file alarm.c
+ * Platform abstraction for the alarm
+ */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
+#include <openthread/platform/alarm-milli.h>
 
-#include <stdbool.h>
-#include <stdint.h>
-
-#include <openthread/platform/alarm.h>
-
-#include "hw_timer0.h"
-#include "hw_gpio.h"
 #include "platform-da15000.h"
 
-static bool sIsRunning = false;
-static uint32_t sAlarm = 0;
+#include "hw_timer0.h"
+
+static bool     sIsRunning = false;
+static uint32_t sAlarm     = 0;
 static uint32_t sCounter;
-volatile bool sAlarmFired = false;
+volatile bool   sAlarmFired = false;
 
 static void timer0_interrupt_cb(void)
 {
@@ -61,7 +52,7 @@ void da15000AlarmProcess(otInstance *aInstance)
     if ((sIsRunning) && (sAlarm <= sCounter))
     {
         sIsRunning = false;
-        otPlatAlarmFired(aInstance);
+        otPlatAlarmMilliFired(aInstance);
     }
 }
 
@@ -76,15 +67,15 @@ void da15000AlarmInit(void)
     hw_timer0_set_on_clock_div(false);
 }
 
-uint32_t otPlatAlarmGetNow(void)
+uint32_t otPlatAlarmMilliGetNow(void)
 {
     return sCounter;
 }
 
-void otPlatAlarmStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
+void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
 {
     (void)aInstance;
-    sAlarm = t0 + dt;
+    sAlarm     = t0 + dt;
     sIsRunning = true;
 
     if (sCounter == 0)
@@ -92,21 +83,12 @@ void otPlatAlarmStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
         hw_timer0_enable();
     }
 
-
-    if (sIsRunning == false)
-    {
-        sIsRunning = true;
-    }
-
     hw_timer0_unfreeze();
 }
 
-void otPlatAlarmStop(otInstance *aInstance)
+void otPlatAlarmMilliStop(otInstance *aInstance)
 {
     (void)aInstance;
     sIsRunning = false;
     hw_timer0_freeze();
 }
-
-
-

@@ -33,19 +33,15 @@
 
 #define WPP_NAME "data_poll_manager.tmh"
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "data_poll_manager.hpp"
 
 #include <openthread/platform/random.h>
 
 #include "common/code_utils.hpp"
+#include "common/instance.hpp"
 #include "common/logging.hpp"
 #include "common/message.hpp"
+#include "common/owner-locator.hpp"
 #include "net/ip6.hpp"
 #include "net/netif.hpp"
 #include "thread/mesh_forwarder.hpp"
@@ -54,24 +50,20 @@
 
 namespace ot {
 
-DataPollManager::DataPollManager(MeshForwarder &aMeshForwarder):
-    mMeshForwarder(aMeshForwarder),
-    mTimer(aMeshForwarder.GetNetif().GetIp6().mTimerScheduler, &DataPollManager::HandlePollTimer, this),
-    mExternalPollPeriod(0),
-    mPollPeriod(0),
-    mEnabled(false),
-    mAttachMode(false),
-    mRetxMode(false),
-    mNoBufferRetxMode(false),
-    mPollTimeoutCounter(0),
-    mPollTxFailureCounter(0),
-    mRemainingFastPolls(0)
+DataPollManager::DataPollManager(Instance &aInstance)
+    : InstanceLocator(aInstance)
+    , mTimerStartTime(0)
+    , mExternalPollPeriod(0)
+    , mPollPeriod(0)
+    , mTimer(aInstance, &DataPollManager::HandlePollTimer, this)
+    , mEnabled(false)
+    , mAttachMode(false)
+    , mRetxMode(false)
+    , mNoBufferRetxMode(false)
+    , mPollTimeoutCounter(0)
+    , mPollTxFailureCounter(0)
+    , mRemainingFastPolls(0)
 {
-}
-
-otInstance *DataPollManager::GetInstance(void)
-{
-    return mMeshForwarder.GetInstance();
 }
 
 otError DataPollManager::StartPolling(void)
@@ -79,8 +71,7 @@ otError DataPollManager::StartPolling(void)
     otError error = OT_ERROR_NONE;
 
     VerifyOrExit(!mEnabled, error = OT_ERROR_ALREADY);
-    VerifyOrExit((mMeshForwarder.GetNetif().GetMle().GetDeviceMode() & Mle::ModeTlv::kModeFFD) == 0,
-                 error = OT_ERROR_INVALID_STATE);
+    VerifyOrExit(!GetNetif().GetMle().IsRxOnWhenIdle(), error = OT_ERROR_INVALID_STATE);
 
     mEnabled = true;
     ScheduleNextPoll(kRecalculatePollPeriod);
@@ -92,34 +83,39 @@ exit:
 void DataPollManager::StopPolling(void)
 {
     mTimer.Stop();
-    mAttachMode = false;
-    mRetxMode = false;
-    mNoBufferRetxMode = false;
-    mPollTimeoutCounter = 0;
+    mAttachMode           = false;
+    mRetxMode             = false;
+    mNoBufferRetxMode     = false;
+    mPollTimeoutCounter   = 0;
     mPollTxFailureCounter = 0;
-    mRemainingFastPolls = 0;
-    mEnabled = false;
+    mRemainingFastPolls   = 0;
+    mEnabled              = false;
 }
 
 otError DataPollManager::SendDataPoll(void)
 {
-    otError error;
-    Message *message;
+    ThreadNetif &netif = GetNetif();
+    otError      error;
+    Message *    message;
+    Neighbor *   parent;
 
     VerifyOrExit(mEnabled, error = OT_ERROR_INVALID_STATE);
-    VerifyOrExit(!mMeshForwarder.GetNetif().GetMac().GetRxOnWhenIdle(), error = OT_ERROR_INVALID_STATE);
+    VerifyOrExit(!netif.GetMac().GetRxOnWhenIdle(), error = OT_ERROR_INVALID_STATE);
+
+    parent = netif.GetMle().GetParentCandidate();
+    VerifyOrExit((parent != NULL) && parent->IsStateValidOrRestoring(), error = OT_ERROR_INVALID_STATE);
 
     mTimer.Stop();
 
-    for (message = mMeshForwarder.GetSendQueue().GetHead(); message; message = message->GetNext())
+    for (message = netif.GetMeshForwarder().GetSendQueue().GetHead(); message; message = message->GetNext())
     {
         VerifyOrExit(message->GetType() != Message::kTypeMacDataPoll, error = OT_ERROR_ALREADY);
     }
 
-    message = mMeshForwarder.GetNetif().GetIp6().mMessagePool.New(Message::kTypeMacDataPoll, 0);
+    message = GetInstance().GetMessagePool().New(Message::kTypeMacDataPoll, 0);
     VerifyOrExit(message != NULL, error = OT_ERROR_NO_BUFS);
 
-    error = mMeshForwarder.SendMessage(*message);
+    error = netif.GetMeshForwarder().SendMessage(*message);
 
     if (error != OT_ERROR_NONE)
     {
@@ -131,7 +127,7 @@ exit:
     switch (error)
     {
     case OT_ERROR_NONE:
-        otLogDebgMac(GetInstance(), "Sending data poll");
+        otLogDebgMac("Sending data poll");
 
         if (mNoBufferRetxMode == true)
         {
@@ -146,12 +142,12 @@ exit:
         break;
 
     case OT_ERROR_INVALID_STATE:
-        otLogWarnMac(GetInstance(), "Data poll tx requested while data polling was not enabled!");
+        otLogWarnMac("Data poll tx requested while data polling was not enabled!");
         StopPolling();
         break;
 
     case OT_ERROR_ALREADY:
-        otLogDebgMac(GetInstance(), "Data poll tx requested when a previous data request still in send queue.");
+        otLogDebgMac("Data poll tx requested when a previous data request still in send queue.");
         ScheduleNextPoll(kUsePreviousPollPeriod);
         break;
 
@@ -178,6 +174,22 @@ void DataPollManager::SetExternalPollPeriod(uint32_t aPeriod)
     }
 }
 
+uint32_t DataPollManager::GetKeepAlivePollPeriod(void) const
+{
+    uint32_t period = 0;
+
+    if (mExternalPollPeriod != 0)
+    {
+        period = mExternalPollPeriod;
+    }
+    else
+    {
+        period = GetDefaultPollPeriod();
+    }
+
+    return period;
+}
+
 void DataPollManager::HandlePollSent(otError aError)
 {
     bool shouldRecalculatePollPeriod = false;
@@ -196,33 +208,39 @@ void DataPollManager::HandlePollSent(otError aError)
 
         if (mRetxMode == true)
         {
-            mRetxMode = false;
-            mPollTxFailureCounter = 0;
+            mRetxMode                   = false;
+            mPollTxFailureCounter       = 0;
             shouldRecalculatePollPeriod = true;
         }
 
-        otLogInfoMac(GetInstance(), "Sent data poll");
+        otLogInfoMac("Sent data poll");
 
+        break;
+
+    case OT_ERROR_CHANNEL_ACCESS_FAILURE:
+    case OT_ERROR_ABORT:
+        mRetxMode                   = true;
+        shouldRecalculatePollPeriod = true;
         break;
 
     default:
         mPollTxFailureCounter++;
 
-        otLogInfoMac(GetInstance(), "Failed to send data poll, error:%s, retx:%d/%d",
-                     otThreadErrorToString(aError), mPollTxFailureCounter, kMaxPollRetxAttempts);
+        otLogInfoMac("Failed to send data poll, error:%s, retx:%d/%d", otThreadErrorToString(aError),
+                     mPollTxFailureCounter, kMaxPollRetxAttempts);
 
         if (mPollTxFailureCounter < kMaxPollRetxAttempts)
         {
             if (mRetxMode == false)
             {
-                mRetxMode = true;
+                mRetxMode                   = true;
                 shouldRecalculatePollPeriod = true;
             }
         }
         else
         {
-            mRetxMode = false;
-            mPollTxFailureCounter = 0;
+            mRetxMode                   = false;
+            mPollTxFailureCounter       = 0;
             shouldRecalculatePollPeriod = true;
         }
 
@@ -248,7 +266,7 @@ void DataPollManager::HandlePollTimeout(void)
 
     mPollTimeoutCounter++;
 
-    otLogInfoMac(GetInstance(), "Data poll timeout, retry:%d/%d", mPollTimeoutCounter, kQuickPollsAfterTimeout);
+    otLogInfoMac("Data poll timeout, retry:%d/%d", mPollTimeoutCounter, kQuickPollsAfterTimeout);
 
     if (mPollTimeoutCounter < kQuickPollsAfterTimeout)
     {
@@ -333,11 +351,12 @@ void DataPollManager::ScheduleNextPoll(PollPeriodSelector aPollPeriodSelector)
 
     if (mTimer.IsRunning())
     {
-        mTimer.StartAt(mTimer.Gett0(), mPollPeriod);
+        mTimer.StartAt(mTimerStartTime, mPollPeriod);
     }
     else
     {
-        mTimer.Start(mPollPeriod);
+        mTimerStartTime = TimerMilli::GetNow();
+        mTimer.StartAt(mTimerStartTime, mPollPeriod);
     }
 }
 
@@ -384,7 +403,7 @@ uint32_t DataPollManager::CalculatePollPeriod(void) const
 
     if (period == 0)
     {
-        period = Timer::SecToMsec(mMeshForwarder.GetNetif().GetMle().GetTimeout()) -  kRetxPollPeriod * kMaxPollRetxAttempts;
+        period = GetDefaultPollPeriod();
 
         if (period == 0)
         {
@@ -395,9 +414,15 @@ uint32_t DataPollManager::CalculatePollPeriod(void) const
     return period;
 }
 
-void DataPollManager::HandlePollTimer(void *aContext)
+void DataPollManager::HandlePollTimer(Timer &aTimer)
 {
-    static_cast<DataPollManager *>(aContext)->SendDataPoll();
+    aTimer.GetOwner<DataPollManager>().SendDataPoll();
 }
 
-}  // namespace ot
+uint32_t DataPollManager::GetDefaultPollPeriod(void) const
+{
+    return TimerMilli::SecToMsec(GetNetif().GetMle().GetTimeout()) -
+           static_cast<uint32_t>(kRetxPollPeriod) * kMaxPollRetxAttempts;
+}
+
+} // namespace ot

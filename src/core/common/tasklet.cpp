@@ -31,38 +31,31 @@
  *   This file implements the tasklet scheduler.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "tasklet.hpp"
-
-#include <openthread/openthread.h>
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
+#include "common/instance.hpp"
 #include "net/ip6.hpp"
 
 namespace ot {
 
-Tasklet::Tasklet(TaskletScheduler &aScheduler, Handler aHandler, void *aContext):
-    mScheduler(aScheduler),
-    mHandler(aHandler),
-    mContext(aContext),
-    mNext(NULL)
+Tasklet::Tasklet(Instance &aInstance, Handler aHandler, void *aOwner)
+    : InstanceLocator(aInstance)
+    , OwnerLocator(aOwner)
+    , mHandler(aHandler)
+    , mNext(NULL)
 {
 }
 
 otError Tasklet::Post(void)
 {
-    return mScheduler.Post(*this);
+    return GetInstance().GetTaskletScheduler().Post(*this);
 }
 
-TaskletScheduler::TaskletScheduler(void):
-    mHead(NULL),
-    mTail(NULL)
+TaskletScheduler::TaskletScheduler(void)
+    : mHead(NULL)
+    , mTail(NULL)
 {
 }
 
@@ -72,16 +65,18 @@ otError TaskletScheduler::Post(Tasklet &aTasklet)
 
     VerifyOrExit(mTail != &aTasklet && aTasklet.mNext == NULL, error = OT_ERROR_ALREADY);
 
+    VerifyOrExit(&aTasklet.GetInstance().Get<TaskletScheduler>() == this);
+
     if (mTail == NULL)
     {
         mHead = &aTasklet;
         mTail = &aTasklet;
-        otTaskletsSignalPending(aTasklet.mScheduler.GetIp6()->GetInstance());
+        otTaskletsSignalPending(&aTasklet.GetInstance());
     }
     else
     {
         mTail->mNext = &aTasklet;
-        mTail = &aTasklet;
+        mTail        = &aTasklet;
     }
 
 exit:
@@ -121,7 +116,7 @@ void TaskletScheduler::ProcessQueuedTasklets(void)
         {
             if (mHead != NULL)
             {
-                otTaskletsSignalPending(cur->mScheduler.GetIp6()->GetInstance());
+                otTaskletsSignalPending(&mHead->GetInstance());
             }
 
             break;
@@ -129,9 +124,4 @@ void TaskletScheduler::ProcessQueuedTasklets(void)
     }
 }
 
-Ip6::Ip6 *TaskletScheduler::GetIp6(void)
-{
-    return Ip6::Ip6FromTaskletScheduler(this);
-}
-
-}  // namespace ot
+} // namespace ot

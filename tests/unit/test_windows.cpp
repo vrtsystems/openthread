@@ -37,7 +37,6 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 // test_aes.cpp
 void TestMacBeaconFrame();
-void TestMacDataFrame();
 void TestMacCommandFrame();
 
 // test_hmac_sha256.cpp
@@ -72,13 +71,15 @@ void TestMessageQueue();
 void TestPriorityQueue();
 
 // test_ncp_buffer.cpp
-namespace ot
-{
+namespace ot {
+namespace Ncp {
     void TestNcpFrameBuffer(void);
+}
 }
 
 // test_timer.cpp
 int TestOneTimer();
+int TestTwoTimers();
 int TestTenTimers();
 
 // test_toolchain.cpp
@@ -88,9 +89,6 @@ void test_packed_union();
 void test_packed_enum();
 void test_addr_sizes();
 void test_addr_bitfield();
-
-// test_fuzz.cpp
-void TestFuzz(uint32_t aSeconds);
 
 #pragma endregion
 
@@ -132,7 +130,6 @@ namespace ot
 
         // test_aes.cpp
         TEST_METHOD(TestMacBeaconFrame) { ::TestMacBeaconFrame(); }
-        TEST_METHOD(TestMacDataFrame) { ::TestMacDataFrame(); }
         TEST_METHOD(TestMacCommandFrame) { ::TestMacCommandFrame(); }
 
         // test_hmac_sha256.cpp
@@ -159,10 +156,11 @@ namespace ot
 
         // test_timer.cpp
         TEST_METHOD(TestOneTimer) { ::TestOneTimer(); }
+        TEST_METHOD(TestTwoTimers) { ::TestTwoTimers(); }
         TEST_METHOD(TestTenTimers) { ::TestTenTimers(); }
 
         // test_ncp_buffer.cpp
-        TEST_METHOD(TestNcpFrameBuffer) { ot::TestNcpFrameBuffer(); }
+        TEST_METHOD(TestNcpFrameBuffer) { ot::Ncp::TestNcpFrameBuffer(); }
 
         // test_toolchain.cpp
         TEST_METHOD(test_packed1) { ::test_packed1(); }
@@ -171,8 +169,5 @@ namespace ot
         TEST_METHOD(test_packed_enum) { ::test_packed_enum(); }
         TEST_METHOD(test_addr_sizes) { ::test_addr_sizes(); }
         TEST_METHOD(test_addr_bitfield) { ::test_addr_bitfield(); }
-
-        // test_settings.cpp
-        TEST_METHOD(RunTestFuzz) { ::TestFuzz(30); }
     };
 }

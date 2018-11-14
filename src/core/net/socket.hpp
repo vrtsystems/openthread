@@ -34,7 +34,7 @@
 #ifndef NET_SOCKET_HPP_
 #define NET_SOCKET_HPP_
 
-#include <openthread/openthread.h>
+#include "openthread-core-config.h"
 
 #include "net/ip6_address.hpp"
 
@@ -52,7 +52,7 @@ namespace Ip6 {
  * This class implements message information for an IPv6 message.
  *
  */
-class MessageInfo: public otMessageInfo
+class MessageInfo : public otMessageInfo
 {
 public:
     /**
@@ -67,7 +67,7 @@ public:
      * @returns A reference to the local socket address.
      *
      */
-    const Address &GetSockAddr(void) const { return *static_cast<const Address *>(&mSockAddr);}
+    const Address &GetSockAddr(void) const { return *static_cast<const Address *>(&mSockAddr); }
 
     /**
      * This method sets the local socket address.
@@ -99,7 +99,7 @@ public:
      * @returns A reference to the peer socket address.
      *
      */
-    Address &GetPeerAddr(void) { return *static_cast<Address *>(&mPeerAddr);}
+    Address &GetPeerAddr(void) { return *static_cast<Address *>(&mPeerAddr); }
 
     /**
      * This method returns a reference to the peer socket address.
@@ -107,7 +107,7 @@ public:
      * @returns A reference to the peer socket address.
      *
      */
-    const Address &GetPeerAddr(void) const { return *static_cast<const Address *>(&mPeerAddr);}
+    const Address &GetPeerAddr(void) const { return *static_cast<const Address *>(&mPeerAddr); }
 
     /**
      * This method sets the peer's socket address.
@@ -186,14 +186,14 @@ public:
  * This class implements a socket address.
  *
  */
-class SockAddr: public otSockAddr
+class SockAddr : public otSockAddr
 {
 public:
     /**
      * This constructor initializes the object.
      *
      */
-    SockAddr(void) { memset(&mAddress, 0, sizeof(mAddress)), mPort = 0, mScopeId = 0; }
+    SockAddr(void) { memset(&mAddress, 0, sizeof(*this)); }
 
     /**
      * This method returns a reference to the IPv6 address.
@@ -216,7 +216,7 @@ public:
  * @}
  */
 
-}  // namespace Ip6
-}  // namespace ot
+} // namespace Ip6
+} // namespace ot
 
-#endif  // NET_SOCKET_HPP_
+#endif // NET_SOCKET_HPP_

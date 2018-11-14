@@ -4,15 +4,23 @@ This directory contains example platform drivers for [Nordic Semiconductor nRF52
 
 [nRF52840]: https://www.nordicsemi.com/eng/Products/nRF52840
 
-To facilitate Thread products development with the nRF52840 platform, Nordic Semiconductor provides <i>nRF5 SDK for Thread</i>. See [Nordic Semiconductor's nRF5 SDK for Thread][nRF5-SDK-section] section for more details.
+To facilitate Thread products development with the nRF52840 platform, Nordic Semiconductor provides <i>nRF5 SDK for Thread and Zigbee</i>. See [Nordic Semiconductor's nRF5 SDK for Thread and Zigbee][nRF5-SDK-section] section for more details.
 
-[nRF5-SDK-section]: #nordic-semiconductors-nrf5-sdk-for-thread
+[nRF5-SDK-section]: #nordic-semiconductors-nrf5-sdk-for-thread-and-zigbee
 
 ## Toolchain
 
 Download and install [GNU toolchain for ARM Cortex-M][gnu-toolchain].
 
 [gnu-toolchain]: https://launchpad.net/gcc-arm-embedded
+
+In a Bash terminal, follow these instructions to install the GNU toolchain and
+other dependencies.
+
+```bash
+$ cd <path-to-openthread>
+$ ./script/bootstrap
+```
 
 ## Building the examples
 
@@ -27,6 +35,70 @@ After a successful build, the `elf` files can be found in
 files using `arm-none-eabi-objcopy`:
 ```bash
 $ arm-none-eabi-objcopy -O ihex ot-cli-ftd ot-cli-ftd.hex
+```
+
+## Native USB support
+
+You can build the libraries with support for native USB CDC ACM as a serial transport.
+To do so, build the libraries with the following parameter:
+```
+$ make -f examples/Makefile-nrf52840 USB=1
+```
+
+Note, that if Windows 7 or earlier is used, an additional USB CDC driver has to be loaded.
+It can be found in third_party/NordicSemiconductor/libraries/usb/nordic_cdc_acm_example.inf
+
+## nRF52840 dongle support (PCA10059)
+
+You can build the libraries with support for USB bootloader present in PCA10059. As this dongle uses native USB support we have to enable it as well. To do so, build the libraries with the following parameter:
+```
+$ make -f examples/Makefile-nrf52840 USB=1 BOOTLOADER=1
+```
+Please see [nRF52840 Dongle Programming][nrf52840-dongle-programming] for more details about how to use USB bootloader.
+
+[nrf52840-dongle-programming]: https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.nrf52%2Fdita%2Fnrf52%2Fdevelopment%2Fnrf52840_dongle%2Fprogramming.html&cp=2_0_4_4
+
+## Prefixing compiler command
+
+You can prefix compiler command using CCPREFIX parameter. This is useful when you utilize tools like [ccache][ccache-website] to speed up compilation. Example usage:
+
+[ccache-website]: https://ccache.samba.org/
+
+```
+$ make -f examples/Makefile-nrf52840 USB=1 CCPREFIX=ccache
+```
+
+## Native SPI Slave support
+
+You can build the libraries with support for native SPI Slave.
+To do so, build the libraries with the following parameter:
+```
+$ make -f examples/Makefile-nrf52840 NCP_SPI=1
+```
+
+With this option enabled, SPI communication between the NCP example and wpantund is possible
+(provided that the wpantund host supports SPI Master). To achieve that, an appropriate SPI device
+should be chosen in wpantund configuration file, `/etc/wpantund.conf`. You can find an example below.
+```
+Config:NCP:SocketPath "system:/usr/bin/spi-hdlc-adapter --gpio-int /sys/class/gpio/gpio25 /dev/spidev0.0"
+```
+
+[spi-hdlc-adapter][spi-hdlc-adapter]
+is a tool that can be used to perform communication between NCP and wpantund over SPI.
+In the above example it is assumed that `spi-hdlc-adapter` is installed in `/usr/bin`.
+
+The default SPI Slave pin configuration for nRF52840 is defined in `examples/platforms/nrf52840/platform-config.h`.
+
+Note that the native SPI Slave support is not intended to be used with Engineering sample A of the nRF52840 chip due to
+single transfer size limitation.
+
+[spi-hdlc-adapter]: https://github.com/openthread/openthread/tree/master/tools/spi-hdlc-adapter
+
+## CryptoCell 310 support
+
+By default, mbedTLS library is built with support for CryptoCell 310 hardware acceleration of cryptographic operations used in OpenThread. You can disable CryptoCell 310 and use software cryptography instead by building OpenThread with the following parameter:
+```
+$ make -f examples/Makefile-nrf52840 DISABLE_CC310=1
 ```
 
 ## Flashing the binaries
@@ -122,14 +194,49 @@ Select the correct target device (nRF52) and the target interface "SWD".
 
 The intended log level can be set using `OPENTHREAD_CONFIG_LOG_LEVEL` define.
 
-## Disabling the Mass Storage Device
+## Segger J-Link configuration
+
+### Disabling the Mass Storage Device
 
 Due to a known issue in Segger’s J-Link firmware, depending on your version, you might experience data corruption or drops if you use the serial port. You can avoid this issue by disabling the Mass Storage Device:
 
  - On Linux or macOS (OS X), open JLinkExe from the terminal.
  - On Microsoft Windows, open the J-Link Commander application.
 
-Run the following command: `MSDDisable`
+Run the following command:
+
+```bash
+MSDDisable
+```
+
+This command takes effect after a power cycle of the development kit and stay this way until changed again.
+
+### Hardware Flow Control detection
+
+By default, J-Link detects at runtime if the target uses flow control or not.
+
+Automatic HWFC detection is done by driving P0.07 (Clear to Send (CTS)) from the interface MCU and evaluating the state of P0.05 (Request to Send (RTS)) when the first data is sent or received. If the state of P0.05 (RTS) is high, HWFC is assumed not to be used.
+
+To avoid potential race conditions, it is possible to force hardware flow control and bypass runtime auto-detection.
+
+ - On Linux or macOS (OS X), open JLinkExe from the terminal.
+ - On Microsoft Windows, open the J-Link Commander application.
+
+Run the following command:
+
+```bash
+SetHWFC Force
+```
+
+The auto-detection feature may be enabled again by the following command:
+
+```bash
+SetHWFC Enable
+```
+
+You can find more details [here][J-Link_OB].
+
+[J-Link_OB]: https://wiki.segger.com/J-Link_OB_SAM3U_NordicSemi#Hardware_flow_control_support
 
 ## Diagnostic module
 
@@ -153,29 +260,31 @@ The following toolchains have been used for testing and verification:
   - gcc version 4.9.3
   - gcc version 6.2.0
 
-The nRF52840 example has been verified by Nordic Semiconductor with following commits:
-  - `030efba` - 22.04.2017 (the newest checked)
+ The following OpenThread commits have been verified with nRF52840 examples by Nordic Semiconductor:
+  - `704511c` - 18.09.2018 (the newest checked)
+  - `ec59d7e` - 06.04.2018
+  - `a89eb88` - 16.11.2017
+  - `6a15261` - 29.06.2017
+  - `030efba` - 22.04.2017
   - `de48acf` - 02.03.2017
   - `50db58d` - 23.01.2017
 
-# Nordic Semiconductor's nRF5 SDK for Thread
+# Nordic Semiconductor's nRF5 SDK for Thread and Zigbee
 
-The [nRF5 Software Development Kit (SDK) for Thread][nRF5-SDK-Thread] helps you when developing Thread products with Nordic Semiconductor's advanced nRF52840 System on Chip (SoC).
+The [nRF5 Software Development Kit (SDK) for Thread and Zigbee][nRF5-SDK-Thread-Zigbee] helps you when developing Thread products with Nordic Semiconductor's advanced nRF52840 System on Chip (SoC).
 
-The <i>nRF5 SDK for Thread</i> includes:
+The <i>nRF5 SDK for Thread and Zigbee</i> includes:
  - a pre-built OpenThread stack for the Nordic nRF52840 SoC with ARM® CryptoCell-310 support,
+ - unique Thread/Bluetooth Low Energy dynamic multiprotocol solution which allows for concurrent operation of Thread and Bluetooth Low Energy utilizing OpenThread and SoftDevice (Nordic’s Bluetooth Low Energy stack) with accompanying example applications,
+ - Thread/Bluetooth Low Energy switched multiprotocol solution with accompanying example applications,
  - unique support for DFU-over-Thread (Device Firmware Upgrade),
- - examples to demonstrate interactions between nodes performing different Thread roles with the use of OpenThread and built-in CoAP protocol,
- - examples to demonstrate multiprotocol support and switching between BLE peripheral
-  and Thread FTD and MTD roles,
- - support for an OpenThread Network Co-Processor (NCP),
+ - examples to demonstrate interactions between nodes performing different Thread roles with the use of OpenThread and CoAP or MQTT-SN protocols,
+ - support for an OpenThread Network Co-Processor (NCP) using UART, USB or SPI transport protocol,
  - Border Router and cloud connectivity example,
  - Thread native commissioning with NFC example,
+ - example applications demonstrating the use of FreeRTOS with OpenThread,
+ - support for IAR, Keil MDK-ARM and Segger Embedded Studio (SES) IDEs for OpenThread stack and all example applications,
  - range of PC tools including a Thread Topology Monitor,
- - software modules inherited from the nRF5 SDK e.g. peripheral drivers, NFC libraries etc.
+ - software modules inherited from the nRF5 SDK e.g. peripheral drivers, NFC libraries, Bluetooth Low Energy libraries etc.
 
-#### Important notice
-
-Due to legal restrictions support for hardware-accelerated cryptography utilizing ARM CryptoCell-310 is only available in mbedTLS library (libmbedcrypto.a) provided with the <i>nRF5 SDK for Thread</i>. The library available in OpenThread repository does not support hardware acceleration. You can still use it, but the commissioning procedure takes much more time in such case. For the best performance and user experience, use the library provided with the SDK.
-
-[nRF5-SDK-Thread]: http://www.nordicsemi.com/eng/Products/nRF5-SDK-for-Thread
+[nRF5-SDK-Thread-Zigbee]: http://www.nordicsemi.com/eng/Products/nRF5-SDK-for-Thread

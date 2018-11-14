@@ -35,29 +35,55 @@
 #ifndef MESHCOP_HPP_
 #define MESHCOP_HPP_
 
+#include "openthread-core-config.h"
+
+#include <openthread/instance.h>
+
 #include "coap/coap.hpp"
 #include "common/message.hpp"
+#include "mac/mac_frame.hpp"
 
 namespace ot {
 namespace MeshCoP {
 
 enum
 {
-    kMeshCoPMessagePriority = Message::kPriorityHigh, // The priority for MeshCoP message
+    kMeshCoPMessagePriority = Message::kPriorityNet, ///< The priority for MeshCoP message
 };
 
 /**
  * This function create Message for MeshCoP
  *
  */
-inline Message *NewMeshCoPMessage(Coap::Coap &aCoap, const Coap::Header &aHeader)
+inline Message *NewMeshCoPMessage(Coap::CoapBase &aCoap, const Coap::Header &aHeader)
 {
-    return aCoap.NewMessage(aHeader, kMeshCoPMessagePriority);
+    otMessageSettings settings = {true, static_cast<otMessagePriority>(kMeshCoPMessagePriority)};
+    return aCoap.NewMessage(aHeader, &settings);
 }
 
+/**
+ * This function computes the Joiner ID from a factory-assigned IEEE EUI-64.
+ *
+ * @param[in]   aEui64     The factory-assigned IEEE EUI-64.
+ * @param[out]  aJoinerId  The Joiner ID.
+ *
+ */
+void ComputeJoinerId(const Mac::ExtAddress &aEui64, Mac::ExtAddress &aJoinerId);
 
-}  // namespace MeshCoP
+/**
+ * This function gets the border agent RLOC.
+ *
+ * @param[in]   aNetif  A reference to the thread interface.
+ * @param[out]  aRloc   Border agent RLOC.
+ *
+ * @retval OT_ERROR_NONE        Successfully got the Border Agent Rloc.
+ * @retval OT_ERROR_NOT_FOUND   Border agent is not available.
+ *
+ */
+otError GetBorderAgentRloc(ThreadNetif &aNetIf, uint16_t &aRloc);
 
-}  // namespace ot
+} // namespace MeshCoP
 
-#endif  // MESHCOP_HPP_
+} // namespace ot
+
+#endif // MESHCOP_HPP_

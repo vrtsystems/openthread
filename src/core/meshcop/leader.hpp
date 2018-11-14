@@ -34,7 +34,10 @@
 #ifndef MESHCOP_LEADER_HPP_
 #define MESHCOP_LEADER_HPP_
 
+#include "openthread-core-config.h"
+
 #include "coap/coap.hpp"
+#include "common/locator.hpp"
 #include "common/timer.hpp"
 #include "meshcop/meshcop_tlvs.hpp"
 #include "net/udp6.hpp"
@@ -47,35 +50,27 @@ OT_TOOL_PACKED_BEGIN
 class CommissioningData
 {
 public:
-    uint8_t GetLength(void) const {
-        return sizeof(Tlv) + mBorderAgentLocator.GetLength() +
-               sizeof(Tlv) + mCommissionerSessionId.GetLength() +
+    uint8_t GetLength(void) const
+    {
+        return sizeof(Tlv) + mBorderAgentLocator.GetLength() + sizeof(Tlv) + mCommissionerSessionId.GetLength() +
                sizeof(Tlv) + mSteeringData.GetLength();
     }
 
-    BorderAgentLocatorTlv mBorderAgentLocator;
+    BorderAgentLocatorTlv    mBorderAgentLocator;
     CommissionerSessionIdTlv mCommissionerSessionId;
-    SteeringDataTlv mSteeringData;
+    SteeringDataTlv          mSteeringData;
 } OT_TOOL_PACKED_END;
 
-class Leader
+class Leader : public InstanceLocator
 {
 public:
     /**
      * This constructor initializes the Leader object.
      *
-     * @param[in]  aThreadNetif  A reference to the Thread network interface.
+     * @param[in]  aInstance     A reference to the OpenThread instance.
      *
      */
-    Leader(ThreadNetif &aThreadNetif);
-
-    /**
-     * This method returns the pointer to the parent otInstance structure.
-     *
-     * @returns The pointer to the parent otInstance structure.
-     *
-     */
-    otInstance *GetInstance(void);
+    explicit Leader(Instance &aInstance);
 
     /**
      * This method sends a MGMT_DATASET_CHANGED message to commissioner.
@@ -119,20 +114,26 @@ private:
         kTimeoutLeaderPetition = 50, ///< TIMEOUT_LEAD_PET (seconds)
     };
 
-    static void HandleTimer(void *aContext);
-    void HandleTimer(void);
+    static void HandleTimer(Timer &aTimer);
+    void        HandleTimer(void);
 
-    static void HandlePetition(void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
+    static void HandlePetition(void *               aContext,
+                               otCoapHeader *       aHeader,
+                               otMessage *          aMessage,
                                const otMessageInfo *aMessageInfo);
-    void HandlePetition(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
-    otError SendPetitionResponse(const Coap::Header &aRequestHeader, const Ip6::MessageInfo &aMessageInfo,
-                                 StateTlv::State aState);
+    void        HandlePetition(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    otError     SendPetitionResponse(const Coap::Header &    aRequestHeader,
+                                     const Ip6::MessageInfo &aMessageInfo,
+                                     StateTlv::State         aState);
 
-    static void HandleKeepAlive(void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
+    static void HandleKeepAlive(void *               aContext,
+                                otCoapHeader *       aHeader,
+                                otMessage *          aMessage,
                                 const otMessageInfo *aMessageInfo);
-    void HandleKeepAlive(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
-    otError SendKeepAliveResponse(const Coap::Header &aRequestHeader, const Ip6::MessageInfo &aMessageInfo,
-                                  StateTlv::State aState);
+    void        HandleKeepAlive(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    otError     SendKeepAliveResponse(const Coap::Header &    aRequestHeader,
+                                      const Ip6::MessageInfo &aMessageInfo,
+                                      StateTlv::State         aState);
 
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
@@ -140,16 +141,15 @@ private:
 
     Coap::Resource mPetition;
     Coap::Resource mKeepAlive;
-    Timer mTimer;
+    TimerMilli     mTimer;
 
     uint32_t mDelayTimerMinimal;
 
     CommissionerIdTlv mCommissionerId;
-    uint16_t mSessionId;
-    ThreadNetif &mNetif;
+    uint16_t          mSessionId;
 };
 
-}  // namespace MeshCoP
-}  // namespace ot
+} // namespace MeshCoP
+} // namespace ot
 
-#endif  // MESHCOP_LEADER_HPP_
+#endif // MESHCOP_LEADER_HPP_

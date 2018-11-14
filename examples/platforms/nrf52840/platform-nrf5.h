@@ -37,7 +37,7 @@
 
 #include <stdint.h>
 
-#include <openthread/types.h>
+#include <openthread/instance.h>
 
 #include "platform-config.h"
 
@@ -52,6 +52,12 @@ void nrf5UartInit(void);
  *
  */
 void nrf5UartDeinit(void);
+
+/**
+ * Clear pending UART data.
+ *
+ */
+void nrf5UartClearPendingData(void);
 
 /**
  * This function performs UART driver processing.
@@ -78,6 +84,12 @@ void nrf5AlarmDeinit(void);
 void nrf5AlarmProcess(otInstance *aInstance);
 
 /**
+ * Function for geting current time in mircosecond.
+ *
+ */
+uint64_t nrf5AlarmGetCurrentTime(void);
+
+/**
  * Initialization of Random Number Generator.
  *
  */
@@ -100,6 +112,23 @@ void nrf5LogInit(void);
  *
  */
 void nrf5LogDeinit(void);
+
+/**
+ * Initialization of SPI Slave driver.
+ *
+ */
+void nrf5SpiSlaveInit(void);
+
+/**
+ * Deinitialization of SPI Slave driver.
+ *
+ */
+void nrf5SpiSlaveDeinit(void);
+
+/**
+ * Function for processing SPI Slave driver.
+ */
+void nrf5SpiSlaveProcess(void);
 
 /**
  * Initialization of Misc module.
@@ -143,4 +172,62 @@ void nrf5CryptoInit(void);
  */
 void nrf5CryptoDeinit(void);
 
-#endif  // PLATFORM_NRF5_H_
+/**
+ * Function for erasing page in flash.
+ *
+ */
+otError nrf5FlashPageErase(uint32_t aAddress);
+
+/**
+ * Function for checking state of flash driver.
+ *
+ */
+bool nrf5FlashIsBusy(void);
+
+/**
+ * Function for writing data into flash.
+ *
+ */
+uint32_t nrf5FlashWrite(uint32_t aAddress, uint8_t *aData, uint32_t aSize);
+
+/**
+ * Initialization of temperature controller.
+ *
+ */
+void nrf5TempInit(void);
+
+/**
+ * Deinitialization of temperature controller.
+ *
+ */
+void nrf5TempDeinit(void);
+
+/**
+ * Function for processing temperature controller.
+ *
+ */
+void nrf5TempProcess(void);
+
+/**
+ * Function for measuring internal temperature.
+ *
+ * @return Temperature value measured.
+ *
+ */
+int32_t nrf5TempGet(void);
+
+#if SOFTDEVICE_PRESENT
+/**
+ * Function for translating SoftDevice error into OpenThread's one.
+ *
+ */
+otError nrf5SdErrorToOtError(uint32_t aSdError);
+
+/**
+ * Function for processing SoftDevice SoC events in flash module.
+ *
+ */
+void nrf5SdSocFlashProcess(uint32_t aEvtId);
+#endif // SOFTDEVICE_PRESENT
+
+#endif // PLATFORM_NRF5_H_

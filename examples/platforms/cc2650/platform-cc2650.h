@@ -29,8 +29,10 @@
 #ifndef PLATFORM_H_
 #define PLATFORM_H_
 
+#include <openthread-core-config.h>
 #include <stdint.h>
-#include "openthread/types.h"
+#include <openthread/config.h>
+#include <openthread/instance.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,7 +78,7 @@ void cc2650RandomInit(void);
 void cc2650UartProcess(void);
 
 #ifdef __cplusplus
-}  // extern "C"
+} // extern "C"
 #endif
 
-#endif  // PLATFORM_H_
+#endif // PLATFORM_H_

@@ -31,15 +31,10 @@
  *   This file implements IPv6 route tables.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "ip6_routes.hpp"
 
 #include "common/code_utils.hpp"
+#include "common/instance.hpp"
 #include "common/message.hpp"
 #include "net/ip6.hpp"
 #include "net/netif.hpp"
@@ -47,9 +42,9 @@
 namespace ot {
 namespace Ip6 {
 
-Routes::Routes(Ip6 &aIp6):
-    mRoutes(NULL),
-    mIp6(aIp6)
+Routes::Routes(Instance &aInstance)
+    : InstanceLocator(aInstance)
+    , mRoutes(NULL)
 {
 }
 
@@ -63,7 +58,7 @@ otError Routes::Add(Route &aRoute)
     }
 
     aRoute.mNext = mRoutes;
-    mRoutes = &aRoute;
+    mRoutes      = &aRoute;
 
 exit:
     return error;
@@ -94,9 +89,9 @@ otError Routes::Remove(Route &aRoute)
 
 int8_t Routes::Lookup(const Address &aSource, const Address &aDestination)
 {
-    int8_t maxPrefixMatch = -1;
+    int8_t  maxPrefixMatch = -1;
     uint8_t prefixMatch;
-    int8_t rval = -1;
+    int8_t  rval = -1;
 
     for (Route *cur = mRoutes; cur; cur = cur->mNext)
     {
@@ -118,21 +113,21 @@ int8_t Routes::Lookup(const Address &aSource, const Address &aDestination)
         }
 
         maxPrefixMatch = static_cast<int8_t>(prefixMatch);
-        rval = cur->mInterfaceId;
+        rval           = cur->mInterfaceId;
     }
 
-    for (Netif *netif = mIp6.GetNetifList(); netif; netif = netif->GetNext())
+    for (Netif *netif = GetIp6().GetNetifList(); netif; netif = netif->GetNext())
     {
         if (netif->RouteLookup(aSource, aDestination, &prefixMatch) == OT_ERROR_NONE &&
             static_cast<int8_t>(prefixMatch) > maxPrefixMatch)
         {
             maxPrefixMatch = static_cast<int8_t>(prefixMatch);
-            rval = netif->GetInterfaceId();
+            rval           = netif->GetInterfaceId();
         }
     }
 
     return rval;
 }
 
-}  // namespace Ip6
-}  // namespace ot
+} // namespace Ip6
+} // namespace ot

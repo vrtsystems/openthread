@@ -34,30 +34,84 @@
 #ifndef OPENTHREAD_CORE_DA15000_CONFIG_H_
 #define OPENTHREAD_CORE_DA15000_CONFIG_H_
 
-#define SETTINGS_CONFIG_BASE_ADDRESS 		(0x7B000)
+/**
+ * @def OPENTHREAD_CONFIG_PLATFORM_INFO
+ *
+ * The platform-specific string to insert into the OpenThread version string.
+ *
+ */
+#define OPENTHREAD_CONFIG_PLATFORM_INFO                         "DA15000"
 
- /**
-  * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
-  *
-  * Define to 1 if you want to enable software ACK timeout logic.
-  *
-  */
+/**
+ * @def SETTINGS_CONFIG_BASE_ADDRESS
+ *
+ * The base address of the pages to be used for non-volatile-settings storage.
+ */
+#define SETTINGS_CONFIG_BASE_ADDRESS                            0x7B000
+
+/**
+ * @def SETTINGS_CONFIG_PAGE_SIZE
+ *
+ * The page size of settings.
+ *
+ */
+#define SETTINGS_CONFIG_PAGE_SIZE                               0x1000
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
+ *
+ * Define to 1 if you want to enable software ACK timeout logic.
+ *
+ */
 #define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT           0
 
- /**
-  * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
-  *
-  * Define to 1 if you want to enable software retransmission logic.
-  *
-  */
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
+ *
+ * Define to 1 if you want to enable software retransmission logic.
+ *
+ */
 #define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT            0
 
- /**
-  * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
-  *
-  * Define to 1 if you want to enable software energy scanning logic.
-  *
-  */
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+ *
+ * Define to 1 if you want to enable software CSMA-CA backoff logic.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF          0
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
+ *
+ * Define to 1 if you want to enable software energy scanning logic.
+ *
+ */
 #define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN           1
+
+/**
+ * @def OPENTHREAD_CONFIG_ADDRESS_CACHE_ENTRIES
+ *
+ * The number of EID-to-RLOC cache entries.
+ *
+ */
+#define OPENTHREAD_CONFIG_ADDRESS_CACHE_ENTRIES                 20
+
+/**
+ * @def OPENTHREAD_CONFIG_LOG_OUTPUT
+ *
+ * The DA15000 platform provides an otPlatLog() function.
+ */
+#ifndef OPENTHREAD_CONFIG_LOG_OUTPUT /* allow command line override */
+#define OPENTHREAD_CONFIG_LOG_OUTPUT  OPENTHREAD_CONFIG_LOG_OUTPUT_APP
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_MAX_STATECHANGE_HANDLERS
+ *
+ * The maximum number of state-changed callback handlers (set using `otSetStateChangedCallback()`).
+ *
+ */
+#define OPENTHREAD_CONFIG_MAX_STATECHANGE_HANDLERS              3
 
 #endif  // OPENTHREAD_CORE_DA15000_CONFIG_H_

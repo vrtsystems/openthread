@@ -26,12 +26,11 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <driverlib/aon_rtc.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <openthread/types.h>
-#include <driverlib/aon_rtc.h>
 
-#include <openthread/platform/alarm.h>
+#include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/diag.h>
 
 /**
@@ -56,9 +55,9 @@ void cc2650AlarmInit(void)
 }
 
 /**
- * Function documented in platform/alarm.h
+ * Function documented in platform/alarm-milli.h
  */
-uint32_t otPlatAlarmGetNow(void)
+uint32_t otPlatAlarmMilliGetNow(void)
 {
     /*
      * This is current value of RTC as it appears in the register.
@@ -70,20 +69,20 @@ uint32_t otPlatAlarmGetNow(void)
 }
 
 /**
- * Function documented in platform/alarm.h
+ * Function documented in platform/alarm-milli.h
  */
-void otPlatAlarmStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
+void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
 {
     (void)aInstance;
-    sTime0 = aT0;
+    sTime0     = aT0;
     sAlarmTime = aDt;
     sIsRunning = true;
 }
 
 /**
- * Function documented in platform/alarm.h
+ * Function documented in platform/alarm-milli.h
  */
-void otPlatAlarmStop(otInstance *aInstance)
+void otPlatAlarmMilliStop(otInstance *aInstance)
 {
     (void)aInstance;
     sIsRunning = false;
@@ -99,7 +98,7 @@ void cc2650AlarmProcess(otInstance *aInstance)
     if (sIsRunning)
     {
         /* unsinged subtraction will result in the absolute offset */
-        offsetTime = otPlatAlarmGetNow() - sTime0;
+        offsetTime = otPlatAlarmMilliGetNow() - sTime0;
 
         if (sAlarmTime <= offsetTime)
         {
@@ -113,9 +112,8 @@ void cc2650AlarmProcess(otInstance *aInstance)
             else
 #endif /* OPENTHREAD_ENABLE_DIAG */
             {
-                otPlatAlarmFired(aInstance);
+                otPlatAlarmMilliFired(aInstance);
             }
         }
     }
 }
-

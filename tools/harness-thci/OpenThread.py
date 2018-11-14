@@ -50,16 +50,12 @@ LINESEPX = re.compile(r'\r\n|\n')
 """regex: used to split lines"""
 
 class OpenThread(IThci):
-    UIStatusMsg = ''
-    networkDataRequirement = ''      # indicate Thread device requests full or stable network data
-    isPowerDown = False              # indicate if Thread device experiences a power down event
-    isWhiteListEnabled = False       # indicate if Thread device enables white list filter
-    isBlackListEnabled = False       # indicate if Thread device enables black list filter
-    isActiveCommissioner = False     # indicate if Thread device is an active commissioner
-    _is_net = False                  # whether device is through ser2net
-    _lines = None                    # buffered lines read from device
     LOWEST_POSSIBLE_PARTATION_ID = 0x1
     LINK_QUALITY_CHANGE_TIME = 100
+
+    # Used for reference firmware version control for Test Harness.
+    # This variable will be updated to match the OpenThread reference firmware officially released.
+    firmwarePrefix = "OPENTHREAD/201806"
 
     #def __init__(self, SerialPort=COMPortName, EUI=MAC_Address):
     def __init__(self, **kwargs):
@@ -69,31 +65,15 @@ class OpenThread(IThci):
                       Includes 'EUI' and 'SerialPort'
         """
         try:
+            self.UIStatusMsg = ''
             self.mac = kwargs.get('EUI')
             self.port = kwargs.get('SerialPort')
             self.handle = None
-            self.networkName = ModuleHelper.Default_NwkName
-            self.networkKey = ModuleHelper.Default_NwkKey
-            self.channel = ModuleHelper.Default_Channel
-            self.channelMask = "0x7fff800" #(0xffff << 11)
-            self.panId = ModuleHelper.Default_PanId
-            self.xpanId = ModuleHelper.Default_XpanId
             self.AutoDUTEnable = False
-            self.localprefix = ModuleHelper.Default_MLPrefix
-            self.pskc = "00000000000000000000000000000000"  # OT only accept hex format PSKc for now
-            self.securityPolicySecs = ModuleHelper.Default_SecurityPolicy
-            self.securityPolicyFlags = "onrcb"
-            self.activetimestamp = ModuleHelper.Default_ActiveTimestamp
-            #self.sedPollingRate = ModuleHelper.Default_Harness_SED_Polling_Rate
-            self.sedPollingRate = 3
-            self.deviceRole = None
-            self.provisioningUrl = ''
-            self.hasActiveDatasetToCommit = False
-            self.logThread = Queue()
+            self._is_net = False                  # whether device is through ser2net
             self.logStatus = {'stop':'stop', 'running':'running', "pauseReq":'pauseReq', 'paused':'paused'}
-            self.logThreadStatus = self.logStatus['stop']
             self.joinStatus = {'notstart':'notstart', 'ongoing':'ongoing', 'succeed':'succeed', "failed":'failed'}
-            self.joinCommissionedStatus = self.joinStatus['notstart']
+            self.logThreadStatus = self.logStatus['stop']
             self.intialize()
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("initialize() Error: " + str(e))
@@ -234,7 +214,7 @@ class OpenThread(IThci):
                         break
                 else:
                     retry_times -= 1
-                    time.sleep(0.1)
+                    time.sleep(0.2)
             if line != 'Done':
                 raise Exception('%s: failed to find end of response' % self.port)
             logging.info('%s: send command[%s] done!', self.port, cmd)
@@ -307,7 +287,7 @@ class OpenThread(IThci):
            mode: thread device mode
            r: rx-on-when-idle
            s: secure IEEE 802.15.4 data request
-           d: full function device
+           d: full thread device
            n: full network data
 
         Returns:
@@ -379,73 +359,21 @@ class OpenThread(IThci):
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("setRouterSelectionJitter() Error: " + str(e))
 
-    def __enableWhiteList(self):
-        """enable white list filter
+    def __setAddressfilterMode(self, mode):
+        """set address filter mode
 
         Returns:
-            True: successful to enable white list filter
-            False: fail to enable white list filter
+            True: successful to set address filter mode.
+            False: fail to set address filter mode.
         """
-        print 'call enableWhiteList'
+        print 'call setAddressFilterMode() ' +  mode
         try:
-            if self.__sendCommand('whitelist enable')[0] == 'Done':
-                self.isWhiteListEnabled = True
+            cmd = 'macfilter addr ' + mode
+            if self.__sendCommand(cmd)[0] == 'Done':
                 return True
-            else:
-                return False
+            return False
         except Exception, e:
-            ModuleHelper.WriteIntoDebugLogger("enableWhiteList() Error: " + str(e))
-
-    def __enableBlackList(self):
-        """enable black list filter
-
-        Returns:
-            True: successful to enable black list filter
-            False: fail to enable black list filter
-        """
-        print 'call enableBlackList'
-        try:
-            if self.__sendCommand('blacklist enable')[0] == 'Done':
-                self.isBlackListEnabled = True
-                return True
-            else:
-                return False
-        except Exception, e:
-            ModuleHelper.WriteIntoDebugLogger("enableBlackList() Error: " + str(e))
-
-    def __disableWhiteList(self):
-        """disable white list filter
-
-        Returns:
-            True: successful to disable white list filter
-            False: fail to disable white list filter
-        """
-        print 'call disableWhiteList'
-        try:
-            if self.__sendCommand('whitelist disable')[0] == 'Done':
-                self.isWhiteListEnabled = False
-                return True
-            else:
-                return False
-        except Exception, e:
-            ModuleHelper.WriteIntoDebugLogger("disableWhiteList() Error: " + str(e))
-
-    def __disableBlackList(self):
-        """disable black list filter
-
-        Returns:
-            True: successful to disable black list filter
-            False: fail to disable black list filter
-        """
-        print 'call disableBlackList'
-        try:
-            if self.__sendCommand('blacklist disable')[0] == 'Done':
-                self.isBlackListEnabled = False
-                return True
-            else:
-                return False
-        except Exception, e:
-            ModuleHelper.WriteIntoDebugLogger("disableBlackList() Error: " + str(e))
+            ModuleHelper.WriteIntoDebugLogger("__setAddressFilterMode() Error: " + str(e))
 
     def __startOpenThread(self):
         """start OpenThread stack
@@ -462,9 +390,22 @@ class OpenThread(IThci):
                 else:
                     self.hasActiveDatasetToCommit = False
 
+            # restore whitelist/blacklist address filter mode if rejoin after reset
+            if self.isPowerDown:
+                if self._addressfilterMode == 'whitelist':
+                    if self.__setAddressfilterMode('whitelist'):
+                        for addr in self._addressfilterSet:
+                            self.addAllowMAC(addr)
+                elif self._addressfilterMode == 'blacklist':
+                    if self.__setAddressfilterMode('blacklist'):
+                        for addr in self._addressfilterSet:
+                            self.addBlockedMAC(addr)
+
             if self.__sendCommand('ifconfig up')[0] == 'Done':
                 self.__setRouterSelectionJitter(1)
-                return self.__sendCommand('thread start')[0] == 'Done'
+                if self.__sendCommand('thread start')[0] == 'Done':
+                    self.isPowerDown = False
+                    return True
             else:
                 return False
         except Exception, e:
@@ -550,7 +491,14 @@ class OpenThread(IThci):
         Returns:
             IPv6 address dotted-quad format
         """
-        return strIp6Prefix[0:4] + '::'
+        prefix1 = strIp6Prefix.rstrip('L')
+        prefix2 = prefix1.lstrip("0x")
+        hexPrefix = str(prefix2).ljust(16,'0')
+        hexIter = iter(hexPrefix)
+        finalMac = ':'.join(a + b + c + d for a,b,c,d in zip(hexIter, hexIter,hexIter,hexIter))
+        prefix = str(finalMac)
+        strIp6Prefix = prefix[:20]
+        return strIp6Prefix +':'
 
     def __convertLongToString(self, iValue):
         """convert a long hex integer to string
@@ -584,7 +532,11 @@ class OpenThread(IThci):
         t_end = time.time() + durationInSeconds
         while time.time() < t_end:
             time.sleep(0.3)
-            if self.logThreadStatus == self.logStatus['paused']:
+
+            if self.logThreadStatus == self.logStatus['pauseReq']:
+                self.logThreadStatus = self.logStatus['paused']
+
+            if self.logThreadStatus != self.logStatus['running']:
                 continue
 
             try:
@@ -595,14 +547,13 @@ class OpenThread(IThci):
 
                     if "Join success" in line:
                         self.joinCommissionedStatus = self.joinStatus['succeed']
+                        break
                     elif "Join failed" in line:
                         self.joinCommissionedStatus = self.joinStatus['failed']
+                        break
 
             except Exception:
                 pass
-
-            if self.logThreadStatus == self.logStatus['pauseReq']:
-                self.logThreadStatus = self.logStatus['paused']
 
         self.logThreadStatus = self.logStatus['stop']
         return logs
@@ -700,9 +651,17 @@ class OpenThread(IThci):
         """initialize the serial port with baudrate, timeout parameters"""
         print '%s call intialize' % self.port
         try:
+            self.deviceConnected = False
+
             # init serial port
             self._connect()
-            self.deviceConnected = True
+
+            if self.firmwarePrefix in self.UIStatusMsg:
+                self.deviceConnected = True
+            else:
+                self.UIStatusMsg = "Firmware Not Matching Expecting " + self.firmwarePrefix + " Now is " + self.UIStatusMsg
+                ModuleHelper.WriteIntoDebugLogger("Err: OpenThread device Firmware not matching..")
+
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("intialize() Error: " + str(e))
             self.deviceConnected = False
@@ -816,7 +775,7 @@ class OpenThread(IThci):
             if bType == MacType.FactoryMac:
                 macAddr64 = self.__sendCommand('eui64')[0]
             elif bType == MacType.HashMac:
-                macAddr64 = self.__sendCommand('hashmacaddr')[0]
+                macAddr64 = self.__sendCommand('joinerid')[0]
             else:
                 macAddr64 = self.__sendCommand('extaddr')[0]
         print macAddr64
@@ -892,92 +851,132 @@ class OpenThread(IThci):
         return self.networkKey
 
     def addBlockedMAC(self, xEUI):
-        """add a given extended address to the black list entry
+        """add a given extended address to the blacklist entry
 
         Args:
             xEUI: extended address in hex format
 
         Returns:
-            True: successful to add a given extended address to the black list entry
-            False: fail to add a given extended address to the black list entry
+            True: successful to add a given extended address to the blacklist entry
+            False: fail to add a given extended address to the blacklist entry
         """
         print '%s call addBlockedMAC' % self.port
         print xEUI
-        macAddr = self.__convertLongToString(xEUI)
+        if isinstance(xEUI, str):
+            macAddr = xEUI
+        else:
+            macAddr = self.__convertLongToString(xEUI)
+
         try:
             # if blocked device is itself
             if macAddr == self.mac:
                 print 'block device itself'
                 return True
 
-            if not self.isBlackListEnabled:
-                self.__enableBlackList()
+            if self._addressfilterMode != 'blacklist':
+                if self.__setAddressfilterMode('blacklist'):
+                    self._addressfilterMode = 'blacklist'
 
-            cmd = 'blacklist add %s' % macAddr
+            cmd = 'macfilter addr add %s' % macAddr
             print cmd
-            return self.__sendCommand(cmd)[0] == 'Done'
+            ret = self.__sendCommand(cmd)[0] == 'Done'
+
+            self._addressfilterSet.add(macAddr)
+            print 'current blacklist entries:'
+            for addr in self._addressfilterSet:
+                print addr
+
+            return ret
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("addBlockedMAC() Error: " + str(e))
 
     def addAllowMAC(self, xEUI):
-        """add a given extended address to the white list entry
+        """add a given extended address to the whitelist addressfilter
 
         Args:
             xEUI: a given extended address in hex format
 
         Returns:
-            True: successful to add a given extended address to the white list entry
-            False: fail to add a given extended address to the white list entry
+            True: successful to add a given extended address to the whitelist entry
+            False: fail to add a given extended address to the whitelist entry
         """
         print '%s call addAllowMAC' % self.port
         print xEUI
-        macAddr = self.__convertLongToString(xEUI)
-        try:
-            if not self.isWhiteListEnabled:
-                self.__enableWhiteList()
+        if isinstance(xEUI, str):
+            macAddr = xEUI
+        else:
+            macAddr = self.__convertLongToString(xEUI)
 
-            cmd = 'whitelist add %s' % macAddr
+        try:
+            if self._addressfilterMode != 'whitelist':
+                if self.__setAddressfilterMode('whitelist'):
+                    self._addressfilterMode = 'whitelist'
+
+            cmd = 'macfilter addr add %s' % macAddr
             print cmd
-            return self.__sendCommand(cmd)[0] == 'Done'
+            ret = self.__sendCommand(cmd)[0] == 'Done'
+
+            self._addressfilterSet.add(macAddr)
+            print 'current whitelist entries:'
+            for addr in self._addressfilterSet:
+                print addr
+            return ret
+
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("addAllowMAC() Error: " + str(e))
 
     def clearBlockList(self):
-        """clear all entries in black list table
+        """clear all entries in blacklist table
 
         Returns:
-            True: successful to clear the black list
-            False: fail to clear the black list
+            True: successful to clear the blacklist
+            False: fail to clear the blacklist
         """
         print '%s call clearBlockList' % self.port
 
-        # remove all entries in black list
+        # remove all entries in blacklist
         try:
-            if self.__sendCommand('blacklist clear')[0] == 'Done':
-                self.__disableBlackList()
-                return True
-            else:
-                return False
+            print 'clearing blacklist entries:'
+            for addr in self._addressfilterSet:
+                print addr
+
+
+            # disable blacklist
+            if self.__setAddressfilterMode('disable'):
+                self._addressfilterMode = 'disable'
+                # clear ops
+                cmd = 'macfilter addr clear'
+                if self.__sendCommand(cmd)[0] == 'Done':
+                    self._addressfilterSet.clear()
+                    return True
+            return False
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("clearBlockList() Error: " + str(e))
 
     def clearAllowList(self):
-        """clear all entries in white list table
+        """clear all entries in whitelist table
 
         Returns:
-            True: successful to clear the white list
-            False: fail to clear the white list
+            True: successful to clear the whitelist
+            False: fail to clear the whitelist
         """
         print '%s call clearAllowList' % self.port
 
-        # remove all entries in white list as well as in black list
+        # remove all entries in whitelist
         try:
-            if self.__sendCommand('whitelist clear')[0] == 'Done':
-                self.__disableWhiteList()
-                self.clearBlockList()
-                return True
-            else:
-                return False
+            print 'clearing whitelist entries:'
+            for addr in self._addressfilterSet:
+                print addr
+
+            # disable whitelist
+            if self.__setAddressfilterMode('disable'):
+                self._addressfilterMode = 'disable'
+                # clear ops
+                cmd = 'macfilter addr clear'
+                if self.__sendCommand(cmd)[0] == 'Done':
+                    self._addressfilterSet.clear()
+                    return True
+            return False
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("clearAllowList() Error: " + str(e))
 
@@ -1096,8 +1095,8 @@ class OpenThread(IThci):
     def powerDown(self):
         """power down the Thread device"""
         print '%s call powerDown' % self.port
-        self.isPowerDown = True
         self._sendline('reset')
+        self.isPowerDown = True
 
     def powerUp(self):
         """power up the Thread device"""
@@ -1120,6 +1119,7 @@ class OpenThread(IThci):
         print '%s call reboot' % self.port
         try:
             self._sendline('reset')
+            self.isPowerDown = True
             time.sleep(3)
 
             self.__startOpenThread()
@@ -1214,6 +1214,7 @@ class OpenThread(IThci):
         try:
             self._sendline('factoryreset')
             self._read()
+
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("reset() Error: " + str(e))
 
@@ -1246,9 +1247,37 @@ class OpenThread(IThci):
     def setDefaultValues(self):
         """set default mandatory Thread Network parameter value"""
         print '%s call setDefaultValues' % self.port
+
+        # initialize variables
+        self.networkName = ModuleHelper.Default_NwkName
+        self.networkKey = ModuleHelper.Default_NwkKey
+        self.channel = ModuleHelper.Default_Channel
+        self.channelMask = "0x7fff800" #(0xffff << 11)
+        self.panId = ModuleHelper.Default_PanId
+        self.xpanId = ModuleHelper.Default_XpanId
+        self.localprefix = ModuleHelper.Default_MLPrefix
+        self.pskc = "00000000000000000000000000000000"  # OT only accept hex format PSKc for now
+        self.securityPolicySecs = ModuleHelper.Default_SecurityPolicy
+        self.securityPolicyFlags = "onrcb"
+        self.activetimestamp = ModuleHelper.Default_ActiveTimestamp
+        #self.sedPollingRate = ModuleHelper.Default_Harness_SED_Polling_Rate
+        self.sedPollingRate = 3
+        self.deviceRole = None
+        self.provisioningUrl = ''
+        self.hasActiveDatasetToCommit = False
+        self.logThread = Queue()
+        self.logThreadStatus = self.logStatus['stop']
+        self.joinCommissionedStatus = self.joinStatus['notstart']
+        self.networkDataRequirement = ''      # indicate Thread device requests full or stable network data
+        self.isPowerDown = False              # indicate if Thread device experiences a power down event
+        self._addressfilterMode = 'disable'   # indicate AddressFilter mode ['disable', 'whitelist', 'blacklist']
+        self._addressfilterSet = set()        # cache filter entries
+        self.isActiveCommissioner = False     # indicate if Thread device is an active commissioner
+        self._lines = None                    # buffered lines read from device
+
+        # initialize device configuration
         try:
             self.setMAC(self.mac)
-
             self.__setChannelMask(self.channelMask)
             self.__setSecurityPolicy(self.securityPolicySecs, self.securityPolicyFlags)
             self.setChannel(self.channel)
@@ -1259,10 +1288,6 @@ class OpenThread(IThci):
             self.setMLPrefix(self.localprefix)
             self.setPSKc(self.pskc)
             self.setActiveTimestamp(self.activetimestamp)
-
-            self.isWhiteListEnabled = False
-            self.isBlackListEnabled = False
-            self.isActiveCommissioner = False
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("setDefaultValue() Error: " + str(e))
 
@@ -1296,11 +1321,11 @@ class OpenThread(IThci):
             ModuleHelper.WriteIntoDebugLogger("setPollingRate() Error: " + str(e))
 
     def setLinkQuality(self, EUIadr, LinkQuality):
-        """set custom link quality on a link to Thread device with a given extended address
+        """set custom LinkQualityIn for all receiving messages from the specified EUIadr
 
         Args:
             EUIadr: a given extended address
-            LinkQuality: a given custom link quality for child devices
+            LinkQuality: a given custom link quality
                          link quality/link margin mapping table
                          3: 21 - 255 (dB)
                          2: 11 - 20 (dB)
@@ -1308,8 +1333,8 @@ class OpenThread(IThci):
                          0: 0 - 2 (dB)
 
         Returns:
-            True: successful to set the link quality on a link to a Thread device
-            False: fail to set the link quality on a link to a Thread device
+            True: successful to set the link quality
+            False: fail to set the link quality
         """
         print '%s call setLinkQuality' % self.port
         print EUIadr
@@ -1322,17 +1347,40 @@ class OpenThread(IThci):
             address64 = ''
             if '0x' in euiStr:
                 address64 = euiStr.lstrip('0x')
-
                 # prepend 0 at the beginning
                 if len(address64) < 16:
-                    address64 = address64.zfill(16)
-                    print address64
+                   address64 = address64.zfill(16)
+                   print address64
 
-            cmd = 'linkquality %s %s' % (address64, str(LinkQuality))
+            cmd = 'macfilter rss add-lqi %s %s' % (address64, str(LinkQuality))
             print cmd
             return self.__sendCommand(cmd)[0] == 'Done'
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("setLinkQuality() Error: " + str(e))
+
+    def setOutBoundLinkQuality(self, LinkQuality):
+        """set custom LinkQualityIn for all receiving messages from the any address
+
+        Args:
+            LinkQuality: a given custom link quality
+                         link quality/link margin mapping table
+                         3: 21 - 255 (dB)
+                         2: 11 - 20 (dB)
+                         1: 3 - 9 (dB)
+                         0: 0 - 2 (dB)
+
+        Returns:
+            True: successful to set the link quality
+            False: fail to set the link quality
+        """
+        print '%s call setOutBoundLinkQuality' % self.port
+        print LinkQuality
+        try:
+            cmd = 'macfilter rss add-lqi * %s' % str(LinkQuality)
+            print cmd
+            return self.__sendCommand(cmd)[0] == 'Done'
+        except Exception, e:
+            ModuleHelper.WriteIntoDebugLogger("setOutBoundLinkQuality() Error: " + str(e))
 
     def removeRouterPrefix(self, prefixEntry):
         """remove the configured prefix on a border router
@@ -1373,6 +1421,7 @@ class OpenThread(IThci):
         print timeout
         try:
             self._sendline('reset')
+            self.isPowerDown = True
             time.sleep(timeout)
 
             if self.deviceRole == Thread_Device_Role.SED:
@@ -1780,8 +1829,7 @@ class OpenThread(IThci):
             filterByPrefix: a given expected global IPv6 prefix to be matched
 
         Returns:
-            a global IPv6 address that matches with filterByPrefix
-            or None if no matched GUA
+            a global IPv6 address
         """
         print '%s call getGUA' % self.port
         print filterByPrefix
@@ -1794,10 +1842,11 @@ class OpenThread(IThci):
                 return globalAddrs[0]
             else:
                 for line in globalAddrs:
-                    if line.startswith(filterByPrefix):
-                        return line
+                    fullIp = ModuleHelper.GetFullIpv6Address(line)
+                    if fullIp.startswith(filterByPrefix):
+                        return fullIp
                 print 'no global address matched'
-                return None
+                return str(globalAddrs[0])
         except Exception, e:
             ModuleHelper.WriteIntoDebugLogger("getGUA() Error: " + str(e))
 
@@ -1889,6 +1938,9 @@ class OpenThread(IThci):
 
         return self.__sendCommand(cmd)
 
+    def diagnosticQuery(self,strDestinationAddr, listTLV_ids = []):
+        self.diagnosticGet(strDestinationAddr, listTLV_ids)
+
     def startNativeCommissioner(self, strPSKc='GRLpassWord'):
         #TODO: Support the whole Native Commissioner functionality
         #      Currently it only aims to trigger a Discovery Request message to pass Certification test 5.8.4
@@ -1934,16 +1986,21 @@ class OpenThread(IThci):
             False: fail to add Joiner's steering data
         """
         print '%s call scanJoiner' % self.port
-        if xEUI == '*':
-            JoinerHashMac = '*'
-        else:
-            JoinerAddr = ModuleHelper.CalculateHashMac(xEUI)
-            JoinerHashMac = hex(int(JoinerAddr)).rstrip("L").lstrip("0x")
 
         # long timeout value to avoid automatic joiner removal (in seconds)
         timeout = 500
 
-        cmd = 'commissioner joiner add %s %s %s' % (JoinerHashMac, strPSKd, str(timeout))
+        if not isinstance(xEUI, str):
+            eui64 = self.__convertLongToString(xEUI)
+
+            # prepend 0 at the beginning
+            if len(eui64) < 16:
+                eui64 = eui64.zfill(16)
+                print eui64
+        else:
+            eui64 = xEUI
+
+        cmd = 'commissioner joiner add %s %s %s' % (eui64, strPSKd, str(timeout))
         print cmd
         if self.__sendCommand(cmd)[0] == 'Done':
             if self.logThreadStatus == self.logStatus['stop']:
@@ -2242,27 +2299,40 @@ class OpenThread(IThci):
 
             if listSecurityPolicy != None:
                 cmd += '0c03'
-                policy = str(hex(listSecurityPolicy[2]))[2:]
+
+                rotationTime = 0
+                policyBits = 0
+
+                # previous passing way listSecurityPolicy=[True, True, 3600, False, False, True]
+                if (len(listSecurityPolicy) == 6):
+                    rotationTime = listSecurityPolicy[2]
+
+                    # the last three reserved bits must be 1
+                    policyBits = 0b00000111
+
+                    if listSecurityPolicy[0]:
+                        policyBits = policyBits | 0b10000000
+                    if listSecurityPolicy[1]:
+                        policyBits = policyBits | 0b01000000
+                    if listSecurityPolicy[3]:
+                        policyBits = policyBits | 0b00100000
+                    if listSecurityPolicy[4]:
+                        policyBits = policyBits | 0b00010000
+                    if listSecurityPolicy[5]:
+                        policyBits = policyBits | 0b00001000
+                else:
+                    # new passing way listSecurityPolicy=[3600, 0b11001111]
+                    rotationTime = listSecurityPolicy[0]
+                    policyBits = listSecurityPolicy[1]
+
+                policy = str(hex(rotationTime))[2:]
 
                 if len(policy) < 4:
                     policy = policy.zfill(4)
 
                 cmd += policy
 
-                policyBit = 0
-
-                if listSecurityPolicy[0]:
-                    policyBit = policyBit | 0b10000000
-                if listSecurityPolicy[1]:
-                    policyBit = policyBit | 0b01000000
-                if listSecurityPolicy[3]:
-                    policyBit = policyBit | 0b00100000
-                if listSecurityPolicy[4]:
-                    policyBit = policyBit | 0b00010000
-                if listSecurityPolicy[5]:
-                    policyBit = policyBit | 0b00001000
-
-                cmd += str(hex(policyBit))[2:]
+                cmd += str(hex(policyBits))[2:]
 
             if xCommissioningSessionId != None:
                 cmd += '0b02'

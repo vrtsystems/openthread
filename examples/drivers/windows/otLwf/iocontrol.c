@@ -82,7 +82,7 @@ OTLWF_IOCTL_HANDLER IoCtls[] =
     { "IOCTL_OTLWF_OT_MAC_WHITELIST_ENABLED",       REF_IOCTL_FUNC_WITH_TUN(otMacWhitelistEnabled) },
     { "IOCTL_OTLWF_OT_ADD_MAC_WHITELIST",           REF_IOCTL_FUNC_WITH_TUN(otAddMacWhitelist) },
     { "IOCTL_OTLWF_OT_REMOVE_MAC_WHITELIST",        REF_IOCTL_FUNC_WITH_TUN(otRemoveMacWhitelist) },
-    { "IOCTL_OTLWF_OT_MAC_WHITELIST_ENTRY",         REF_IOCTL_FUNC(otMacWhitelistEntry) },
+    { "IOCTL_OTLWF_OT_NEXT_MAC_WHITELIST",          REF_IOCTL_FUNC(otNextMacWhitelist) },
     { "IOCTL_OTLWF_OT_CLEAR_MAC_WHITELIST",         REF_IOCTL_FUNC_WITH_TUN(otClearMacWhitelist) },
     { "IOCTL_OTLWF_OT_DEVICE_ROLE",                 REF_IOCTL_FUNC_WITH_TUN(otDeviceRole) },
     { "IOCTL_OTLWF_OT_CHILD_INFO_BY_ID",            REF_IOCTL_FUNC(otChildInfoById) },
@@ -95,18 +95,18 @@ OTLWF_IOCTL_HANDLER IoCtls[] =
     { "IOCTL_OTLWF_OT_PARTITION_ID",                REF_IOCTL_FUNC_WITH_TUN(otPartitionId) },
     { "IOCTL_OTLWF_OT_RLOC16",                      REF_IOCTL_FUNC_WITH_TUN(otRloc16) },
     { "IOCTL_OTLWF_OT_ROUTER_ID_SEQUENCE",          REF_IOCTL_FUNC(otRouterIdSequence) },
+    { "IOCTL_OTLWF_OT_MAX_ROUTER_ID",               REF_IOCTL_FUNC(otMaxRouterId) },
     { "IOCTL_OTLWF_OT_ROUTER_INFO",                 REF_IOCTL_FUNC(otRouterInfo) },
     { "IOCTL_OTLWF_OT_STABLE_NETWORK_DATA_VERSION", REF_IOCTL_FUNC_WITH_TUN(otStableNetworkDataVersion) },
     { "IOCTL_OTLWF_OT_MAC_BLACKLIST_ENABLED",       REF_IOCTL_FUNC(otMacBlacklistEnabled) },
     { "IOCTL_OTLWF_OT_ADD_MAC_BLACKLIST",           REF_IOCTL_FUNC(otAddMacBlacklist) },
     { "IOCTL_OTLWF_OT_REMOVE_MAC_BLACKLIST",        REF_IOCTL_FUNC(otRemoveMacBlacklist) },
-    { "IOCTL_OTLWF_OT_MAC_BLACKLIST_ENTRY",         REF_IOCTL_FUNC(otMacBlacklistEntry) },
+    { "IOCTL_OTLWF_OT_NEXT_MAC_BLACKLIST",          REF_IOCTL_FUNC(otNextMacBlacklist) },
     { "IOCTL_OTLWF_OT_CLEAR_MAC_BLACKLIST",         REF_IOCTL_FUNC(otClearMacBlacklist) },
-    { "IOCTL_OTLWF_OT_MAX_TRANSMIT_POWER",          REF_IOCTL_FUNC(otMaxTransmitPower) },
+    { "IOCTL_OTLWF_OT_TRANSMIT_POWER",              REF_IOCTL_FUNC(otTransmitPower) },
     { "IOCTL_OTLWF_OT_NEXT_ON_MESH_PREFIX",         REF_IOCTL_FUNC(otNextOnMeshPrefix) },
     { "IOCTL_OTLWF_OT_POLL_PERIOD",                 REF_IOCTL_FUNC(otPollPeriod) },
     { "IOCTL_OTLWF_OT_LOCAL_LEADER_PARTITION_ID",   REF_IOCTL_FUNC(otLocalLeaderPartitionId) },
-    { "IOCTL_OTLWF_OT_ASSIGN_LINK_QUALITY",         REF_IOCTL_FUNC(otAssignLinkQuality) },
     { "IOCTL_OTLWF_OT_PLATFORM_RESET",              REF_IOCTL_FUNC_WITH_TUN(otPlatformReset) },
     { "IOCTL_OTLWF_OT_PARENT_INFO",                 REF_IOCTL_FUNC_WITH_TUN(otParentInfo) },
     { "IOCTL_OTLWF_OT_SINGLETON",                   REF_IOCTL_FUNC(otSingleton) },
@@ -117,7 +117,7 @@ OTLWF_IOCTL_HANDLER IoCtls[] =
     { "IOCTL_OTLWF_OT_JOINER_START",                REF_IOCTL_FUNC(otJoinerStart) },
     { "IOCTL_OTLWF_OT_JOINER_STOP",                 REF_IOCTL_FUNC(otJoinerStop) },
     { "IOCTL_OTLWF_OT_FACTORY_EUI64",               REF_IOCTL_FUNC(otFactoryAssignedIeeeEui64) },
-    { "IOCTL_OTLWF_OT_HASH_MAC_ADDRESS",            REF_IOCTL_FUNC(otHashMacAddress) },
+    { "IOCTL_OTLWF_OT_JOINER_ID",                   REF_IOCTL_FUNC(otJoinerId) },
     { "IOCTL_OTLWF_OT_ROUTER_DOWNGRADE_THRESHOLD",  REF_IOCTL_FUNC_WITH_TUN(otRouterDowngradeThreshold) },
     { "IOCTL_OTLWF_OT_COMMISSIONER_PANID_QUERY",    REF_IOCTL_FUNC(otCommissionerPanIdQuery) },
     { "IOCTL_OTLWF_OT_COMMISSIONER_ENERGY_SCAN",    REF_IOCTL_FUNC(otCommissionerEnergyScan) },
@@ -141,9 +141,16 @@ OTLWF_IOCTL_HANDLER IoCtls[] =
     { "IOCTL_OTLWF_OT_THREAD_AUTO_START",           REF_IOCTL_FUNC(otThreadAutoStart) },
     { "IOCTL_OTLWF_OT_PREFERRED_ROUTER_ID",         REF_IOCTL_FUNC(otThreadPreferredRouterId) },
     { "IOCTL_OTLWF_OT_PSKC",                        REF_IOCTL_FUNC_WITH_TUN(otPSKc) },
+    { "IOCTL_OTLWF_OT_PARENT_PRIORITY",             REF_IOCTL_FUNC(otParentPriority) },
+    { "IOCTL_OTLWF_OT_ADD_MAC_FIXED_RSS",           REF_IOCTL_FUNC_WITH_TUN(otAddMacFixedRss) },
+    { "IOCTL_OTLWF_OT_REMOVE_MAC_FIXED_RSS",        REF_IOCTL_FUNC_WITH_TUN(otRemoveMacFixedRss) },
+    { "IOCTL_OTLWF_OT_NEXT_MAC_FIXED_RSS",          REF_IOCTL_FUNC(otNextMacFixedRss) },
+    { "IOCTL_OTLWF_OT_CLEAR_MAC_FIXED_RSS",         REF_IOCTL_FUNC_WITH_TUN(otClearMacFixedRss) },
+    { "IOCTL_OTLWF_OT_NEXT_ROUTE",                  REF_IOCTL_FUNC(otNextRoute) },
 };
 
-static_assert(ARRAYSIZE(IoCtls) == (MAX_OTLWF_IOCTL_FUNC_CODE - MIN_OTLWF_IOCTL_FUNC_CODE) + 1,
+// intentionally -1 in the end due to that IOCTL_OTLWF_OT_ASSIGN_LINK_QUALITY (#161) is removed now.
+static_assert(ARRAYSIZE(IoCtls) == (MAX_OTLWF_IOCTL_FUNC_CODE - MIN_OTLWF_IOCTL_FUNC_CODE) + 1 - 1,
               "The IoCtl strings should be up to date with the actual IoCtl list.");
 
 const char*
@@ -1249,12 +1256,13 @@ otLwfIoCtl_otExtendedPanId(
 
     if (InBufferLength >= sizeof(otExtendedPanId))
     {
-        status = ThreadErrorToNtstatus(otThreadSetExtendedPanId(pFilter->otCtx, (uint8_t*)InBuffer));
+        status = ThreadErrorToNtstatus(otThreadSetExtendedPanId(pFilter->otCtx, (otExtendedPanId*)InBuffer));
         *OutBufferLength = 0;
     }
     else if (*OutBufferLength >= sizeof(otExtendedPanId))
     {
-        memcpy(OutBuffer, otThreadGetExtendedPanId(pFilter->otCtx), sizeof(otExtendedPanId));
+        const otExtendedPanId* aExtendedPanId = otThreadGetExtendedPanId(pFilter->otCtx);
+        memcpy(OutBuffer, aExtendedPanId, sizeof(otExtendedPanId));
         *OutBufferLength = sizeof(otExtendedPanId);
         status = STATUS_SUCCESS;
     }
@@ -1369,7 +1377,7 @@ otLwfIoCtl_otFactoryAssignedIeeeEui64(
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
 NTSTATUS
-otLwfIoCtl_otHashMacAddress(
+otLwfIoCtl_otJoinerId(
     _In_ PMS_FILTER         pFilter,
     _In_reads_bytes_(InBufferLength)
             PUCHAR          InBuffer,
@@ -1386,9 +1394,8 @@ otLwfIoCtl_otHashMacAddress(
 
     if (*OutBufferLength >= sizeof(otExtAddress))
     {
-        otLinkGetJoinerId(pFilter->otCtx, (otExtAddress*)OutBuffer);
+        status = ThreadErrorToNtstatus(otJoinerGetId(pFilter->otCtx, (otExtAddress*)OutBuffer));
         *OutBufferLength = sizeof(otExtAddress);
-        status = STATUS_SUCCESS;
     }
     else
     {
@@ -1533,7 +1540,7 @@ enum
 {
     kThreadMode_RxOnWhenIdle        = (1 << 3),
     kThreadMode_SecureDataRequest   = (1 << 2),
-    kThreadMode_FullFunctionDevice  = (1 << 1),
+    kThreadMode_FullThreadDevice  = (1 << 1),
     kThreadMode_FullNetworkData     = (1 << 0),
 };
 
@@ -1557,7 +1564,7 @@ otLwfTunIoCtl_otLinkMode(
 
         if (aLinkMode->mRxOnWhenIdle)       numeric_mode |= kThreadMode_RxOnWhenIdle;
         if (aLinkMode->mSecureDataRequests) numeric_mode |= kThreadMode_SecureDataRequest;
-        if (aLinkMode->mDeviceType)         numeric_mode |= kThreadMode_FullFunctionDevice;
+        if (aLinkMode->mDeviceType)         numeric_mode |= kThreadMode_FullThreadDevice;
         if (aLinkMode->mNetworkData)        numeric_mode |= kThreadMode_FullNetworkData;
 
         status =
@@ -1608,7 +1615,7 @@ otLwfTunIoCtl_otLinkMode_Handler(
 
             aLinkMode->mRxOnWhenIdle = ((numeric_mode & kThreadMode_RxOnWhenIdle) == kThreadMode_RxOnWhenIdle);
             aLinkMode->mSecureDataRequests = ((numeric_mode & kThreadMode_SecureDataRequest) == kThreadMode_SecureDataRequest);
-            aLinkMode->mDeviceType = ((numeric_mode & kThreadMode_FullFunctionDevice) == kThreadMode_FullFunctionDevice);
+            aLinkMode->mDeviceType = ((numeric_mode & kThreadMode_FullThreadDevice) == kThreadMode_FullThreadDevice);
             aLinkMode->mNetworkData = ((numeric_mode & kThreadMode_FullNetworkData) == kThreadMode_FullNetworkData);
 
             *OutBufferLength = sizeof(otLinkModeConfig);
@@ -1929,12 +1936,13 @@ otLwfIoCtl_otMeshLocalPrefix(
 
     if (InBufferLength >= sizeof(otMeshLocalPrefix))
     {
-        status = ThreadErrorToNtstatus(otThreadSetMeshLocalPrefix(pFilter->otCtx, InBuffer));
+        status = ThreadErrorToNtstatus(otThreadSetMeshLocalPrefix(pFilter->otCtx, (otMeshLocalPrefix*)InBuffer));
         *OutBufferLength = 0;
     }
     else if (*OutBufferLength >= sizeof(otMeshLocalPrefix))
     {
-        memcpy(OutBuffer, otThreadGetMeshLocalPrefix(pFilter->otCtx), sizeof(otMeshLocalPrefix));
+        const otMeshLocalPrefix* aMeshLocalPrefix = otThreadGetMeshLocalPrefix(pFilter->otCtx);
+        memcpy(OutBuffer, aMeshLocalPrefix, sizeof(otMeshLocalPrefix));
         *OutBufferLength = sizeof(otMeshLocalPrefix);
         status = STATUS_SUCCESS;
     }
@@ -2586,7 +2594,7 @@ otLwfIoCtl_otAddBorderRouter(
 
     if (InBufferLength >= sizeof(otBorderRouterConfig))
     {
-        status = ThreadErrorToNtstatus(otNetDataAddPrefixInfo(pFilter->otCtx, (otBorderRouterConfig*)InBuffer));
+        status = ThreadErrorToNtstatus(otBorderRouterAddOnMeshPrefix(pFilter->otCtx, (otBorderRouterConfig*)InBuffer));
     }
 
     return status;
@@ -2667,7 +2675,7 @@ otLwfIoCtl_otRemoveBorderRouter(
 
     if (InBufferLength >= sizeof(otIp6Prefix))
     {
-        status = ThreadErrorToNtstatus(otNetDataRemovePrefixInfo(pFilter->otCtx, (otIp6Prefix*)InBuffer));
+        status = ThreadErrorToNtstatus(otBorderRouterRemoveOnMeshPrefix(pFilter->otCtx, (otIp6Prefix*)InBuffer));
     }
 
     return status;
@@ -2730,7 +2738,7 @@ otLwfIoCtl_otAddExternalRoute(
 
     if (InBufferLength >= sizeof(otExternalRouteConfig))
     {
-        status = ThreadErrorToNtstatus(otNetDataAddRoute(pFilter->otCtx, (otExternalRouteConfig*)InBuffer));
+        status = ThreadErrorToNtstatus(otBorderRouterAddRoute(pFilter->otCtx, (otExternalRouteConfig*)InBuffer));
     }
 
     return status;
@@ -2802,7 +2810,7 @@ otLwfIoCtl_otRemoveExternalRoute(
 
     if (InBufferLength >= sizeof(otIp6Prefix))
     {
-        status = ThreadErrorToNtstatus(otNetDataRemoveRoute(pFilter->otCtx, (otIp6Prefix*)InBuffer));
+        status = ThreadErrorToNtstatus(otBorderRouterRemoveRoute(pFilter->otCtx, (otIp6Prefix*)InBuffer));
     }
 
     return status;
@@ -2865,7 +2873,7 @@ otLwfIoCtl_otSendServerData(
     UNREFERENCED_PARAMETER(OutBuffer);
     *OutBufferLength = 0;
 
-    status = ThreadErrorToNtstatus(otNetDataRegister(pFilter->otCtx));
+    status = ThreadErrorToNtstatus(otBorderRouterRegister(pFilter->otCtx));
 
     return status;
 }
@@ -3439,13 +3447,15 @@ otLwfIoCtl_otMacWhitelistEnabled(
     if (InBufferLength >= sizeof(BOOLEAN))
     {
         BOOLEAN aEnabled = *(BOOLEAN*)InBuffer;
-        otLinkSetWhitelistEnabled(pFilter->otCtx, aEnabled);
-        status = STATUS_SUCCESS;
+        otMacFilterAddressMode mode =
+            aEnabled ? OT_MAC_FILTER_ADDRESS_MODE_WHITELIST : OT_MAC_FILTER_ADDRESS_MODE_DISABLED;
+        status = ThreadErrorToNtstatus(otLinkFilterSetAddressMode(pFilter->otCtx, mode));
         *OutBufferLength = 0;
     }
     else if (*OutBufferLength >= sizeof(BOOLEAN))
     {
-        *(BOOLEAN*)OutBuffer = otLinkIsWhitelistEnabled(pFilter->otCtx) ? TRUE : FALSE;
+        otMacFilterAddressMode mode = otLinkFilterGetAddressMode(pFilter->otCtx);
+        *(BOOLEAN*)OutBuffer = (mode == OT_MAC_FILTER_ADDRESS_MODE_WHITELIST) ? TRUE : FALSE;
         status = STATUS_SUCCESS;
         *OutBufferLength = sizeof(BOOLEAN);
     }
@@ -3535,24 +3545,28 @@ otLwfIoCtl_otAddMacWhitelist(
     )
 {
     NTSTATUS status = STATUS_INVALID_PARAMETER;
-
     UNREFERENCED_PARAMETER(OutBuffer);
     *OutBufferLength = 0;
+    int8_t aRss = OT_MAC_FILTER_FIXED_RSS_DISABLED;
 
     if (InBufferLength >= sizeof(otExtAddress) + sizeof(int8_t))
     {
-        int8_t aRssi = *(int8_t*)(InBuffer + sizeof(otExtAddress));
-        status = ThreadErrorToNtstatus(otLinkAddWhitelistRssi(pFilter->otCtx, (uint8_t*)InBuffer, aRssi));
+         aRss = *(int8_t*)(InBuffer + sizeof(otExtAddress));
     }
-    else if (InBufferLength >= sizeof(otExtAddress))
+
+    otError error = otLinkFilterAddAddress(pFilter->otCtx, (otExtAddress *)InBuffer);
+
+    if ((error == OT_ERROR_NONE || error == OT_ERROR_ALREADY) &&
+        (aRss != OT_MAC_FILTER_FIXED_RSS_DISABLED))
     {
-        status = ThreadErrorToNtstatus(otLinkAddWhitelist(pFilter->otCtx, (uint8_t*)InBuffer));
+
+       error = otLinkFilterAddRssIn(pFilter->otCtx, (otExtAddress *)InBuffer, aRss);
     }
+
+    status = ThreadErrorToNtstatus(error);
 
     return status;
 }
-
-#define RSSI_OVERRIDE_DISABLED        127 // Used for PROP_MAC_WHITELIST
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
 NTSTATUS
@@ -3571,10 +3585,10 @@ otLwfTunIoCtl_otAddMacWhitelist(
 
     if (InBufferLength >= sizeof(otExtAddress))
     {
-        int8_t aRssi = RSSI_OVERRIDE_DISABLED;
+        int8_t aRss = OT_MAC_FILTER_FIXED_RSS_DISABLED;
         if (InBufferLength >= sizeof(otExtAddress) + sizeof(int8_t))
         {
-            aRssi = *(int8_t*)(InBuffer + sizeof(otExtAddress));
+            aRss = *(int8_t*)(InBuffer + sizeof(otExtAddress));
         }
 
         status =
@@ -3587,7 +3601,7 @@ otLwfTunIoCtl_otAddMacWhitelist(
                 sizeof(otExtAddress) + sizeof(int8_t),
                 "Ec",
                 (otExtAddress*)InBuffer,
-                &aRssi);
+                &aRss);
     }
 
     return status;
@@ -3612,8 +3626,8 @@ otLwfIoCtl_otRemoveMacWhitelist(
 
     if (InBufferLength >= sizeof(otExtAddress))
     {
-        otLinkRemoveWhitelist(pFilter->otCtx, (uint8_t*)InBuffer);
-        status = STATUS_SUCCESS;
+        status = ThreadErrorToNtstatus(otLinkFilterRemoveAddress(pFilter->otCtx,
+                    (otExtAddress *)InBuffer));
     }
 
     return status;
@@ -3653,7 +3667,7 @@ otLwfTunIoCtl_otRemoveMacWhitelist(
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
 NTSTATUS
-otLwfIoCtl_otMacWhitelistEntry(
+otLwfIoCtl_otNextMacWhitelist(
     _In_ PMS_FILTER         pFilter,
     _In_reads_bytes_(InBufferLength)
             PUCHAR          InBuffer,
@@ -3666,15 +3680,25 @@ otLwfIoCtl_otMacWhitelistEntry(
     NTSTATUS status = STATUS_INVALID_PARAMETER;
 
     if (InBufferLength >= sizeof(uint8_t) &&
-        *OutBufferLength >= sizeof(otMacWhitelistEntry))
+        *OutBufferLength >= sizeof(uint8_t) + sizeof(otMacFilterEntry))
     {
+        uint8_t aIterator = *(uint8_t*)(InBuffer);
+        otMacFilterEntry *aEntry = (otMacFilterEntry*)((PUCHAR)OutBuffer + sizeof(uint8_t));
+
         status = ThreadErrorToNtstatus(
-            otLinkGetWhitelistEntry(
+            otLinkFilterGetNextAddress(
                 pFilter->otCtx,
-                *(uint8_t*)InBuffer,
-                (otMacWhitelistEntry*)OutBuffer)
+                &aIterator,
+                aEntry
+                )
             );
-        *OutBufferLength = sizeof(otMacWhitelistEntry);
+
+        *OutBufferLength = sizeof(otMacFilterEntry) + sizeof(uint8_t);
+
+        if (status == STATUS_SUCCESS)
+        {
+            *(uint8_t*)OutBuffer = aIterator;
+        }
     }
     else
     {
@@ -3703,7 +3727,7 @@ otLwfIoCtl_otClearMacWhitelist(
     UNREFERENCED_PARAMETER(OutBuffer);
     *OutBufferLength = 0;
 
-    otLinkClearWhitelist(pFilter->otCtx);
+    otLinkFilterClearAddresses(pFilter->otCtx);
 
     return status;
 }
@@ -4490,6 +4514,37 @@ otLwfIoCtl_otRouterIdSequence(
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
 NTSTATUS
+otLwfIoCtl_otMaxRouterId(
+    _In_ PMS_FILTER         pFilter,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _Out_writes_bytes_(*OutBufferLength)
+            PVOID           OutBuffer,
+    _Inout_ PULONG          OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    UNREFERENCED_PARAMETER(InBuffer);
+    UNREFERENCED_PARAMETER(InBufferLength);
+
+    if (*OutBufferLength >= sizeof(uint8_t))
+    {
+        *(uint8_t*)OutBuffer = otThreadGetMaxRouterId(pFilter->otCtx);
+        *OutBufferLength = sizeof(uint8_t);
+        status = STATUS_SUCCESS;
+    }
+    else
+    {
+        *OutBufferLength = 0;
+    }
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
 otLwfIoCtl_otRouterInfo(
     _In_ PMS_FILTER         pFilter,
     _In_reads_bytes_(InBufferLength)
@@ -4624,13 +4679,15 @@ otLwfIoCtl_otMacBlacklistEnabled(
     if (InBufferLength >= sizeof(BOOLEAN))
     {
         BOOLEAN aEnabled = *(BOOLEAN*)InBuffer;
-        otLinkSetBlacklistEnabled(pFilter->otCtx, aEnabled);
-        status = STATUS_SUCCESS;
+        otMacFilterAddressMode mode =
+            aEnabled ? OT_MAC_FILTER_ADDRESS_MODE_BLACKLIST : OT_MAC_FILTER_ADDRESS_MODE_DISABLED;
+        status = ThreadErrorToNtstatus(otLinkFilterSetAddressMode(pFilter->otCtx, mode));
         *OutBufferLength = 0;
     }
     else if (*OutBufferLength >= sizeof(BOOLEAN))
     {
-        *(BOOLEAN*)OutBuffer = otLinkIsBlacklistEnabled(pFilter->otCtx) ? TRUE : FALSE;
+        otMacFilterAddressMode mode = otLinkFilterGetAddressMode(pFilter->otCtx);
+        *(BOOLEAN*)OutBuffer = mode == (OT_MAC_FILTER_ADDRESS_MODE_BLACKLIST) ? TRUE : FALSE;
         status = STATUS_SUCCESS;
         *OutBufferLength = sizeof(BOOLEAN);
     }
@@ -4661,7 +4718,8 @@ otLwfIoCtl_otAddMacBlacklist(
 
     if (InBufferLength >= sizeof(otExtAddress))
     {
-        status = ThreadErrorToNtstatus(otLinkAddBlacklist(pFilter->otCtx, (uint8_t*)InBuffer));
+        status = ThreadErrorToNtstatus(otLinkFilterAddAddress(pFilter->otCtx,
+                    (otExtAddress *)InBuffer));
     }
 
     return status;
@@ -4686,8 +4744,8 @@ otLwfIoCtl_otRemoveMacBlacklist(
 
     if (InBufferLength >= sizeof(otExtAddress))
     {
-        otLinkRemoveBlacklist(pFilter->otCtx, (uint8_t*)InBuffer);
-        status = STATUS_SUCCESS;
+        status = ThreadErrorToNtstatus(otLinkFilterRemoveAddress(pFilter->otCtx,
+                    (otExtAddress *)InBuffer));
     }
 
     return status;
@@ -4695,7 +4753,7 @@ otLwfIoCtl_otRemoveMacBlacklist(
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
 NTSTATUS
-otLwfIoCtl_otMacBlacklistEntry(
+otLwfIoCtl_otNextMacBlacklist(
     _In_ PMS_FILTER         pFilter,
     _In_reads_bytes_(InBufferLength)
             PUCHAR          InBuffer,
@@ -4708,16 +4766,27 @@ otLwfIoCtl_otMacBlacklistEntry(
     NTSTATUS status = STATUS_INVALID_PARAMETER;
 
     if (InBufferLength >= sizeof(uint8_t) &&
-        *OutBufferLength >= sizeof(otMacBlacklistEntry))
+        *OutBufferLength >= sizeof(uint8_t) + sizeof(otMacFilterEntry))
     {
+        uint8_t aIterator = *(uint8_t*)(InBuffer);
+        otMacFilterEntry *aEntry = (otMacFilterEntry*)((PUCHAR)OutBuffer + sizeof(uint8_t));
+
         status = ThreadErrorToNtstatus(
-            otLinkGetBlacklistEntry(
+            otLinkFilterGetNextAddress(
                 pFilter->otCtx,
-                *(uint8_t*)InBuffer,
-                (otMacBlacklistEntry*)OutBuffer)
+                &aIterator,
+                aEntry
+                )
             );
-        *OutBufferLength = sizeof(otMacBlacklistEntry);
+
+        *OutBufferLength = sizeof(otMacFilterEntry) + sizeof(uint8_t);
+
+        if (status == STATUS_SUCCESS)
+        {
+            *(uint8_t*)OutBuffer = aIterator;
+        }
     }
+
     else
     {
         *OutBufferLength = 0;
@@ -4745,14 +4814,14 @@ otLwfIoCtl_otClearMacBlacklist(
     UNREFERENCED_PARAMETER(OutBuffer);
     *OutBufferLength = 0;
 
-    otLinkClearBlacklist(pFilter->otCtx);
+    otLinkFilterClearAddresses(pFilter->otCtx);
 
     return status;
 }
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
 NTSTATUS
-otLwfIoCtl_otMaxTransmitPower(
+otLwfIoCtl_otTransmitPower(
     _In_ PMS_FILTER         pFilter,
     _In_reads_bytes_(InBufferLength)
             PUCHAR          InBuffer,
@@ -4766,15 +4835,13 @@ otLwfIoCtl_otMaxTransmitPower(
 
     if (InBufferLength >= sizeof(int8_t))
     {
-        otLinkSetMaxTransmitPower(pFilter->otCtx, *(int8_t*)InBuffer);
-        status = STATUS_SUCCESS;
+        status = ThreadErrorToNtstatus(otPlatRadioSetTransmitPower(pFilter->otCtx, *(int8_t*)InBuffer));
         *OutBufferLength = 0;
     }
     else if (*OutBufferLength >= sizeof(int8_t))
     {
-        *(int8_t*)OutBuffer = otLinkGetMaxTransmitPower(pFilter->otCtx);
+        status = ThreadErrorToNtstatus(otPlatRadioGetTransmitPower(pFilter->otCtx, (int8_t*)OutBuffer));
         *OutBufferLength = sizeof(int8_t);
-        status = STATUS_SUCCESS;
     }
     else
     {
@@ -4798,23 +4865,86 @@ otLwfIoCtl_otNextOnMeshPrefix(
 {
     NTSTATUS status = STATUS_INVALID_PARAMETER;
 
-    if (InBufferLength >= sizeof(BOOLEAN) + sizeof(uint8_t) &&
-        *OutBufferLength >= sizeof(uint8_t) + sizeof(otBorderRouterConfig))
+    if (InBufferLength >= sizeof(BOOLEAN) + sizeof(uint32_t) &&
+        *OutBufferLength >= sizeof(uint32_t) + sizeof(otBorderRouterConfig))
     {
         BOOLEAN aLocal = *(BOOLEAN*)InBuffer;
-        uint8_t aIterator = *(uint8_t*)(InBuffer + sizeof(BOOLEAN));
-        otBorderRouterConfig* aConfig = (otBorderRouterConfig*)((PUCHAR)OutBuffer + sizeof(uint8_t));
-        status = ThreadErrorToNtstatus(
-            otNetDataGetNextPrefixInfo(
-                pFilter->otCtx,
-                aLocal,
-                &aIterator,
-                aConfig)
-            );
+        uint32_t aIterator = *(uint32_t*)(InBuffer + sizeof(BOOLEAN));
+        otBorderRouterConfig* aConfig = (otBorderRouterConfig*)((PUCHAR)OutBuffer + sizeof(uint32_t));
+        if (aLocal)
+        {
+            status = ThreadErrorToNtstatus(
+                otBorderRouterGetNextOnMeshPrefix(
+                    pFilter->otCtx,
+                    &aIterator,
+                    aConfig)
+                );
+        }
+        else
+        {
+            status = ThreadErrorToNtstatus(
+                otNetDataGetNextOnMeshPrefix(
+                    pFilter->otCtx,
+                    &aIterator,
+                    aConfig)
+                );
+        }
         *OutBufferLength = sizeof(uint8_t) + sizeof(otBorderRouterConfig);
         if (status == STATUS_SUCCESS)
         {
-            *(uint8_t*)OutBuffer = aIterator;
+            *(uint32_t*)OutBuffer = aIterator;
+        }
+    }
+    else
+    {
+        *OutBufferLength = 0;
+    }
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfIoCtl_otNextRoute(
+    _In_ PMS_FILTER         pFilter,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _Out_writes_bytes_(*OutBufferLength)
+            PVOID           OutBuffer,
+    _Inout_ PULONG          OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    if (InBufferLength >= sizeof(BOOLEAN) + sizeof(uint32_t) &&
+        *OutBufferLength >= sizeof(uint32_t) + sizeof(otExternalRouteConfig))
+    {
+        BOOLEAN aLocal = *(BOOLEAN*)InBuffer;
+        uint32_t aIterator = *(uint32_t*)(InBuffer + sizeof(BOOLEAN));
+        otExternalRouteConfig* aConfig = (otExternalRouteConfig*)((PUCHAR)OutBuffer + sizeof(uint32_t));
+        if (aLocal)
+        {
+            status = ThreadErrorToNtstatus(
+                otBorderRouterGetNextRoute(
+                    pFilter->otCtx,
+                    &aIterator,
+                    aConfig)
+                );
+        }
+        else
+        {
+            status = ThreadErrorToNtstatus(
+                otNetDataGetNextRoute(
+                    pFilter->otCtx,
+                    &aIterator,
+                    aConfig)
+                );
+        }
+        *OutBufferLength = sizeof(uint8_t) + sizeof(otExternalRouteConfig);
+        if (status == STATUS_SUCCESS)
+        {
+            *(uint32_t*)OutBuffer = aIterator;
         }
     }
     else
@@ -4884,48 +5014,6 @@ otLwfIoCtl_otLocalLeaderPartitionId(
         *(uint32_t*)OutBuffer = otThreadGetLocalLeaderPartitionId(pFilter->otCtx);
         *OutBufferLength = sizeof(uint32_t);
         status = STATUS_SUCCESS;
-    }
-    else
-    {
-        *OutBufferLength = 0;
-    }
-
-    return status;
-}
-
-_IRQL_requires_max_(PASSIVE_LEVEL)
-NTSTATUS
-otLwfIoCtl_otAssignLinkQuality(
-    _In_ PMS_FILTER         pFilter,
-    _In_reads_bytes_(InBufferLength)
-            PUCHAR          InBuffer,
-    _In_    ULONG           InBufferLength,
-    _Out_writes_bytes_(*OutBufferLength)
-            PVOID           OutBuffer,
-    _Inout_ PULONG          OutBufferLength
-    )
-{
-    NTSTATUS status = STATUS_INVALID_PARAMETER;
-
-    if (InBufferLength >= sizeof(otExtAddress) + sizeof(uint8_t))
-    {
-        otLinkSetAssignLinkQuality(
-            pFilter->otCtx,
-            (uint8_t*)InBuffer,
-            *(uint8_t*)(InBuffer + sizeof(otExtAddress)));
-        status = STATUS_SUCCESS;
-        *OutBufferLength = 0;
-    }
-    else if (InBufferLength >= sizeof(otExtAddress) &&
-            *OutBufferLength >= sizeof(uint8_t))
-    {
-        status = ThreadErrorToNtstatus(
-            otLinkGetAssignLinkQuality(
-                pFilter->otCtx,
-                (uint8_t*)InBuffer,
-                (uint8_t*)OutBuffer)
-            );
-        *OutBufferLength = sizeof(uint32_t);
     }
     else
     {
@@ -5832,20 +5920,22 @@ otLwfIoCtl_otSendActiveGet(
     *OutBufferLength = 0;
     UNREFERENCED_PARAMETER(OutBuffer);
 
-    if (InBufferLength >= sizeof(uint8_t))
+    if (InBufferLength >= sizeof(otOperationalDatasetComponents) + sizeof(uint8_t))
     {
-        uint8_t aLength = *(uint8_t*)InBuffer;
-        PUCHAR aTlvTypes = aLength == 0 ? NULL : InBuffer + sizeof(uint8_t);
+        const otOperationalDatasetComponents *aDatasetComp = (otOperationalDatasetComponents*)InBuffer;
+        uint8_t aLength = *(uint8_t*)(InBuffer + sizeof(otOperationalDatasetComponents));
+        PUCHAR aTlvTypes = aLength == 0 ? NULL : InBuffer + sizeof(otOperationalDatasetComponents) + sizeof(uint8_t);
 
-        if (InBufferLength >= sizeof(uint8_t) + aLength)
+        if (InBufferLength >= sizeof(otOperationalDatasetComponents) + sizeof(uint8_t) + aLength)
         {
             otIp6Address *aAddress = NULL;
-            if (InBufferLength >= sizeof(uint8_t) + aLength + sizeof(otIp6Address))
-                aAddress = (otIp6Address*)(InBuffer + sizeof(uint8_t) + aLength);
+            if (InBufferLength >= sizeof(otOperationalDatasetComponents) + sizeof(uint8_t) + aLength + sizeof(otIp6Address))
+                aAddress = (otIp6Address*)(InBuffer + sizeof(otOperationalDatasetComponents) + sizeof(uint8_t) + aLength);
 
             status = ThreadErrorToNtstatus(
                 otDatasetSendMgmtActiveGet(
                     pFilter->otCtx,
+                    aDatasetComp,
                     aTlvTypes,
                     aLength,
                     aAddress)
@@ -5911,20 +6001,22 @@ otLwfIoCtl_otSendPendingGet(
     *OutBufferLength = 0;
     UNREFERENCED_PARAMETER(OutBuffer);
 
-    if (InBufferLength >= sizeof(uint8_t))
+    if (InBufferLength >= sizeof(otOperationalDataset) + sizeof(uint8_t))
     {
-        uint8_t aLength = *(uint8_t*)InBuffer;
-        PUCHAR aTlvTypes = aLength == 0 ? NULL : InBuffer + sizeof(uint8_t);
+        const otOperationalDatasetComponents *aDatasetComp = (otOperationalDatasetComponents*)InBuffer;
+        uint8_t aLength = *(uint8_t*)(InBuffer + sizeof(otOperationalDataset));
+        PUCHAR aTlvTypes = aLength == 0 ? NULL : InBuffer + sizeof(otOperationalDataset) +  sizeof(uint8_t);
 
-        if (InBufferLength >= sizeof(uint8_t) + aLength)
+        if (InBufferLength >= sizeof(otOperationalDatasetComponents) + sizeof(uint8_t) + aLength)
         {
             otIp6Address *aAddress = NULL;
-            if (InBufferLength >= sizeof(uint8_t) + aLength + sizeof(otIp6Address))
-                aAddress = (otIp6Address*)(InBuffer + sizeof(uint8_t) + aLength);
+            if (InBufferLength >= sizeof(otOperationalDatasetComponents) + sizeof(uint8_t) + aLength + sizeof(otIp6Address))
+                aAddress = (otIp6Address*)(InBuffer + sizeof(otOperationalDataset) + sizeof(uint8_t) + aLength);
 
             status = ThreadErrorToNtstatus(
                 otDatasetSendMgmtPendingGet(
                     pFilter->otCtx,
+                    aDatasetComp,
                     aTlvTypes,
                     aLength,
                     aAddress)
@@ -6209,6 +6301,291 @@ otLwfIoCtl_otThreadPreferredRouterId(
                     pFilter->otCtx,
                     *(uint8_t*)InBuffer != FALSE)
             );
+        *OutBufferLength = 0;
+    }
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfIoCtl_otParentPriority(
+    _In_ PMS_FILTER         pFilter,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _Out_writes_bytes_(*OutBufferLength)
+            PVOID           OutBuffer,
+    _Inout_ PULONG          OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    if (InBufferLength >= sizeof(int8_t))
+    {
+        otThreadSetParentPriority(pFilter->otCtx, *(int8_t*)InBuffer);
+        status = STATUS_SUCCESS;
+        *OutBufferLength = 0;
+    }
+    else if (*OutBufferLength >= sizeof(int8_t))
+    {
+        *(uint16_t*)OutBuffer = otThreadGetParentPriority(pFilter->otCtx);
+        status = STATUS_SUCCESS;
+        *OutBufferLength = sizeof(int8_t);
+    }
+    else
+    {
+        *OutBufferLength = 0;
+    }
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfIoCtl_otAddMacFixedRss(
+    _In_ PMS_FILTER         pFilter,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _Out_writes_bytes_(*OutBufferLength)
+            PVOID           OutBuffer,
+    _Inout_ PULONG          OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    UNREFERENCED_PARAMETER(OutBuffer);
+    *OutBufferLength = 0;
+
+    if (InBufferLength >= sizeof(otExtAddress) + sizeof(int8_t))
+    {
+        int8_t aRss = *(int8_t*)(InBuffer + sizeof(otExtAddress));
+        status = ThreadErrorToNtstatus(otLinkFilterAddRssIn(pFilter->otCtx,
+                    (otExtAddress *)InBuffer, aRss));
+    }
+    else if (InBufferLength >= sizeof(int8_t))
+    {
+        status = ThreadErrorToNtstatus(otLinkFilterAddRssIn(pFilter->otCtx, NULL,
+                    *(int8_t *)InBuffer));
+    }
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfTunIoCtl_otAddMacFixedRss(
+    _In_ PMS_FILTER         pFilter,
+    _In_ PIRP               pIrp,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _In_    ULONG           OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    UNREFERENCED_PARAMETER(OutBufferLength);
+
+    if (InBufferLength >= sizeof(otExtAddress) + sizeof(int8_t))
+    {
+        int8_t aRss = OT_MAC_FILTER_FIXED_RSS_DISABLED;
+        aRss = *(int8_t*)(InBuffer + sizeof(otExtAddress));
+        status =
+            otLwfTunSendCommandForIrp(
+                    pFilter,
+                    pIrp,
+                    NULL,
+                    SPINEL_CMD_PROP_VALUE_INSERT,
+                    SPINEL_PROP_MAC_FIXED_RSS,
+                    sizeof(otExtAddress) + sizeof(int8_t),
+                    "Ec",
+                    (otExtAddress*)InBuffer,
+                    &aRss);
+    }
+    else
+    {
+        status =
+            otLwfTunSendCommandForIrp(
+                    pFilter,
+                    pIrp,
+                    NULL,
+                    SPINEL_CMD_PROP_VALUE_INSERT,
+                    SPINEL_PROP_MAC_FIXED_RSS,
+                    sizeof(int8_t),
+                    "c",
+                    (int8_t*)InBuffer);
+    }
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfIoCtl_otRemoveMacFixedRss(
+    _In_ PMS_FILTER         pFilter,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _Out_writes_bytes_(*OutBufferLength)
+            PVOID           OutBuffer,
+    _Inout_ PULONG          OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    UNREFERENCED_PARAMETER(OutBuffer);
+    *OutBufferLength = 0;
+
+    if (InBufferLength >= sizeof(otExtAddress))
+    {
+        status = ThreadErrorToNtstatus(otLinkFilterRemoveRssIn(pFilter->otCtx, (otExtAddress *)InBuffer));
+    }
+    else
+    {
+        status = ThreadErrorToNtstatus(otLinkFilterRemoveRssIn(pFilter->otCtx, NULL));
+    }
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfTunIoCtl_otRemoveMacFixedRss(
+    _In_ PMS_FILTER         pFilter,
+    _In_ PIRP               pIrp,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _In_    ULONG           OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    UNREFERENCED_PARAMETER(OutBufferLength);
+
+    if (InBufferLength >= sizeof(otExtAddress))
+    {
+        status =
+            otLwfTunSendCommandForIrp(
+                pFilter,
+                pIrp,
+                NULL,
+                SPINEL_CMD_PROP_VALUE_REMOVE,
+                SPINEL_PROP_MAC_FIXED_RSS,
+                sizeof(otExtAddress),
+                "E",
+                (otExtAddress*)InBuffer);
+    }
+    else
+    {
+        status =
+            otLwfTunSendCommandForIrp(
+                    pFilter,
+                    pIrp,
+                    NULL,
+                    SPINEL_CMD_PROP_VALUE_REMOVE,
+                    SPINEL_PROP_MAC_FIXED_RSS,
+                    0,
+                    NULL);
+
+    }
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfIoCtl_otClearMacFixedRss(
+    _In_ PMS_FILTER         pFilter,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _Out_writes_bytes_(*OutBufferLength)
+            PVOID           OutBuffer,
+    _Inout_ PULONG          OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+
+    UNREFERENCED_PARAMETER(InBuffer);
+    UNREFERENCED_PARAMETER(InBufferLength);
+    UNREFERENCED_PARAMETER(OutBuffer);
+    *OutBufferLength = 0;
+
+    otLinkFilterClearRssIn(pFilter->otCtx);
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfTunIoCtl_otClearMacFixedRss(
+    _In_ PMS_FILTER         pFilter,
+    _In_ PIRP               pIrp,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _In_    ULONG           OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    UNREFERENCED_PARAMETER(InBuffer);
+    UNREFERENCED_PARAMETER(InBufferLength);
+    UNREFERENCED_PARAMETER(OutBufferLength);
+
+    status =
+        otLwfTunSendCommandForIrp(
+            pFilter,
+            pIrp,
+            NULL,
+            SPINEL_CMD_PROP_VALUE_SET,
+            SPINEL_PROP_MAC_FIXED_RSS,
+            0,
+            NULL);
+
+    return status;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS
+otLwfIoCtl_otNextMacFixedRss(
+    _In_ PMS_FILTER         pFilter,
+    _In_reads_bytes_(InBufferLength)
+            PUCHAR          InBuffer,
+    _In_    ULONG           InBufferLength,
+    _Out_writes_bytes_(*OutBufferLength)
+            PVOID           OutBuffer,
+    _Inout_ PULONG          OutBufferLength
+    )
+{
+    NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+    if (InBufferLength >= sizeof(uint8_t) &&
+        *OutBufferLength >= sizeof(uint8_t) + sizeof(otMacFilterEntry))
+    {
+        uint8_t aIterator = *(uint8_t*)(InBuffer);
+        otMacFilterEntry *aEntry = (otMacFilterEntry*)((PUCHAR)OutBuffer + sizeof(uint8_t));
+
+        status = ThreadErrorToNtstatus(
+            otLinkFilterGetNextRssIn(
+                pFilter->otCtx,
+                &aIterator,
+                aEntry
+                )
+            );
+
+        *OutBufferLength = sizeof(otMacFilterEntry) + sizeof(uint8_t);
+
+        if (status == STATUS_SUCCESS)
+        {
+            *(uint8_t*)OutBuffer = aIterator;
+        }
+    }
+    else
+    {
         *OutBufferLength = 0;
     }
 

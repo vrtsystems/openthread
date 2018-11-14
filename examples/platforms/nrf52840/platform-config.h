@@ -35,12 +35,14 @@
 #ifndef PLATFORM_CONFIG_H_
 #define PLATFORM_CONFIG_H_
 
-#include "device/nrf.h"
-#include "hal/nrf_uart.h"
-#include "hal/nrf_peripherals.h"
+#include "nrf.h"
+#include "nrf_peripherals.h"
+#include "drivers/clock/nrf_drv_clock.h"
 #include "hal/nrf_radio.h"
+#include "hal/nrf_uart.h"
 
-#include <openthread-core-config.h>
+#include "openthread-core-config.h"
+#include <openthread/config.h>
 
 /*******************************************************************************
  * @section UART Driver Configuration.
@@ -52,7 +54,9 @@
  * UART Instance.
  *
  */
-#define UART_INSTANCE  NRF_UART0
+#ifndef UART_INSTANCE
+#define UART_INSTANCE NRF_UART0
+#endif
 
 /**
  * @def UART_PARITY
@@ -64,19 +68,19 @@
  *         \ref NRF_UART_PARITY_INCLUDED - Parity bit is present.
  *
  */
-#define UART_PARITY  NRF_UART_PARITY_EXCLUDED
+#ifndef UART_PARITY
+#define UART_PARITY NRF_UART_PARITY_EXCLUDED
+#endif
 
 /**
- * @def UART_HWFC
+ * @def UART_HWFC_ENABLED
  *
- * UART Hardware Flow Control.
- *
- * @brief Possible values:
- *         \ref NRF_UART_HWFC_ENABLED - HW Flow control enabled.
- *         \ref NRF_UART_HWFC_DISABLED - HW Flow control disabled.
+ * Enable UART Hardware Flow Control.
  *
  */
-#define UART_HWFC  NRF_UART_HWFC_ENABLED
+#ifndef UART_HWFC_ENABLED
+#define UART_HWFC_ENABLED 1
+#endif
 
 /**
  * @def UART_BAUDRATE
@@ -102,7 +106,9 @@
  *         \ref NRF_UART_BAUDRATE_1000000 - 1000000 baud.
  *
  */
-#define UART_BAUDRATE  NRF_UART_BAUDRATE_115200
+#ifndef UART_BAUDRATE
+#define UART_BAUDRATE NRF_UART_BAUDRATE_115200
+#endif
 
 /**
  *  @def UART_IRQN
@@ -110,7 +116,9 @@
  * UART Interrupt number.
  *
  */
-#define UART_IRQN  UARTE0_UART0_IRQn
+#ifndef UART_IRQN
+#define UART_IRQN UARTE0_UART0_IRQn
+#endif
 
 /**
  * @def UART_IRQ_PRIORITY
@@ -118,7 +126,9 @@
  * UART Interrupt priority.
  *
  */
-#define UART_IRQ_PRIORITY  6
+#ifndef UART_IRQ_PRIORITY
+#define UART_IRQ_PRIORITY 6
+#endif
 
 /**
  * @def UART_RX_BUFFER_SIZE
@@ -126,7 +136,9 @@
  * UART Receive buffer size.
  *
  */
-#define UART_RX_BUFFER_SIZE  256
+#ifndef UART_RX_BUFFER_SIZE
+#define UART_RX_BUFFER_SIZE 256
+#endif
 
 /**
  * @def UART_PIN_TX
@@ -134,7 +146,9 @@
  * UART TX Pin.
  *
  */
-#define UART_PIN_TX  6
+#ifndef UART_PIN_TX
+#define UART_PIN_TX 6
+#endif
 
 /**
  * @def UART_PIN_RX
@@ -142,7 +156,9 @@
  * UART RX Pin.
  *
  */
-#define UART_PIN_RX  8
+#ifndef UART_PIN_RX
+#define UART_PIN_RX 8
+#endif
 
 /**
  * @def UART_PIN_CTS
@@ -150,7 +166,9 @@
  * UART CTS Pin.
  *
  */
-#define UART_PIN_CTS  7
+#ifndef UART_PIN_CTS
+#define UART_PIN_CTS 7
+#endif
 
 /**
  * @def UART_PIN_RTS
@@ -158,7 +176,9 @@
  * UART RTS Pin.
  *
  */
-#define UART_PIN_RTS  5
+#ifndef UART_PIN_RTS
+#define UART_PIN_RTS 5
+#endif
 
 /*******************************************************************************
  * @section Alarm Driver Configuration.
@@ -170,7 +190,9 @@
  * RTC Instance.
  *
  */
-#define RTC_INSTANCE  NRF_RTC2
+#ifndef RTC_INSTANCE
+#define RTC_INSTANCE NRF_RTC2
+#endif
 
 /**
  * @def RTC_IRQ_HANDLER
@@ -178,7 +200,9 @@
  * RTC interrupt handler name
  *
  */
-#define RTC_IRQ_HANDLER  RTC2_IRQHandler
+#ifndef RTC_IRQ_HANDLER
+#define RTC_IRQ_HANDLER RTC2_IRQHandler
+#endif
 
 /**
  * @def RTC_IRQN
@@ -186,7 +210,9 @@
  * RTC Interrupt number.
  *
  */
-#define RTC_IRQN  RTC2_IRQn
+#ifndef RTC_IRQN
+#define RTC_IRQN RTC2_IRQn
+#endif
 
 /**
  * @def RTC_IRQ_PRIORITY
@@ -194,7 +220,9 @@
  * RTC Interrupt priority.
  *
  */
-#define RTC_IRQ_PRIORITY  6
+#ifndef RTC_IRQ_PRIORITY
+#define RTC_IRQ_PRIORITY 6
+#endif
 
 /*******************************************************************************
  * @section Random Number Generator Driver Configuration.
@@ -206,7 +234,9 @@
  * True Random Number Generator buffer size.
  *
  */
-#define RNG_BUFFER_SIZE  64
+#ifndef RNG_BUFFER_SIZE
+#define RNG_BUFFER_SIZE 64
+#endif
 
 /**
  * @def RNG_IRQ_PRIORITY
@@ -214,7 +244,9 @@
  * RNG Interrupt priority.
  *
  */
-#define RNG_IRQ_PRIORITY  6
+#ifndef RNG_IRQ_PRIORITY
+#define RNG_IRQ_PRIORITY 6
+#endif
 
 /*******************************************************************************
  * @section Log module configuration.
@@ -226,7 +258,9 @@
  * RTT's buffer index.
  *
  */
-#define LOG_RTT_BUFFER_INDEX  0
+#ifndef LOG_RTT_BUFFER_INDEX
+#define LOG_RTT_BUFFER_INDEX 0
+#endif
 
 /**
  * @def LOG_RTT_BUFFER_NAME
@@ -234,7 +268,9 @@
  * RTT's name.
  *
  */
-#define LOG_RTT_BUFFER_NAME  "Terminal"
+#ifndef LOG_RTT_BUFFER_NAME
+#define LOG_RTT_BUFFER_NAME "Terminal"
+#endif
 
 /**
  * @def LOG_RTT_BUFFER_SIZE
@@ -242,7 +278,9 @@
  * LOG RTT's buffer size.
  *
  */
-#define LOG_RTT_BUFFER_SIZE  256
+#ifndef LOG_RTT_BUFFER_SIZE
+#define LOG_RTT_BUFFER_SIZE 256
+#endif
 
 /**
  * @def LOG_RTT_COLOR_ENABLE
@@ -250,7 +288,9 @@
  * Enable colors on RTT Viewer.
  *
  */
-#define LOG_RTT_COLOR_ENABLE  1
+#ifndef LOG_RTT_COLOR_ENABLE
+#define LOG_RTT_COLOR_ENABLE 1
+#endif
 
 /**
  * @def LOG_PARSE_BUFFER_SIZE
@@ -259,7 +299,9 @@
  * stack.
  *
  */
-#define LOG_PARSE_BUFFER_SIZE  128
+#ifndef LOG_PARSE_BUFFER_SIZE
+#define LOG_PARSE_BUFFER_SIZE 128
+#endif
 
 /**
  * @def LOG_TIMESTAMP_ENABLE
@@ -267,74 +309,213 @@
  * Enable timestamp in the logs.
  *
  */
-#define LOG_TIMESTAMP_ENABLE  1
+#ifndef LOG_TIMESTAMP_ENABLE
+#define LOG_TIMESTAMP_ENABLE 1
+#endif
 
 /*******************************************************************************
- * @section Radio Driver Configuration.
+ * @section SPI Slave configuration.
  ******************************************************************************/
 
 /**
- * @def RADIO_CCA_MODE
- *
- * RADIO CCA Mode.
- *
+ * @def SPIS Instance.
  */
-#define RADIO_CCA_MODE  NRF_RADIO_CCA_MODE_ED
+#ifndef SPIS_INSTANCE
+#define SPIS_INSTANCE NRF_SPIS0
+#endif
 
 /**
- * @def RADIO_CCA_ED_THRESHOLD
+ * @def SPIS mode.
  *
- * RADIO Energy Detection Threshold.
- *
+ * @brief Possible values:
+ *         \ref NRF_SPIS_MODE_0 - SCK active high, sample on leading edge of clock.
+ *         \ref NRF_SPIS_MODE_1 - SCK active high, sample on trailing edge of clock.
+ *         \ref NRF_SPIS_MODE_2 - SCK active low, sample on leading edge of clock.
+ *         \ref NRF_SPIS_MODE_3 - SCK active low, sample on trailing edge of clock.
  */
-#define RADIO_CCA_ED_THRESHOLD  0x2D
+#ifndef SPIS_MODE
+#define SPIS_MODE NRF_SPIS_MODE_0
+#endif
 
 /**
- * @def RADIO_CCA_CORR_THRESHOLD
+ * @def SPIS bit orders.
  *
- * RADIO Correlator Threshold.
- *
+ * @brief Possible values:
+ *         \ref NRF_SPIS_BIT_ORDER_MSB_FIRST - Most significant bit shifted out first.
+ *         \ref NRF_SPIS_BIT_ORDER_LSB_FIRST - Least significant bit shifted out first.
  */
-#define RADIO_CCA_CORR_THRESHOLD  0x2D
+#ifndef SPIS_BIT_ORDER
+#define SPIS_BIT_ORDER NRF_SPIS_BIT_ORDER_MSB_FIRST
+#endif
 
 /**
- * @def RADIO_CCA_CORR_LIMIT
- *
- * RADIO Correlator limit.
- *
+ * @def SPIS Interrupt number.
  */
-#define RADIO_CCA_CORR_LIMIT  0x02
+#ifndef SPIS_IRQN
+#define SPIS_IRQN SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn
+#endif
 
 /**
- * @def RADIO_IRQ_PRIORITY
- *
- * RADIO Interrupt priority.
- *
+ * @def SPIS Interrupt priority.
  */
-#define RADIO_IRQ_PRIORITY  0
+#ifndef SPIS_IRQ_PRIORITY
+#define SPIS_IRQ_PRIORITY 6
+#endif
 
 /**
- * @def RADIO_PENDING_SHORT_ADDRESSES
- *
- * RADIO Number of slots containing short addresses of nodes for which pending data is stored.
- *
+ * @def SPIS MOSI Pin.
  */
-#define RADIO_PENDING_SHORT_ADDRESSES  OPENTHREAD_CONFIG_MAX_CHILDREN
+#ifndef SPIS_PIN_MOSI
+#define SPIS_PIN_MOSI 4
+#endif
 
 /**
- * @def RADIO_PENDING_EXTENDED_ADDRESSES
- *
- * RADIO Number of slots containing extended addresses of nodes for which pending data is stored.
- *
+ * @def SPIS MISO Pin.
  */
-#define RADIO_PENDING_EXTENDED_ADDRESSES  OPENTHREAD_CONFIG_MAX_CHILDREN
+#ifndef SPIS_PIN_MISO
+#define SPIS_PIN_MISO 28
+#endif
 
 /**
- * @def RADIO_RX_BUFFERS
+ * @def SPIS SCK Pin.
+ */
+#ifndef SPIS_PIN_SCK
+#define SPIS_PIN_SCK 3
+#endif
+
+/**
+ * @def SPIS CSN Pin.
+ */
+#ifndef SPIS_PIN_CSN
+#define SPIS_PIN_CSN 29
+#endif
+
+/**
+ * @def SPIS Host IRQ Pin.
+ */
+#ifndef SPIS_PIN_HOST_IRQ
+#define SPIS_PIN_HOST_IRQ 30
+#endif
+
+/*******************************************************************************
+ * @section USB driver configuration.
+ ******************************************************************************/
+
+/**
+ * @def USB_HOST_UART_CONFIG_DELAY_MS
  *
- * RADIO Number of buffers in receive queue.
+ * Delay after DTR gets asserted that we start send any queued data. This allows slow
+ * Linux-based hosts to have enough time to configure their port for raw mode.
  *
  */
-#define RADIO_RX_BUFFERS  16
+#ifndef USB_HOST_UART_CONFIG_DELAY_MS
+#define USB_HOST_UART_CONFIG_DELAY_MS 10
+#endif
 
-#endif  // PLATFORM_CONFIG_H_
+/**
+ * @def USB_CDC_AS_SERIAL_TRANSPORT
+ *
+ * Use USB CDC driver for serial communication.
+ */
+#ifndef USB_CDC_AS_SERIAL_TRANSPORT
+#define USB_CDC_AS_SERIAL_TRANSPORT 0
+#endif
+
+/**
+ * @def OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
+ *
+ * Reset the application, not the chip, when a software reset is requested.
+ * via `otPlatReset()`.
+ */
+#ifndef OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
+#define OPENTHREAD_PLATFORM_USE_PSEUDO_RESET USB_CDC_AS_SERIAL_TRANSPORT
+#endif
+
+/*******************************************************************************
+ * @section Platform FEM Configuration
+ ******************************************************************************/
+
+/**
+ * @def PLATFORM_FEM_ENABLE_DEFAULT_CONFIG
+ *
+ * Enable default front end module configuration.
+ *
+ */
+#ifndef PLATFORM_FEM_ENABLE_DEFAULT_CONFIG
+#define PLATFORM_FEM_ENABLE_DEFAULT_CONFIG 0
+#endif
+
+/*******************************************************************************
+ * @section Radio driver configuration.
+ ******************************************************************************/
+
+/**
+ * @def NRF_802154_PENDING_SHORT_ADDRESSES
+ *
+ * Number of slots containing short addresses of nodes for which pending data is stored.
+ *
+ */
+#ifndef NRF_802154_PENDING_SHORT_ADDRESSES
+#define NRF_802154_PENDING_SHORT_ADDRESSES OPENTHREAD_CONFIG_MAX_CHILDREN
+#endif
+
+/**
+ * @def NRF_802154_PENDING_EXTENDED_ADDRESSES
+ *
+ * Number of slots containing extended addresses of nodes for which pending data is stored.
+ *
+ */
+#ifndef NRF_802154_PENDING_EXTENDED_ADDRESSES
+#define NRF_802154_PENDING_EXTENDED_ADDRESSES OPENTHREAD_CONFIG_MAX_CHILDREN
+#endif
+
+/**
+ * @def NRF_802154_CSMA_CA_ENABLED
+ *
+ * If CSMA-CA procedure should be enabled by the driver. Disabling CSMA-CA procedure improves
+ * driver performance.
+ *
+ */
+#ifndef NRF_802154_CSMA_CA_ENABLED
+#define NRF_802154_CSMA_CA_ENABLED 1
+#endif
+
+/**
+ * @def NRF_802154_ACK_TIMEOUT_ENABLED
+ *
+ * If ACK timeout feature should be enabled in the driver.
+ *
+ */
+#ifndef NRF_802154_ACK_TIMEOUT_ENABLED
+#define NRF_802154_ACK_TIMEOUT_ENABLED 1
+#endif
+
+/*******************************************************************************
+ * @section Temperature sensor driver configuration.
+ ******************************************************************************/
+
+/**
+ * @def TEMP_MEASUREMENT_INTERVAL
+ *
+ * Interval of consecutive temperature measurements [s].
+ *
+ */
+#ifndef TEMP_MEASUREMENT_INTERVAL
+#define TEMP_MEASUREMENT_INTERVAL 30
+#endif
+
+/**
+ * @def NRF_802154_TX_STARTED_NOTIFY_ENABLED
+ *
+ * If notification of started transmission should be enabled in the driver.
+ *
+ * @note This feature must be enabled to support Header IE related features.
+ *
+ */
+#ifndef NRF_802154_TX_STARTED_NOTIFY_ENABLED
+#if OPENTHREAD_CONFIG_HEADER_IE_SUPPORT
+#define NRF_802154_TX_STARTED_NOTIFY_ENABLED 1
+#endif
+#endif
+
+#endif // PLATFORM_CONFIG_H_

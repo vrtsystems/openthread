@@ -34,6 +34,8 @@
 #ifndef COAP_HEADER_HPP_
 #define COAP_HEADER_HPP_
 
+#include "openthread-core-config.h"
+
 #include "utils/wrap_string.h"
 
 #include <openthread/coap.h>
@@ -131,7 +133,8 @@ public:
      * @param[in]  aVersion  The Version value.
      *
      */
-    void SetVersion(uint8_t aVersion) {
+    void SetVersion(uint8_t aVersion)
+    {
         mHeader.mFields.mVersionTypeToken &= ~kVersionMask;
         mHeader.mFields.mVersionTypeToken |= aVersion << kVersionOffset;
     }
@@ -142,7 +145,7 @@ public:
      * @returns The Type value.
      *
      */
-    Type GetType(void) const { return static_cast<Header::Type>(mHeader.mFields.mVersionTypeToken & kTypeMask); }
+    Type GetType(void) const { return static_cast<Type>(mHeader.mFields.mVersionTypeToken & kTypeMask); }
 
     /**
      * This method sets the Type value.
@@ -150,7 +153,8 @@ public:
      * @param[in]  aType  The Type value.
      *
      */
-    void SetType(Type aType) {
+    void SetType(Type aType)
+    {
         mHeader.mFields.mVersionTypeToken &= ~kTypeMask;
         mHeader.mFields.mVersionTypeToken |= aType;
     }
@@ -170,6 +174,16 @@ public:
      *
      */
     void SetCode(Code aCode) { mHeader.mFields.mCode = static_cast<uint8_t>(aCode); }
+
+#if OPENTHREAD_ENABLE_APPLICATION_COAP
+    /**
+     * This method returns the CoAP Code as human readable string.
+     *
+     * @ returns The CoAP Code as string.
+     *
+     */
+    const char *CodeToString(void) const;
+#endif // OPENTHREAD_ENABLE_APPLICATION_COAP
 
     /**
      * This method returns the Message ID value.
@@ -193,7 +207,10 @@ public:
      * @returns The Token length.
      *
      */
-    uint8_t GetTokenLength(void) const { return (mHeader.mFields.mVersionTypeToken & kTokenLengthMask) >> kTokenLengthOffset; }
+    uint8_t GetTokenLength(void) const
+    {
+        return (mHeader.mFields.mVersionTypeToken & kTokenLengthMask) >> kTokenLengthOffset;
+    }
 
     /**
      * This method returns a pointer to the Token value.
@@ -210,7 +227,8 @@ public:
      * @param[in]  aTokenLength  The Length of @p aToken.
      *
      */
-    void SetToken(const uint8_t *aToken, uint8_t aTokenLength) {
+    void SetToken(const uint8_t *aToken, uint8_t aTokenLength)
+    {
         mHeader.mFields.mVersionTypeToken = (mHeader.mFields.mVersionTypeToken & ~kTokenLengthMask) |
                                             ((aTokenLength << kTokenLengthOffset) & kTokenLengthMask);
         memcpy(mHeader.mBytes + kTokenOffset, aToken, aTokenLength);
@@ -234,7 +252,8 @@ public:
      * @retval FALSE  If Tokens differ in length or value.
      *
      */
-    bool IsTokenEqual(const Header &aHeader) const {
+    bool IsTokenEqual(const Header &aHeader) const
+    {
         return ((this->GetTokenLength() == aHeader.GetTokenLength()) &&
                 (memcmp(this->GetToken(), aHeader.GetToken(), this->GetTokenLength()) == 0));
     }
@@ -251,8 +270,8 @@ public:
          */
         enum
         {
-            kOptionDeltaOffset   = 4,                          ///< Delta Offset
-            kOptionDeltaMask     = 0xf << kOptionDeltaOffset,  ///< Delta Mask
+            kOptionDeltaOffset = 4,                         ///< Delta Offset
+            kOptionDeltaMask   = 0xf << kOptionDeltaOffset, ///< Delta Mask
         };
 
         /**
@@ -288,6 +307,19 @@ public:
     otError AppendUintOption(uint16_t aNumber, uint32_t aValue);
 
     /**
+     * This method appends a string CoAP option.
+     *
+     * @param[in]  aNumber  The CoAP Option number.
+     * @param[in]  aValue   The CoAP Option string value.
+     *
+     * @retval OT_ERROR_NONE          Successfully appended the option.
+     * @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.
+     * @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.
+     *
+     */
+    otError AppendStringOption(uint16_t aNumber, const char *aValue);
+
+    /**
      * This method appends an Observe option.
      *
      * @param[in]  aObserve  Observe field value.
@@ -301,7 +333,7 @@ public:
     /**
      * This method appends a Uri-Path option.
      *
-     * @param[in]  aUriPath  A pointer to a NULL-terminated string.
+     * @param[in]  aUriPath           A pointer to a NULL-terminated string.
      *
      * @retval OT_ERROR_NONE          Successfully appended the option.
      * @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.
@@ -311,25 +343,28 @@ public:
     otError AppendUriPathOptions(const char *aUriPath);
 
     /**
-     * Media Types
+     * This method appends a Proxy-Uri option.
      *
-     */
-    enum MediaType
-    {
-        kApplicationOctetStream = 42,  ///< application/octet-stream
-    };
-
-    /**
-     * This method appends a Content-Format option.
-     *
-     * @param[in]  aType  The Media Type value.
+     * @param[in]  aProxyUri          A pointer to a NULL-terminated string.
      *
      * @retval OT_ERROR_NONE          Successfully appended the option.
      * @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.
      * @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.
      *
      */
-    otError AppendContentFormatOption(MediaType aType);
+    otError AppendProxyUriOption(const char *aProxyUri);
+
+    /**
+     * This method appends a Content-Format option.
+     *
+     * @param[in]  aContentFormat  The Content Format value.
+     *
+     * @retval OT_ERROR_NONE          Successfully appended the option.
+     * @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.
+     * @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.
+     *
+     */
+    otError AppendContentFormatOption(otCoapOptionContentFormat aContentFormat);
 
     /**
      * This method appends a Max-Age option.
@@ -392,7 +427,7 @@ public:
      * @returns The header length in bytes.
      *
      */
-    uint8_t GetLength(void) const { return mHeaderLength; }
+    uint16_t GetLength(void) const { return mHeaderLength; }
 
     /**
      * This method sets a default response header based on request header.
@@ -418,7 +453,7 @@ public:
      * @retval FALSE  Header is not a request header.
      *
      */
-    bool IsRequest(void) const { return (GetCode() >= kCoapRequestGet && GetCode() <= kCoapRequestDelete); };
+    bool IsRequest(void) const { return (GetCode() >= OT_COAP_CODE_GET && GetCode() <= OT_COAP_CODE_DELETE); };
 
     /**
      * This method checks if a header is a response header.
@@ -427,7 +462,7 @@ public:
      * @retval FALSE  Header is not a response header.
      *
      */
-    bool IsResponse(void) const { return (GetCode() >= kCoapResponseCodeMin); };
+    bool IsResponse(void) const { return (GetCode() >= OT_COAP_CODE_RESPONSE_MIN); };
 
     /**
      * This method checks if a header is a CON message header.
@@ -436,7 +471,7 @@ public:
      * @retval FALSE  Header is not is a CON message header.
      *
      */
-    bool IsConfirmable(void) const { return (GetType() == kCoapTypeConfirmable); };
+    bool IsConfirmable(void) const { return (GetType() == OT_COAP_TYPE_CONFIRMABLE); };
 
     /**
      * This method checks if a header is a NON message header.
@@ -445,7 +480,7 @@ public:
      * @retval FALSE  Header is not is a NON message header.
      *
      */
-    bool IsNonConfirmable(void) const { return (GetType() == kCoapTypeNonConfirmable); };
+    bool IsNonConfirmable(void) const { return (GetType() == OT_COAP_TYPE_NON_CONFIRMABLE); };
 
     /**
      * This method checks if a header is a ACK message header.
@@ -454,7 +489,7 @@ public:
      * @retval FALSE  Header is not is a ACK message header.
      *
      */
-    bool IsAck(void) const { return (GetType() == kCoapTypeAcknowledgment); };
+    bool IsAck(void) const { return (GetType() == OT_COAP_TYPE_ACKNOWLEDGMENT); };
 
     /**
      * This method checks if a header is a RST message header.
@@ -463,7 +498,7 @@ public:
      * @retval FALSE  Header is not is a RST message header.
      *
      */
-    bool IsReset(void) const { return (GetType() == kCoapTypeReset);  };
+    bool IsReset(void) const { return (GetType() == OT_COAP_TYPE_RESET); };
 
 private:
     /**
@@ -472,23 +507,22 @@ private:
      */
     enum
     {
-        kVersionMask                = 0xc0,  ///< Version mask as specified (RFC 7252).
-        kVersionOffset              = 6,     ///< Version offset as specified (RFC 7252).
+        kVersionMask   = 0xc0, ///< Version mask as specified (RFC 7252).
+        kVersionOffset = 6,    ///< Version offset as specified (RFC 7252).
 
-        kTypeMask                   = 0x30,  ///< Type mask as specified (RFC 7252).
+        kTypeMask = 0x30, ///< Type mask as specified (RFC 7252).
 
-        kTokenLengthMask            = 0x0f,  ///< Token Length mask as specified (RFC 7252).
-        kTokenLengthOffset          = 0,     ///< Token Length offset as specified (RFC 7252).
-        kTokenOffset                = 4,     ///< Token offset as specified (RFC 7252).
-        kMaxTokenLength             = 8,     ///< Max token length as specified (RFC 7252).
+        kTokenLengthMask   = 0x0f, ///< Token Length mask as specified (RFC 7252).
+        kTokenLengthOffset = 0,    ///< Token Length offset as specified (RFC 7252).
+        kTokenOffset       = 4,    ///< Token offset as specified (RFC 7252).
 
-        kMaxOptionHeaderSize        = 5,     ///< Maximum size of an Option header
+        kMaxOptionHeaderSize = 5, ///< Maximum size of an Option header
 
-        kOption1ByteExtension       = 13,    ///< Indicates a 1 byte extension (RFC 7252).
-        kOption2ByteExtension       = 14,    ///< Indicates a 1 byte extension (RFC 7252).
+        kOption1ByteExtension = 13, ///< Indicates a 1 byte extension (RFC 7252).
+        kOption2ByteExtension = 14, ///< Indicates a 1 byte extension (RFC 7252).
 
-        kOption1ByteExtensionOffset = 13,    ///< Delta/Length offset as specified (RFC 7252).
-        kOption2ByteExtensionOffset = 269,   ///< Delta/Length offset as specified (RFC 7252).
+        kOption1ByteExtensionOffset = 13,  ///< Delta/Length offset as specified (RFC 7252).
+        kOption2ByteExtensionOffset = 269, ///< Delta/Length offset as specified (RFC 7252).
     };
 };
 
@@ -497,7 +531,7 @@ private:
  *
  */
 
-}  // namespace Coap
-}  // namespace ot
+} // namespace Coap
+} // namespace ot
 
-#endif  // COAP_HEADER_HPP_
+#endif // COAP_HEADER_HPP_

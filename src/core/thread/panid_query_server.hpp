@@ -34,77 +34,64 @@
 #ifndef PANID_QUERY_SERVER_HPP_
 #define PANID_QUERY_SERVER_HPP_
 
-#include <openthread/types.h>
-
 #include "openthread-core-config.h"
+
 #include "coap/coap.hpp"
+#include "common/locator.hpp"
 #include "common/timer.hpp"
 #include "net/ip6_address.hpp"
 #include "net/udp6.hpp"
 
 namespace ot {
 
-class MeshForwarder;
-class ThreadLastTransactionTimeTlv;
-class ThreadMeshLocalEidTlv;
-class ThreadNetif;
-class ThreadTargetTlv;
-
 /**
  * This class implements handling PANID Query Requests.
  *
  */
-class PanIdQueryServer
+class PanIdQueryServer : public InstanceLocator
 {
 public:
     /**
      * This constructor initializes the object.
      *
      */
-    PanIdQueryServer(ThreadNetif &aThreadNetif);
-
-    /**
-     * This method returns the pointer to the parent otInstance structure.
-     *
-     * @returns The pointer to the parent otInstance structure.
-     *
-     */
-    otInstance *GetInstance();
+    explicit PanIdQueryServer(Instance &aInstance);
 
 private:
     enum
     {
-        kScanDelay = 1000,  ///< SCAN_DELAY (milliseconds)
+        kScanDelay = 1000, ///< SCAN_DELAY (milliseconds)
     };
 
-    static void HandleQuery(void *aContext, otCoapHeader *aHeader, otMessage *aMessage, const otMessageInfo *aMessageInfo);
-    void HandleQuery(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    static void HandleQuery(void *               aContext,
+                            otCoapHeader *       aHeader,
+                            otMessage *          aMessage,
+                            const otMessageInfo *aMessageInfo);
+    void        HandleQuery(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
     static void HandleScanResult(void *aContext, Mac::Frame *aFrame);
-    void HandleScanResult(Mac::Frame *aFrame);
+    void        HandleScanResult(Mac::Frame *aFrame);
 
-    static void HandleTimer(void *aContext);
-    void HandleTimer(void);
+    static void HandleTimer(Timer &aTimer);
+    void        HandleTimer(void);
 
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
     otError SendConflict(void);
 
     Ip6::Address mCommissioner;
-    uint32_t mChannelMask;
-    uint16_t mPanId;
+    uint32_t     mChannelMask;
+    uint16_t     mPanId;
 
-    Timer mTimer;
+    TimerMilli mTimer;
 
     Coap::Resource mPanIdQuery;
-
-    ThreadNetif &mNetif;
 };
 
 /**
  * @}
  */
 
-}  // namespace ot
+} // namespace ot
 
-#endif  // PANID_QUERY_SERVER_HPP_
+#endif // PANID_QUERY_SERVER_HPP_

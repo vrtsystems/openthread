@@ -34,16 +34,14 @@
 #ifndef DATA_POLL_MANAGER_HPP_
 #define DATA_POLL_MANAGER_HPP_
 
-#include <openthread/types.h>
-
 #include "openthread-core-config.h"
+
 #include "common/code_utils.hpp"
+#include "common/locator.hpp"
 #include "common/timer.hpp"
 #include "mac/mac_frame.hpp"
 
 namespace ot {
-
-class MeshForwarder;
 
 /**
  * @addtogroup core-data-poll-manager
@@ -59,30 +57,22 @@ class MeshForwarder;
  *
  */
 
-class DataPollManager
+class DataPollManager : public InstanceLocator
 {
 public:
     enum
     {
-        kDefaultFastPolls   = 8,  ///< Default number of fast poll transmissions (@sa StartFastPolls).
-        kMaxFastPolls       = 15, ///< Maximum number of fast poll transmissions allowed.
+        kDefaultFastPolls = 8,  ///< Default number of fast poll transmissions (@sa StartFastPolls).
+        kMaxFastPolls     = 15, ///< Maximum number of fast poll transmissions allowed.
     };
 
     /**
      * This constructor initializes the data poll manager object.
      *
-     * @param[in]  aMeshForwarder  A reference to the Mesh Forwarder.
+     * @param[in]  aInstance   A reference to the OpenThread instance.
      *
      */
-    explicit DataPollManager(MeshForwarder &aMeshForwarder);
-
-    /**
-     * This method returns the pointer to the parent otInstance structure.
-     *
-     * @returns The pointer to the parent otInstance structure.
-     *
-     */
-    otInstance *GetInstance(void);
+    explicit DataPollManager(Instance &aInstance);
 
     /**
      * This method instructs the data poll manager to start sending periodic data polls.
@@ -194,20 +184,29 @@ public:
      */
     void SendFastPolls(uint8_t aNumFastPolls);
 
+    /**
+     * This method gets the maximum data polling period in use.
+     *
+     * @returns the maximum data polling period in use.
+     *
+     */
+    uint32_t GetKeepAlivePollPeriod(void) const;
+
 private:
-    enum  // Poll period under different conditions (in milliseconds).
+    enum // Poll period under different conditions (in milliseconds).
     {
-        kAttachDataPollPeriod   = OPENTHREAD_CONFIG_ATTACH_DATA_POLL_PERIOD,  ///< Poll period during attach.
-        kRetxPollPeriod         = 500,                                        ///< Poll retx period due to tx failure.
-        kNoBufferRetxPollPeriod = 200,                                        ///< Poll retx due to no buffer space.
-        kFastPollPeriod         = 188,                                        ///< Period used for fast polls.
-        kMinPollPeriod          = 10,                                         ///< Minimum allowed poll period.
+        kAttachDataPollPeriod   = OPENTHREAD_CONFIG_ATTACH_DATA_POLL_PERIOD, ///< Poll period during attach.
+        kRetxPollPeriod         = OPENTHREAD_CONFIG_RETX_POLL_PERIOD,        ///< Poll retx period due to tx failure.
+        kNoBufferRetxPollPeriod = 200,                                       ///< Poll retx due to no buffer space.
+        kFastPollPeriod         = 188,                                       ///< Period used for fast polls.
+        kMinPollPeriod          = OPENTHREAD_CONFIG_MINIMUM_POLL_PERIOD,     ///< Minimum allowed poll period.
     };
 
     enum
     {
-        kQuickPollsAfterTimeout = 5,  ///< Maximum number of quick data poll tx in case of back-to-back poll timeouts.
-        kMaxPollRetxAttempts    = 5,  ///< Maximum number of retransmit attempts of data poll (mac data request).
+        kQuickPollsAfterTimeout = 5, ///< Maximum number of quick data poll tx in case of back-to-back poll timeouts.
+        kMaxPollRetxAttempts = OPENTHREAD_CONFIG_FAILED_CHILD_TRANSMISSIONS, ///< Maximum number of retransmit attempts
+                                                                             ///< of data poll (mac data request).
     };
 
     enum PollPeriodSelector
@@ -216,22 +215,24 @@ private:
         kRecalculatePollPeriod,
     };
 
-    void ScheduleNextPoll(PollPeriodSelector aPollPeriodSelector);
-    uint32_t CalculatePollPeriod(void) const;
-    static void HandlePollTimer(void *aContext);
+    void        ScheduleNextPoll(PollPeriodSelector aPollPeriodSelector);
+    uint32_t    CalculatePollPeriod(void) const;
+    static void HandlePollTimer(Timer &aTimer);
+    uint32_t    GetDefaultPollPeriod(void) const;
 
-    MeshForwarder &mMeshForwarder;
-    Timer     mTimer;
-    uint32_t  mExternalPollPeriod;
-    uint32_t  mPollPeriod;
+    uint32_t mTimerStartTime;
+    uint32_t mExternalPollPeriod;
+    uint32_t mPollPeriod;
 
-    bool      mEnabled: 1;               //< Indicates whether data polling is enabled/started.
-    bool      mAttachMode: 1;            //< Indicates whether in attach mode (to use attach poll period).
-    bool      mRetxMode: 1;              //< Indicates whether last poll tx failed at mac/radio layer (poll retx mode).
-    bool      mNoBufferRetxMode: 1;      //< Indicates whether last poll tx failed due to insufficient buffer.
-    uint8_t   mPollTimeoutCounter: 4;    //< Poll timeouts counter (0 to `kQuickPollsAfterTimout`).
-    uint8_t   mPollTxFailureCounter: 4;  //< Poll tx failure counter (0 to `kMaxPollRetxAttempts`).
-    uint8_t   mRemainingFastPolls: 4;    //< Number of remaining fast polls when in transient fast polling mode.
+    TimerMilli mTimer;
+
+    bool    mEnabled : 1;              //< Indicates whether data polling is enabled/started.
+    bool    mAttachMode : 1;           //< Indicates whether in attach mode (to use attach poll period).
+    bool    mRetxMode : 1;             //< Indicates whether last poll tx failed at mac/radio layer (poll retx mode).
+    bool    mNoBufferRetxMode : 1;     //< Indicates whether last poll tx failed due to insufficient buffer.
+    uint8_t mPollTimeoutCounter : 4;   //< Poll timeouts counter (0 to `kQuickPollsAfterTimout`).
+    uint8_t mPollTxFailureCounter : 4; //< Poll tx failure counter (0 to `kMaxPollRetxAttempts`).
+    uint8_t mRemainingFastPolls : 4;   //< Number of remaining fast polls when in transient fast polling mode.
 };
 
 /**
@@ -239,6 +240,6 @@ private:
  *
  */
 
-}  // namespace ot
+} // namespace ot
 
-#endif  // DATA_POLL_MANAGER_HPP_
+#endif // DATA_POLL_MANAGER_HPP_

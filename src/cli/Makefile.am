@@ -31,14 +31,14 @@ include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 #----------------------------------------
 #
 # This library on the face of it, appears to be identical
-# for both the MTD and FTD varients, however ...
+# for both the MTD and FTD variants, however ...
 #
 # The source code here includes numerous OpenThread internal headers.
 # Due to the "domino-effect" other internal headers are included.
 #
 # For example:
-#     cli.cpp includes: 
-#            src/core/openthread-instance.h
+#     cli.cpp includes:
+#            src/core/common/instance.hpp
 # Which Includes:
 #            src/core/therad/thread_netif.hpp
 # Which Includes:
@@ -51,8 +51,8 @@ include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 # The FTD flavor has many private components (class variables).
 # The MTD flavor has no private components.
 #
-# Bottom line: The Class(structs) are thus different in the downstream 
-# libs. At this level (in the CLI, and likewise in the NCP) they are 
+# Bottom line: The Class(structs) are thus different in the downstream
+# libs. At this level (in the CLI, and likewise in the NCP) they are
 # functionally identical.
 #
 # ORIGINALLY (historical note about how things are/where built):
@@ -108,10 +108,15 @@ include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 # Unless and until these libraries do not "accidently" suck in
 # a "flavored" header file somewhere.
 
-lib_LIBRARIES =                       \
-    libopenthread-cli-mtd.a           \
-    libopenthread-cli-ftd.a           \
-    $(NULL)
+lib_LIBRARIES                       = $(NULL)
+
+if OPENTHREAD_ENABLE_FTD
+lib_LIBRARIES                      += libopenthread-cli-ftd.a
+endif
+
+if OPENTHREAD_ENABLE_MTD
+lib_LIBRARIES                      += libopenthread-cli-mtd.a
+endif
 
 CPPFLAGS_COMMON =                     \
     -I$(top_srcdir)/include           \
@@ -120,6 +125,11 @@ CPPFLAGS_COMMON =                     \
     $(OPENTHREAD_TARGET_DEFINES)      \
     $(NULL)
 
+if OPENTHREAD_POSIX
+CPPFLAGS_COMMON +=                    \
+    -DOPENTHREAD_POSIX=1              \
+    $(NULL)
+endif
 
 libopenthread_cli_mtd_a_CPPFLAGS =    \
     -DOPENTHREAD_MTD=1                \
@@ -133,11 +143,12 @@ libopenthread_cli_ftd_a_CPPFLAGS =    \
 
 SOURCES_COMMON =                      \
     cli.cpp                           \
+    cli_coap.cpp                      \
+    cli_coap_secure.cpp               \
     cli_console.cpp                   \
     cli_dataset.cpp                   \
     cli_uart.cpp                      \
-    cli_coap.cpp                      \
-    cli_udp.cpp                       \
+    cli_udp_example.cpp               \
     $(NULL)
 
 libopenthread_cli_ftd_a_SOURCES =     \
@@ -150,12 +161,14 @@ libopenthread_cli_mtd_a_SOURCES =     \
 
 noinst_HEADERS                      = \
     cli.hpp                           \
+    cli_coap.hpp                      \
+    cli_coap_secure.hpp               \
     cli_console.hpp                   \
     cli_dataset.hpp                   \
-    cli_uart.hpp                      \
     cli_server.hpp                    \
-    cli_coap.hpp                      \
-    cli_udp.hpp                       \
+    cli_uart.hpp                      \
+    cli_udp_example.hpp               \
+    x509_cert_key.hpp                 \
     $(NULL)
 
 if OPENTHREAD_BUILD_COVERAGE

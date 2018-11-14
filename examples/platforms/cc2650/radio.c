@@ -26,31 +26,33 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <openthread/types.h>
+#include <openthread/config.h>
 
+#include "cc2650_radio.h"
 #include <assert.h>
 #include <utils/code_utils.h>
-#include "cc2650_radio.h"
+#include <openthread/platform/alarm-milli.h>
+#include <openthread/platform/diag.h>
 #include <openthread/platform/radio.h>
 #include <openthread/platform/random.h> /* to seed the CSMA-CA funciton */
 
-#include <driverlib/prcm.h>
-#include <inc/hw_prcm.h>
-#include <inc/hw_memmap.h>
-#include <inc/hw_fcfg1.h>
-#include <inc/hw_ccfg.h>
-#include <driverlib/rfc.h>
-#include <driverlib/osc.h>
-#include <driverlib/rf_data_entry.h>
-#include <driverlib/rf_mailbox.h>
-#include <driverlib/rf_common_cmd.h>
-#include <driverlib/rf_ieee_mailbox.h>
-#include <driverlib/rf_ieee_cmd.h>
 #include <driverlib/chipinfo.h>
+#include <driverlib/osc.h>
+#include <driverlib/prcm.h>
+#include <driverlib/rf_common_cmd.h>
+#include <driverlib/rf_data_entry.h>
+#include <driverlib/rf_ieee_cmd.h>
+#include <driverlib/rf_ieee_mailbox.h>
+#include <driverlib/rf_mailbox.h>
+#include <driverlib/rfc.h>
+#include <inc/hw_ccfg.h>
+#include <inc/hw_fcfg1.h>
+#include <inc/hw_memmap.h>
+#include <inc/hw_prcm.h>
 
 enum
 {
-    CC2650_RECEIVE_SENSITIVITY = -100,  // dBm
+    CC2650_RECEIVE_SENSITIVITY = -100, // dBm
 };
 
 /* phy state as defined by openthread */
@@ -59,8 +61,7 @@ static volatile cc2650_PhyState sState;
 static output_config_t const *sCurrentOutputPower = &(rgOutputPower[OUTPUT_CONFIG_COUNT - 1]);
 
 /* Overrides for IEEE 802.15.4, differential mode */
-static uint32_t sIEEEOverrides[] =
-{
+static uint32_t sIEEEOverrides[] = {
     0x00354038, /* Synth: Set RTRIM (POTAILRESTRIM) to 5 */
     0x4001402D, /* Synth: Correct CKVD latency setting (address) */
     0x00608402, /* Synth: Correct CKVD latency setting (value) */
@@ -75,55 +76,52 @@ static uint32_t sIEEEOverrides[] =
 };
 
 /*
- * status of the pending bit of the last ack packet found by the
- * sTransmitRxAckCmd radio command
+ * Number of retry counts left to the currently transmitting frame.
  *
- * used to pass data from the radio state ISR to the processing loop
- */
-static volatile bool sReceivedAckPendingBit = false;
-
-/*
- * number of retry counts left to the currently transmitting frame
- *
- * initialized when a frame is passed to be sent over the air, and decremented
+ * Initialized when a frame is passed to be sent over the air, and decremented
  * by the radio ISR every time the transmit command string fails to receive a
- * corresponding ack
+ * corresponding ack.
  */
 static volatile unsigned int sTransmitRetryCount = 0;
 
 /*
- * offset of the radio timer from the rtc
+ * Offset of the radio timer from the rtc.
  *
- * used when we start and stop the RAT
+ * Used when we start and stop the RAT on enabling and disabling of the rf
+ * core.
  */
 static uint32_t sRatOffset = 0;
 
 /*
- * radio command structures that run on the CM0
+ * Radio command structures that run on the CM0.
  */
-static volatile rfc_CMD_SYNC_START_RAT_t     sStartRatCmd;
-static volatile rfc_CMD_RADIO_SETUP_t        sRadioSetupCmd;
+// clang-format off
+static volatile __attribute__((aligned(4))) rfc_CMD_SYNC_START_RAT_t     sStartRatCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_RADIO_SETUP_t        sRadioSetupCmd;
 
-static volatile rfc_CMD_FS_POWERDOWN_t       sFsPowerdownCmd;
-static volatile rfc_CMD_SYNC_STOP_RAT_t      sStopRatCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_FS_POWERDOWN_t       sFsPowerdownCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_SYNC_STOP_RAT_t      sStopRatCmd;
 
-static volatile rfc_CMD_CLEAR_RX_t           sClearReceiveQueueCmd;
-static volatile rfc_CMD_IEEE_MOD_FILT_t      sModifyReceiveFilterCmd;
-static volatile rfc_CMD_IEEE_MOD_SRC_MATCH_t sModifyReceiveSrcMatchCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_CLEAR_RX_t           sClearReceiveQueueCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_IEEE_MOD_FILT_t      sModifyReceiveFilterCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_IEEE_MOD_SRC_MATCH_t sModifyReceiveSrcMatchCmd;
 
-static volatile rfc_CMD_IEEE_ED_SCAN_t       sEdScanCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_IEEE_ED_SCAN_t       sEdScanCmd;
 
-static volatile rfc_CMD_IEEE_RX_t            sReceiveCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_IEEE_RX_t            sReceiveCmd;
 
-static volatile rfc_CMD_IEEE_CSMA_t          sCsmacaBackoffCmd;
-static volatile rfc_CMD_IEEE_TX_t            sTransmitCmd;
-static volatile rfc_CMD_IEEE_RX_ACK_t        sTransmitRxAckCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_IEEE_CSMA_t          sCsmacaBackoffCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_IEEE_TX_t            sTransmitCmd;
+static volatile __attribute__((aligned(4))) rfc_CMD_IEEE_RX_ACK_t        sTransmitRxAckCmd;
 
-static volatile ext_src_match_data_t         sSrcMatchExtData;
-static volatile short_src_match_data_t       sSrcMatchShortData;
+static volatile __attribute__((aligned(4))) ext_src_match_data_t         sSrcMatchExtData;
+static volatile __attribute__((aligned(4))) short_src_match_data_t       sSrcMatchShortData;
+// clang-format on
 
-/* struct containing radio stats */
-static rfc_ieeeRxOutput_t sRfStats;
+/*
+ * Structure containing radio statistics.
+ */
+static __attribute__((aligned(4))) rfc_ieeeRxOutput_t sRfStats;
 
 #define RX_BUF_SIZE 144
 /* two receive buffers entries with room for 1 max IEEE802.15.4 frame in each */
@@ -131,25 +129,24 @@ static uint8_t sRxBuf0[RX_BUF_SIZE] __attribute__((aligned(4)));
 static uint8_t sRxBuf1[RX_BUF_SIZE] __attribute__((aligned(4)));
 
 /* The RX Data Queue */
-static dataQueue_t sRxDataQueue = { 0 };
+static dataQueue_t sRxDataQueue = {0};
 
 /* openthread data primatives */
 static otRadioFrame sTransmitFrame;
-static otRadioFrame sReceiveFrame;
-static otError sTransmitError;
-static otError sReceiveError;
+static otError      sTransmitError;
 
-static uint8_t sTransmitPsdu[OT_RADIO_FRAME_MAX_SIZE] __attribute__((aligned(4))) ;
-static uint8_t sReceivePsdu[OT_RADIO_FRAME_MAX_SIZE] __attribute__((aligned(4))) ;
+static __attribute__((aligned(4))) uint8_t sTransmitPsdu[OT_RADIO_FRAME_MAX_SIZE];
 
-/**
- * Interrupt handlers forward declared for register function
+static volatile bool sTxCmdChainDone = false;
+
+/*
+ * Interrupt handlers forward declared for register functions.
  */
 void RFCCPE0IntHandler(void);
 void RFCCPE1IntHandler(void);
 
 /**
- * @brief initialize the RX/TX buffers
+ * Initialize the RX/TX buffers.
  *
  * Zeros out the receive and transmit buffers and sets up the data structures
  * of the receive queue.
@@ -160,29 +157,28 @@ static void rfCoreInitBufs(void)
     memset(sRxBuf0, 0x00, RX_BUF_SIZE);
     memset(sRxBuf1, 0x00, RX_BUF_SIZE);
 
-    entry = (rfc_dataEntry_t *)sRxBuf0;
-    entry->pNextEntry = sRxBuf1;
+    entry               = (rfc_dataEntry_t *)sRxBuf0;
+    entry->pNextEntry   = sRxBuf1;
     entry->config.lenSz = DATA_ENTRY_LENSZ_BYTE;
-    entry->length = sizeof(sRxBuf0) - sizeof(rfc_dataEntry_t);
+    entry->length       = sizeof(sRxBuf0) - sizeof(rfc_dataEntry_t);
 
-    entry = (rfc_dataEntry_t *)sRxBuf1;
-    entry->pNextEntry = sRxBuf0;
+    entry               = (rfc_dataEntry_t *)sRxBuf1;
+    entry->pNextEntry   = sRxBuf0;
     entry->config.lenSz = DATA_ENTRY_LENSZ_BYTE;
-    entry->length = sizeof(sRxBuf0) - sizeof(rfc_dataEntry_t);
+    entry->length       = sizeof(sRxBuf1) - sizeof(rfc_dataEntry_t);
 
-    sTransmitFrame.mPsdu = sTransmitPsdu;
+    sTransmitFrame.mPsdu   = sTransmitPsdu;
     sTransmitFrame.mLength = 0;
-    sReceiveFrame.mPsdu = sReceivePsdu;
-    sReceiveFrame.mLength = 0;
 }
 
 /**
- * @brief initialize the RX command structure
+ * Initialize the RX command structure.
  *
  * Sets the default values for the receive command structure.
  */
 static void rfCoreInitReceiveParams(void)
 {
+    // clang-format off
     static const rfc_CMD_IEEE_RX_t cReceiveCmd =
     {
         .commandNo                  = CMD_IEEE_RX,
@@ -225,7 +221,7 @@ static void rfCoreInitReceiveParams(void)
         {
             .bAcceptFt0Beacon       = 1,
             .bAcceptFt1Data         = 1,
-            .bAcceptFt2Ack          = 0,
+            .bAcceptFt2Ack          = 1,
             .bAcceptFt3MacCmd       = 1,
             .bAcceptFt4Reserved     = 1,
             .bAcceptFt5Reserved     = 1,
@@ -248,6 +244,7 @@ static void rfCoreInitReceiveParams(void)
         },
         .endTime                    = 0u,
     };
+    // clang-format on
     sReceiveCmd = cReceiveCmd;
 
     sReceiveCmd.pRxQ    = &sRxDataQueue;
@@ -261,10 +258,10 @@ static void rfCoreInitReceiveParams(void)
 }
 
 /**
- * @brief sends the direct abort command to the radio core
+ * Sends the direct abort command to the radio core.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command completed correctly
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command completed correctly.
  */
 static uint_fast8_t rfCoreExecuteAbortCmd(void)
 {
@@ -272,12 +269,12 @@ static uint_fast8_t rfCoreExecuteAbortCmd(void)
 }
 
 /**
- * @brief sends the direct ping command to the radio core
+ * Sends the direct ping command to the radio core.
  *
  * Check that the Radio core is alive and able to respond to commands.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command completed correctly
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command completed correctly.
  */
 static uint_fast8_t rfCoreExecutePingCmd(void)
 {
@@ -285,28 +282,28 @@ static uint_fast8_t rfCoreExecutePingCmd(void)
 }
 
 /**
- * @brief sends the immediate clear rx queue command to the radio core
+ * Sends the immediate clear rx queue command to the radio core.
  *
  * Uses the radio core to mark all of the entries in the receive queue as
  * pending. This is used instead of clearing the entries manually to avoid race
  * conditions between the main processor and the radio core.
  *
- * @param [in] aQueue a pointer to the receive queue to be cleared
+ * @param [in] aQueue A pointer to the receive queue to be cleared.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command completed correctly
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command completed correctly.
  */
 static uint_fast8_t rfCoreClearReceiveQueue(dataQueue_t *aQueue)
 {
     /* memset skipped because sClearReceiveQueueCmd has only 2 members and padding */
     sClearReceiveQueueCmd.commandNo = CMD_CLEAR_RX;
-    sClearReceiveQueueCmd.pQueue = aQueue;
+    sClearReceiveQueueCmd.pQueue    = aQueue;
 
     return (RFCDoorbellSendTo((uint32_t)&sClearReceiveQueueCmd) & 0xFF);
 }
 
 /**
- * @brief enable/disable filtering
+ * Enable/disable frame filtering.
  *
  * Uses the radio core to alter the current running RX command filtering
  * options. This ensures there is no access fault between the CM3 and CM0 for
@@ -317,10 +314,11 @@ static uint_fast8_t rfCoreClearReceiveQueue(dataQueue_t *aQueue)
  *
  * @note An IEEE RX command *must* be running while this command executes.
  *
- * @param [in] aEnable TRUE: enable frame filtering, FALSE: disable frame filtering
+ * @param [in] aEnable TRUE: enable frame filtering,
+ *                     FALSE: disable frame filtering.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command completed correctly
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command completed correctly.
  */
 static uint_fast8_t rfCoreModifyRxFrameFilter(bool aEnable)
 {
@@ -338,7 +336,7 @@ static uint_fast8_t rfCoreModifyRxFrameFilter(bool aEnable)
 }
 
 /**
- * @brief enable/disable autoPend
+ * Enable/disable autoPend feature.
  *
  * Uses the radio core to alter the current running RX command filtering
  * options. This ensures there is no access fault between the CM3 and CM0 for
@@ -349,10 +347,11 @@ static uint_fast8_t rfCoreModifyRxFrameFilter(bool aEnable)
  *
  * @note An IEEE RX command *must* be running while this command executes.
  *
- * @param [in] aEnable TRUE: enable autoPend, FALSE: disable autoPend
+ * @param [in] aEnable TRUE: enable autoPend,
+ *                     FALSE: disable autoPend.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command completed correctly
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command completed correctly.
  */
 static uint_fast8_t rfCoreModifyRxAutoPend(bool aEnable)
 {
@@ -370,7 +369,7 @@ static uint_fast8_t rfCoreModifyRxAutoPend(bool aEnable)
 }
 
 /**
- * @brief sends the immediate modify source matching command to the radio core
+ * Sends the immediate modify source matching command to the radio core.
  *
  * Uses the radio core to alter the current source matching parameters used by
  * the running RX command. This ensures there is no access fault between the
@@ -380,12 +379,13 @@ static uint_fast8_t rfCoreModifyRxAutoPend(bool aEnable)
  *
  * @note An IEEE RX command *must* be running while this command executes.
  *
- * @param [in] aEntryNo the index of the entry to alter
- * @param [in] aType TRUE: the entry is a short address, FALSE: the entry is an extended address
- * @param [in] aEnable whether the given entry is to be enabled or disabled
+ * @param [in] aEntryNo The index of the entry to alter.
+ * @param [in] aType    TRUE: the entry is a short address,
+ *                      FALSE: the entry is an extended address.
+ * @param [in] aEnable  Whether the given entry is to be enabled or disabled.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command completed correctly
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command completed correctly.
  */
 static uint_fast8_t rfCoreModifySourceMatchEntry(uint8_t aEntryNo, cc2650_address_t aType, bool aEnable)
 {
@@ -412,114 +412,123 @@ static uint_fast8_t rfCoreModifySourceMatchEntry(uint8_t aEntryNo, cc2650_addres
     }
 
     sModifyReceiveSrcMatchCmd.options.entryType = aType;
-    sModifyReceiveSrcMatchCmd.entryNo = aEntryNo;
+    sModifyReceiveSrcMatchCmd.entryNo           = aEntryNo;
 
     return (RFCDoorbellSendTo((uint32_t)&sModifyReceiveSrcMatchCmd) & 0xFF);
 }
 
 /**
- * @brief walks the short address source match list to find an address
+ * Walks the short address source match list to find an address.
  *
- * @param [in] address the short address to search for
+ * @param [in] aAddress The short address to search for.
  *
- * @return the index where the address was found
- * @retval CC2650_SRC_MATCH_NONE the address was not found
+ * @return The index where the address was found.
+ * @retval CC2650_SRC_MATCH_NONE The address was not found.
  */
 static uint8_t rfCoreFindShortSrcMatchIdx(const uint16_t aAddress)
 {
     uint8_t i;
+    uint8_t ret = CC2650_SRC_MATCH_NONE;
 
     for (i = 0; i < CC2650_SHORTADD_SRC_MATCH_NUM; i++)
     {
         if (sSrcMatchShortData.extAddrEnt[i].shortAddr == aAddress)
         {
-            return i;
+            ret = i;
+            break;
         }
     }
 
-    return CC2650_SRC_MATCH_NONE;
+    return ret;
 }
 
 /**
- * @brief walks the short address source match list to find an empty slot
+ * Walks the short address source match list to find an empty slot.
  *
- * @return the index of an unused address slot
- * @retval CC2650_SRC_MATCH_NONE no unused slots available
+ * @return The index of an unused address slot.
+ * @retval CC2650_SRC_MATCH_NONE No unused slots available.
  */
 static uint8_t rfCoreFindEmptyShortSrcMatchIdx(void)
 {
     uint8_t i;
+    uint8_t ret = CC2650_SRC_MATCH_NONE;
 
     for (i = 0; i < CC2650_SHORTADD_SRC_MATCH_NUM; i++)
     {
         if ((sSrcMatchShortData.srcMatchEn[i / 32] & (1 << (i % 32))) == 0u)
         {
-            return i;
+            ret = i;
+            break;
         }
     }
 
-    return CC2650_SRC_MATCH_NONE;
+    return ret;
 }
 
 /**
- * @brief walks the ext address source match list to find an address
+ * Walks the extended address source match list to find an address.
  *
- * @param [in] address the ext address to search for
+ * @param [in] aAddress The extended address to search for.
  *
- * @return the index where the address was found
- * @retval CC2650_SRC_MATCH_NONE the address was not found
+ * @return The index where the address was found.
+ * @retval CC2650_SRC_MATCH_NONE The address was not found.
  */
 static uint8_t rfCoreFindExtSrcMatchIdx(const uint64_t *aAddress)
 {
     uint8_t i;
+    uint8_t ret = CC2650_SRC_MATCH_NONE;
 
     for (i = 0; i < CC2650_EXTADD_SRC_MATCH_NUM; i++)
     {
         if (sSrcMatchExtData.extAddrEnt[i] == *aAddress)
         {
-            return i;
+            ret = i;
+            break;
         }
     }
 
-    return CC2650_SRC_MATCH_NONE;
+    return ret;
 }
 
 /**
- * @brief walks the ext address source match list to find an empty slot
+ * Walks the extended address source match list to find an empty slot.
  *
- * @return the index of an unused address slot
- * @retval CC2650_SRC_MATCH_NONE no unused slots available
+ * @return The index of an unused address slot.
+ * @retval CC2650_SRC_MATCH_NONE No unused slots available.
  */
 static uint8_t rfCoreFindEmptyExtSrcMatchIdx(void)
 {
     uint8_t i;
+    uint8_t ret = CC2650_SRC_MATCH_NONE;
 
     for (i = 0; i < CC2650_EXTADD_SRC_MATCH_NUM; i++)
     {
         if ((sSrcMatchExtData.srcMatchEn[i / 32] & (1 << (i % 32))) != 0u)
         {
-            return i;
+            ret = i;
+            break;
         }
     }
 
-    return CC2650_SRC_MATCH_NONE;
+    return ret;
 }
 
 /**
- * @brief sends the tx command to the radio core
+ * Sends the tx command to the radio core.
  *
  * Sends the packet to the radio core to be sent asynchronously.
  *
- * @param [in] aPsdu a pointer to the data to be sent
- * @note this *must* be 4 byte aligned and not include the FCS, that is
- * calculated in hardware.
- * @param [in] aLen the length in bytes of data pointed to by psdu.
+ * @note @ref aPsdu *must* be 4 byte aligned and not include the FCS.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command completed correctly
+ * @param [in] aPsdu A pointer to the data to be sent.
+ * @param [in] aLen  The length in bytes of data pointed to by PSDU.
+ *
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command completed correctly.
  */
 static uint_fast8_t rfCoreSendTransmitCmd(uint8_t *aPsdu, uint8_t aLen)
 {
+    // clang-format off
     static const rfc_CMD_IEEE_CSMA_t cCsmacaBackoffCmd =
     {
         .commandNo                  = CMD_IEEE_CSMA,
@@ -581,28 +590,29 @@ static uint_fast8_t rfCoreSendTransmitCmd(uint8_t *aPsdu, uint8_t aLen)
         /* number of RAT ticks to wait before claiming we haven't received an ack */
         .endTime                    = ((IEEE802154_MAC_ACK_WAIT_DURATION * CC2650_RAT_TICKS_PER_SEC) / IEEE802154_SYMBOLS_PER_SEC),
     };
+    // clang-format on
 
     /* reset retry count */
     sTransmitRetryCount = 0;
 
-    sCsmacaBackoffCmd               = cCsmacaBackoffCmd;
+    sCsmacaBackoffCmd = cCsmacaBackoffCmd;
     /* initialize the random state with a true random seed for the radio core's
      * psudo rng */
-    sCsmacaBackoffCmd.randomState   = otPlatRandomGet();
-    sCsmacaBackoffCmd.pNextOp       = (rfc_radioOp_t *) &sTransmitCmd;
+    sCsmacaBackoffCmd.randomState = otPlatRandomGet();
+    sCsmacaBackoffCmd.pNextOp     = (rfc_radioOp_t *)&sTransmitCmd;
 
     sTransmitCmd = cTransmitCmd;
     /* no need to look for an ack if the tx operation was stopped */
     sTransmitCmd.payloadLen = aLen;
-    sTransmitCmd.pPayload = aPsdu;
+    sTransmitCmd.pPayload   = aPsdu;
 
     if (aPsdu[0] & IEEE802154_ACK_REQUEST)
     {
         /* setup the receive ack command to follow the tx command */
         sTransmitCmd.condition.rule = COND_STOP_ON_FALSE;
-        sTransmitCmd.pNextOp = (rfc_radioOp_t *) &sTransmitRxAckCmd;
+        sTransmitCmd.pNextOp        = (rfc_radioOp_t *)&sTransmitRxAckCmd;
 
-        sTransmitRxAckCmd = cTransmitRxAckCmd;
+        sTransmitRxAckCmd       = cTransmitRxAckCmd;
         sTransmitRxAckCmd.seqNo = aPsdu[IEEE802154_DSN_OFFSET];
     }
 
@@ -610,7 +620,7 @@ static uint_fast8_t rfCoreSendTransmitCmd(uint8_t *aPsdu, uint8_t aLen)
 }
 
 /**
- * @brief sends the rx command to the radio core
+ * Sends the rx command to the radio core.
  *
  * Sends the pre-built receive command to the radio core. This sets up the
  * radio to receive packets according to the settings in the global rx command.
@@ -619,8 +629,8 @@ static uint_fast8_t rfCoreSendTransmitCmd(uint8_t *aPsdu, uint8_t aLen)
  * It is only concerned with sending the command to the radio core. See @ref
  * otPlatRadioSetPanId for an example of how the rx settings are set changed.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command completed correctly
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command completed correctly.
  */
 static uint_fast8_t rfCoreSendReceiveCmd(void)
 {
@@ -630,6 +640,7 @@ static uint_fast8_t rfCoreSendReceiveCmd(void)
 
 static uint_fast8_t rfCoreSendEdScanCmd(uint8_t aChannel, uint16_t aDurration)
 {
+    // clang-format off
     static const rfc_CMD_IEEE_ED_SCAN_t cEdScanCmd =
     {
         .commandNo                  = CMD_IEEE_ED_SCAN,
@@ -656,6 +667,7 @@ static uint_fast8_t rfCoreSendEdScanCmd(uint8_t aChannel, uint16_t aDurration)
             .pastTrig               = 1,
         },
     };
+    // clang-format on
     sEdScanCmd = cEdScanCmd;
 
     sEdScanCmd.channel = aChannel;
@@ -667,7 +679,7 @@ static uint_fast8_t rfCoreSendEdScanCmd(uint8_t aChannel, uint16_t aDurration)
 }
 
 /**
- * @brief enables the cpe0 and cpe1 radio interrupts
+ * Enables the cpe0 and cpe1 radio interrupts.
  *
  * Enables the @ref IRQ_LAST_COMMAND_DONE and @ref IRQ_LAST_FG_COMMAND_DONE to
  * be handled by the @ref RFCCPE0IntHandler interrupt handler.
@@ -676,11 +688,7 @@ static void rfCoreSetupInt(void)
 {
     bool interruptsWereDisabled;
 
-    /* We are already turned on by the caller, so this should not happen */
-    if (!PRCMRfReady())
-    {
-        return;
-    }
+    otEXPECT(PRCMRfReady());
 
     interruptsWereDisabled = IntMasterDisable();
 
@@ -699,10 +707,13 @@ static void rfCoreSetupInt(void)
     {
         IntMasterEnable();
     }
+
+exit:
+    return;
 }
 
 /**
- * @brief disables and clears the cpe0 and cpe1 radio interrupts
+ * Disables and clears the cpe0 and cpe1 radio interrupts.
  */
 static void rfCoreStopInt(void)
 {
@@ -728,7 +739,7 @@ static void rfCoreStopInt(void)
 }
 
 /**
- * @brief Sets the mode for the radio core to IEEE 802.15.4
+ * Sets the mode for the radio core to IEEE 802.15.4
  */
 static void rfCoreSetModeSelect(void)
 {
@@ -750,7 +761,7 @@ static void rfCoreSetModeSelect(void)
 }
 
 /**
- * @brief turns on the radio core
+ * Turns on the radio core.
  *
  * Sets up the power and resources for the radio core.
  * - switches the high frequency clock to the xosc crystal
@@ -761,8 +772,8 @@ static void rfCoreSetModeSelect(void)
  * - sets up the interrupts
  * - sends the ping command to the radio core to make sure it is running
  *
- * @return the value from the ping command to the radio core
- * @retval CMDSTA_Done the radio core is alive and responding
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command was received.
  */
 static uint_fast8_t rfCorePowerOn(void)
 {
@@ -805,12 +816,14 @@ static uint_fast8_t rfCorePowerOn(void)
     /* Enable RF Core power domain */
     PRCMPowerDomainOn(PRCM_DOMAIN_RFCORE);
 
-    while (PRCMPowerDomainStatus(PRCM_DOMAIN_RFCORE) != PRCM_DOMAIN_POWER_ON);
+    while (PRCMPowerDomainStatus(PRCM_DOMAIN_RFCORE) != PRCM_DOMAIN_POWER_ON)
+        ;
 
     PRCMDomainEnable(PRCM_DOMAIN_RFCORE);
     PRCMLoadSet();
 
-    while (!PRCMLoadGet());
+    while (!PRCMLoadGet())
+        ;
 
     rfCoreSetupInt();
 
@@ -820,15 +833,15 @@ static uint_fast8_t rfCorePowerOn(void)
     }
 
     /* Let CPE boot */
-    HWREG(RFC_PWR_NONBUF_BASE + RFC_PWR_O_PWMCLKEN) = (RFC_PWR_PWMCLKEN_RFC_M | RFC_PWR_PWMCLKEN_CPE_M |
-                                                       RFC_PWR_PWMCLKEN_CPERAM_M);
+    HWREG(RFC_PWR_NONBUF_BASE + RFC_PWR_O_PWMCLKEN) =
+        (RFC_PWR_PWMCLKEN_RFC_M | RFC_PWR_PWMCLKEN_CPE_M | RFC_PWR_PWMCLKEN_CPERAM_M);
 
     /* Send ping (to verify RFCore is ready and alive) */
     return rfCoreExecutePingCmd();
 }
 
 /**
- * @brief turns off the radio core
+ * Turns off the radio core.
  *
  * Switches off the power and resources for the radio core.
  * - disables the interrupts
@@ -843,11 +856,13 @@ static void rfCorePowerOff(void)
     PRCMDomainDisable(PRCM_DOMAIN_RFCORE);
     PRCMLoadSet();
 
-    while (!PRCMLoadGet());
+    while (!PRCMLoadGet())
+        ;
 
     PRCMPowerDomainOff(PRCM_DOMAIN_RFCORE);
 
-    while (PRCMPowerDomainStatus(PRCM_DOMAIN_RFCORE) != PRCM_DOMAIN_POWER_OFF);
+    while (PRCMPowerDomainStatus(PRCM_DOMAIN_RFCORE) != PRCM_DOMAIN_POWER_OFF)
+        ;
 
     if (OSCClockSourceGet(OSC_SRC_CLK_HF) != OSC_RCOSC_HF)
     {
@@ -859,18 +874,21 @@ static void rfCorePowerOff(void)
 }
 
 /**
- * @brief sends the setup command string to the radio core
+ * Sends the setup command string to the radio core.
  *
  * Enables the clock line from the RTC to the RF core RAT. Enables the RAT
  * timer and sets up the radio in IEEE mode.
  *
- * @return the value from the command status register
- * @retval CMDSTA_Done the command was received
+ * @return The value from the command status register.
+ * @retval CMDSTA_Done The command was received.
  */
 static uint_fast16_t rfCoreSendEnableCmd(void)
 {
-    uint8_t ret;
-    bool interruptsWereDisabled;
+    uint8_t       doorbellRet;
+    bool          interruptsWereDisabled;
+    uint_fast16_t ret;
+
+    // clang-format off
     static const rfc_CMD_SYNC_START_RAT_t cStartRatCmd =
     {
         .commandNo                  = CMD_SYNC_START_RAT,
@@ -894,57 +912,59 @@ static uint_fast16_t rfCoreSendEnableCmd(void)
         },
         .mode                       = 1, // IEEE 802.15.4 mode
     };
+    // clang-format on
     /* turn on the clock line to the radio core */
     HWREGBITW(AON_RTC_BASE + AON_RTC_O_CTL, AON_RTC_CTL_RTC_UPD_EN_BITN) = 1;
 
     /* initialize the rat start command */
     sStartRatCmd         = cStartRatCmd;
-    sStartRatCmd.pNextOp = (rfc_radioOp_t *) &sRadioSetupCmd;
+    sStartRatCmd.pNextOp = (rfc_radioOp_t *)&sRadioSetupCmd;
     sStartRatCmd.rat0    = sRatOffset;
 
     /* initialize radio setup command */
-    sRadioSetupCmd              = cRadioSetupCmd;
+    sRadioSetupCmd = cRadioSetupCmd;
     /* initally set the radio tx power to the max */
     sRadioSetupCmd.txPower      = sCurrentOutputPower->value;
     sRadioSetupCmd.pRegOverride = sIEEEOverrides;
 
     interruptsWereDisabled = IntMasterDisable();
 
-    if ((ret = (RFCDoorbellSendTo((uint32_t)&sStartRatCmd) & 0xFF)) != CMDSTA_Done)
-    {
-        if (!interruptsWereDisabled)
-        {
-            IntMasterEnable();
-        }
-
-        return ret;
-    }
+    doorbellRet = (RFCDoorbellSendTo((uint32_t)&sStartRatCmd) & 0xFF);
+    otEXPECT_ACTION(CMDSTA_Done == doorbellRet, ret = doorbellRet);
 
     /* synchronously wait for the CM0 to stop executing */
-    while ((HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) & IRQ_LAST_COMMAND_DONE) == 0x00);
+    while ((HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) & IRQ_LAST_COMMAND_DONE) == 0x00)
+        ;
+
+    ret = sRadioSetupCmd.status;
+
+exit:
 
     if (!interruptsWereDisabled)
     {
         IntMasterEnable();
     }
 
-    return sRadioSetupCmd.status;
+    return ret;
 }
 
 /**
- * @brief sends the shutdown command string to the radio core
+ * Sends the shutdown command string to the radio core.
  *
  * Powers down the frequency synthesizer and stops the RAT.
  *
  * @note synchronously waits until the command string completes.
  *
- * @return the status of the RAT stop command
- * @retval DONE_OK the command string executed properly
+ * @return The status of the RAT stop command.
+ * @retval DONE_OK The command string executed properly.
  */
 static uint_fast16_t rfCoreSendDisableCmd(void)
 {
-    uint8_t doorbellRet;
-    bool interruptsWereDisabled;
+    uint8_t       doorbellRet;
+    bool          interruptsWereDisabled;
+    uint_fast16_t ret;
+
+    // clang-format off
     static const rfc_CMD_FS_POWERDOWN_t cFsPowerdownCmd =
     {
         .commandNo                  = CMD_FS_POWERDOWN,
@@ -967,11 +987,12 @@ static uint_fast16_t rfCoreSendDisableCmd(void)
             .rule                   = COND_NEVER,
         },
     };
+    // clang-format on
 
     HWREGBITW(AON_RTC_BASE + AON_RTC_O_CTL, AON_RTC_CTL_RTC_UPD_EN_BITN) = 1;
 
     /* initialize the command to power down the frequency synth */
-    sFsPowerdownCmd = cFsPowerdownCmd;
+    sFsPowerdownCmd         = cFsPowerdownCmd;
     sFsPowerdownCmd.pNextOp = (rfc_radioOp_t *)&sStopRatCmd;
 
     sStopRatCmd = cStopRatCmd;
@@ -981,35 +1002,31 @@ static uint_fast16_t rfCoreSendDisableCmd(void)
     HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) = ~IRQ_LAST_COMMAND_DONE;
 
     doorbellRet = (RFCDoorbellSendTo((uint32_t)&sFsPowerdownCmd) & 0xFF);
-
-    if (doorbellRet != CMDSTA_Done)
-    {
-        if (!interruptsWereDisabled)
-        {
-            IntMasterEnable();
-        }
-
-        return doorbellRet;
-    }
+    otEXPECT_ACTION(CMDSTA_Done == doorbellRet, ret = doorbellRet);
 
     /* synchronously wait for the CM0 to stop */
-    while ((HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) & IRQ_LAST_COMMAND_DONE) == 0x00);
+    while ((HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) & IRQ_LAST_COMMAND_DONE) == 0x00)
+        ;
 
-    if (!interruptsWereDisabled)
-    {
-        IntMasterEnable();
-    }
+    ret = sStopRatCmd.status;
 
     if (sStopRatCmd.status == DONE_OK)
     {
         sRatOffset = sStopRatCmd.rat0;
     }
 
-    return sStopRatCmd.status;
+exit:
+
+    if (!interruptsWereDisabled)
+    {
+        IntMasterEnable();
+    }
+
+    return ret;
 }
 
 /**
- * error interrupt handler
+ * Error interrupt handler.
  */
 void RFCCPE1IntHandler(void)
 {
@@ -1018,7 +1035,7 @@ void RFCCPE1IntHandler(void)
 }
 
 /**
- * command done handler
+ * Command done handler.
  */
 void RFCCPE0IntHandler(void)
 {
@@ -1026,9 +1043,7 @@ void RFCCPE0IntHandler(void)
     {
         HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) = ~IRQ_LAST_COMMAND_DONE;
 
-        if (sState == cc2650_stateReceive &&
-            sReceiveCmd.status != ACTIVE &&
-            sReceiveCmd.status != IEEE_SUSPENDED)
+        if (sState == cc2650_stateReceive && sReceiveCmd.status != ACTIVE && sReceiveCmd.status != IEEE_SUSPENDED)
         {
             /* the rx command was probably aborted to change the channel */
             sState = cc2650_stateSleep;
@@ -1061,29 +1076,27 @@ void RFCCPE0IntHandler(void)
                     {
                         sTransmitError = OT_ERROR_NO_ACK;
                         /* signal polling function we are done transmitting, we failed to send the packet */
-                        sState = cc2650_stateTransmitComplete;
+                        sTxCmdChainDone = true;
                     }
 
                     break;
 
                 case IEEE_DONE_ACK:
-                    sReceivedAckPendingBit = false;
                     sTransmitError = OT_ERROR_NONE;
                     /* signal polling function we are done transmitting */
-                    sState = cc2650_stateTransmitComplete;
+                    sTxCmdChainDone = true;
                     break;
 
                 case IEEE_DONE_ACKPEND:
-                    sReceivedAckPendingBit = true;
                     sTransmitError = OT_ERROR_NONE;
                     /* signal polling function we are done transmitting */
-                    sState = cc2650_stateTransmitComplete;
+                    sTxCmdChainDone = true;
                     break;
 
                 default:
                     sTransmitError = OT_ERROR_FAILED;
                     /* signal polling function we are done transmitting */
-                    sState = cc2650_stateTransmitComplete;
+                    sTxCmdChainDone = true;
                     break;
                 }
             }
@@ -1094,7 +1107,6 @@ void RFCCPE0IntHandler(void)
                 switch (sTransmitCmd.status)
                 {
                 case IEEE_DONE_OK:
-                    sReceivedAckPendingBit = false;
                     sTransmitError = OT_ERROR_NONE;
                     break;
 
@@ -1113,12 +1125,12 @@ void RFCCPE0IntHandler(void)
                     break;
 
                 default:
-                    sTransmitError = OT_ERROR_GENERIC;
+                    sTransmitError = OT_ERROR_FAILED;
                     break;
                 }
 
                 /* signal polling function we are done transmitting */
-                sState = cc2650_stateTransmitComplete;
+                sTxCmdChainDone = true;
             }
         }
     }
@@ -1194,7 +1206,7 @@ otError otPlatRadioDisable(otInstance *aInstance)
          */
         rfCorePowerOff();
         sState = cc2650_stateDisabled;
-        error = OT_ERROR_NONE;
+        error  = OT_ERROR_NONE;
     }
 
     return error;
@@ -1222,9 +1234,24 @@ exit:
 /**
  * Function documented in platform/radio.h
  */
-void otPlatRadioSetDefaultTxPower(otInstance *aInstance, int8_t aPower)
+otError otPlatRadioGetTransmitPower(otInstance *aInstance, int8_t *aPower)
 {
-    unsigned int i;
+    otError error = OT_ERROR_NONE;
+    (void)aInstance;
+
+    otEXPECT_ACTION(aPower != NULL, error = OT_ERROR_INVALID_ARGS);
+    *aPower = sCurrentOutputPower->dbm;
+
+exit:
+    return error;
+}
+
+/**
+ * Function documented in platform/radio.h
+ */
+otError otPlatRadioSetTransmitPower(otInstance *aInstance, int8_t aPower)
+{
+    unsigned int           i;
     output_config_t const *powerCfg = &(rgOutputPower[0]);
     (void)aInstance;
 
@@ -1241,6 +1268,8 @@ void otPlatRadioSetDefaultTxPower(otInstance *aInstance, int8_t aPower)
     }
 
     sCurrentOutputPower = powerCfg;
+
+    return OT_ERROR_NONE;
 }
 
 /**
@@ -1269,7 +1298,7 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
         {
             /* we are already running on the right channel */
             sState = cc2650_stateReceive;
-            error = OT_ERROR_NONE;
+            error  = OT_ERROR_NONE;
         }
         else
         {
@@ -1286,7 +1315,7 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
             otEXPECT_ACTION(rfCoreSendReceiveCmd() == CMDSTA_Done, error = OT_ERROR_FAILED);
 
             sState = cc2650_stateReceive;
-            error = OT_ERROR_NONE;
+            error  = OT_ERROR_NONE;
         }
     }
 
@@ -1311,11 +1340,11 @@ otError otPlatRadioSleep(otInstance *aInstance)
         if (rfCoreExecuteAbortCmd() != CMDSTA_Done)
         {
             error = OT_ERROR_BUSY;
-            return error;
         }
-
-        sState = cc2650_stateSleep;
-        return error;
+        else
+        {
+            sState = cc2650_stateSleep;
+        }
     }
 
     return error;
@@ -1339,25 +1368,18 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
 
     if (sState == cc2650_stateReceive)
     {
-        /*
-         * This is the easiest way to setup the frequency synthesizer.
-         * And we are supposed to fall into the receive state afterwards.
-         */
-        error = otPlatRadioReceive(aInstance, aFrame->mChannel);
+        sState = cc2650_stateTransmit;
 
-        if (error == OT_ERROR_NONE)
-        {
-            sState = cc2650_stateTransmit;
-
-            /* removing 2 bytes of CRC placeholder because we generate that in hardware */
-            otEXPECT_ACTION(rfCoreSendTransmitCmd(aFrame->mPsdu, aFrame->mLength - 2) == CMDSTA_Done,
-                            error = OT_ERROR_FAILED);
-            error = OT_ERROR_NONE;
-        }
+        /* removing 2 bytes of CRC placeholder because we generate that in hardware */
+        otEXPECT_ACTION(rfCoreSendTransmitCmd(aFrame->mPsdu, aFrame->mLength - 2) == CMDSTA_Done,
+                        error = OT_ERROR_FAILED);
+        error           = OT_ERROR_NONE;
+        sTransmitError  = OT_ERROR_NONE;
+        sTxCmdChainDone = false;
+        otPlatRadioTxStarted(aInstance, aFrame);
     }
 
 exit:
-    sTransmitError = error;
     return error;
 }
 
@@ -1410,17 +1432,15 @@ otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, const uint16_t a
     if (idx == CC2650_SRC_MATCH_NONE)
     {
         /* the entry does not exist already, add it */
-        otEXPECT_ACTION((idx = rfCoreFindEmptyShortSrcMatchIdx()) != CC2650_SRC_MATCH_NONE,
-                        error = OT_ERROR_NO_BUFS);
+        otEXPECT_ACTION((idx = rfCoreFindEmptyShortSrcMatchIdx()) != CC2650_SRC_MATCH_NONE, error = OT_ERROR_NO_BUFS);
         sSrcMatchShortData.extAddrEnt[idx].shortAddr = aShortAddress;
-        sSrcMatchShortData.extAddrEnt[idx].panId = sReceiveCmd.localPanID;
+        sSrcMatchShortData.extAddrEnt[idx].panId     = sReceiveCmd.localPanID;
     }
 
     if (sReceiveCmd.status == ACTIVE || sReceiveCmd.status == IEEE_SUSPENDED)
     {
         /* we have a running or backgrounded rx command */
-        otEXPECT_ACTION(rfCoreModifySourceMatchEntry(idx, SHORT_ADDRESS, true) == CMDSTA_Done,
-                        error = OT_ERROR_FAILED);
+        otEXPECT_ACTION(rfCoreModifySourceMatchEntry(idx, SHORT_ADDRESS, true) == CMDSTA_Done, error = OT_ERROR_FAILED);
     }
     else
     {
@@ -1464,7 +1484,7 @@ exit:
 /**
  * Function documented in platform/radio.h
  */
-otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     otError error = OT_ERROR_NONE;
     (void)aInstance;
@@ -1480,8 +1500,7 @@ otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aEx
     if (sReceiveCmd.status == ACTIVE || sReceiveCmd.status == IEEE_SUSPENDED)
     {
         /* we have a running or backgrounded rx command */
-        otEXPECT_ACTION(rfCoreModifySourceMatchEntry(idx, EXT_ADDRESS, true) == CMDSTA_Done,
-                        error = OT_ERROR_FAILED);
+        otEXPECT_ACTION(rfCoreModifySourceMatchEntry(idx, EXT_ADDRESS, true) == CMDSTA_Done, error = OT_ERROR_FAILED);
     }
     else
     {
@@ -1497,7 +1516,7 @@ exit:
 /**
  * Function documented in platform/radio.h
  */
-otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const uint8_t *aExtAddress)
+otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress)
 {
     otError error = OT_ERROR_NONE;
     (void)aInstance;
@@ -1508,14 +1527,11 @@ otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const uint8_t *a
     if (sReceiveCmd.status == ACTIVE || sReceiveCmd.status == IEEE_SUSPENDED)
     {
         /* we have a running or backgrounded rx command */
-        otEXPECT_ACTION(rfCoreModifySourceMatchEntry(idx, EXT_ADDRESS, false) == CMDSTA_Done,
-                        error = OT_ERROR_FAILED);
+        otEXPECT_ACTION(rfCoreModifySourceMatchEntry(idx, EXT_ADDRESS, false) == CMDSTA_Done, error = OT_ERROR_FAILED);
     }
     else
     {
         /* we are not running, so we must update the values ourselves */
-        sSrcMatchExtData.srcPendEn[idx] = 0u;
-        sSrcMatchExtData.srcMatchEn[idx] = 0u;
         sSrcMatchExtData.srcPendEn[idx / 32] &= ~(1 << (idx % 32));
         sSrcMatchExtData.srcMatchEn[idx / 32] &= ~(1 << (idx % 32));
     }
@@ -1525,8 +1541,8 @@ exit:
 }
 
 /**
-* Function documented in platform/radio.h
-*/
+ * Function documented in platform/radio.h
+ */
 void otPlatRadioClearSrcMatchShortEntries(otInstance *aInstance)
 {
     (void)aInstance;
@@ -1552,8 +1568,8 @@ exit:
 }
 
 /**
-* Function documented in platform/radio.h
-*/
+ * Function documented in platform/radio.h
+ */
 void otPlatRadioClearSrcMatchExtEntries(otInstance *aInstance)
 {
     (void)aInstance;
@@ -1614,7 +1630,7 @@ void otPlatRadioSetPromiscuous(otInstance *aInstance, bool aEnable)
  */
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64)
 {
-    uint8_t *eui64;
+    uint8_t *    eui64;
     unsigned int i;
     (void)aInstance;
 
@@ -1659,7 +1675,7 @@ void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64)
  * Function documented in platform/radio.h
  *
  * @note it is entirely possible for this function to fail, but there is no
- * valid way to return that error since the funciton prototype was changed.
+ * valid way to return that error since the function prototype was changed.
  */
 void otPlatRadioSetPanId(otInstance *aInstance, uint16_t aPanid)
 {
@@ -1690,9 +1706,9 @@ exit:
  * Function documented in platform/radio.h
  *
  * @note it is entirely possible for this function to fail, but there is no
- * valid way to return that error since the funciton prototype was changed.
+ * valid way to return that error since the function prototype was changed.
  */
-void otPlatRadioSetExtendedAddress(otInstance *aInstance, uint8_t *aAddress)
+void otPlatRadioSetExtendedAddress(otInstance *aInstance, const otExtAddress *aAddress)
 {
     (void)aInstance;
 
@@ -1719,7 +1735,7 @@ exit:
  * Function documented in platform/radio.h
  *
  * @note it is entirely possible for this function to fail, but there is no
- * valid way to return that error since the funciton prototype was changed.
+ * valid way to return that error since the function prototype was changed.
  */
 void otPlatRadioSetShortAddress(otInstance *aInstance, uint16_t aAddress)
 {
@@ -1743,47 +1759,100 @@ exit:
     return;
 }
 
-/**
- * @brief search the receive queue for unprocessed messages
- *
- * Loop through the receive queue structure looking for data entries that the
- * radio core has marked as finished. Then place those in @ref sReceiveFrame
- * and mark any errors in @ref sReceiveError.
- */
-static void readFrame(void)
+static void cc2650RadioProcessTransmitDone(otInstance *  aInstance,
+                                           otRadioFrame *aTransmitFrame,
+                                           otRadioFrame *aAckFrame,
+                                           otError       aTransmitError)
 {
-    rfc_ieeeRxCorrCrc_t *crcCorr;
-    uint8_t rssi;
-    rfc_dataEntryGeneral_t *startEntry = (rfc_dataEntryGeneral_t *)sRxDataQueue.pCurrEntry;
-    rfc_dataEntryGeneral_t *curEntry = startEntry;
+#if OPENTHREAD_ENABLE_DIAG
+
+    if (otPlatDiagModeGet())
+    {
+        otPlatDiagRadioTransmitDone(aInstance, aTransmitFrame, aTransmitError);
+    }
+    else
+#endif /* OPENTHREAD_ENABLE_DIAG */
+    {
+        otPlatRadioTxDone(aInstance, aTransmitFrame, aAckFrame, aTransmitError);
+    }
+}
+
+static void cc2650RadioProcessReceiveDone(otInstance *aInstance, otRadioFrame *aReceiveFrame, otError aReceiveError)
+{
+#if OPENTHREAD_ENABLE_DIAG
+
+    if (otPlatDiagModeGet())
+    {
+        otPlatDiagRadioReceiveDone(aInstance, aReceiveFrame, aReceiveError);
+    }
+    else
+#endif /* OPENTHREAD_ENABLE_DIAG */
+    {
+        otPlatRadioReceiveDone(aInstance, aReceiveFrame, aReceiveError);
+    }
+}
+
+static void cc2650RadioProcessReceiveQueue(otInstance *aInstance)
+{
+    rfc_ieeeRxCorrCrc_t *   crcCorr;
+    rfc_dataEntryGeneral_t *curEntry, *startEntry;
+    uint8_t                 rssi;
+
+    startEntry = (rfc_dataEntryGeneral_t *)sRxDataQueue.pCurrEntry;
+    curEntry   = startEntry;
 
     /* loop through receive queue */
     do
     {
         uint8_t *payload = &(curEntry->data);
 
-        if (sReceiveFrame.mLength == 0 && curEntry->status == DATA_ENTRY_FINISHED)
+        if (curEntry->status == DATA_ENTRY_FINISHED)
         {
-            uint8_t len = payload[0];
+            uint8_t      len;
+            otError      receiveError;
+            otRadioFrame receiveFrame;
+
             /* get the information appended to the end of the frame.
              * This array access looks like it is a fencepost error, but the
              * first byte is the number of bytes that follow.
              */
+            len     = payload[0];
             crcCorr = (rfc_ieeeRxCorrCrc_t *)&payload[len];
-            rssi = payload[len - 1];
+            rssi    = payload[len - 1];
 
             if (crcCorr->status.bCrcErr == 0 && (len - 2) < OT_RADIO_FRAME_MAX_SIZE)
             {
-                sReceiveFrame.mLength = len;
-                memcpy(sReceiveFrame.mPsdu, &(payload[1]), len - 2);
-                sReceiveFrame.mChannel = sReceiveCmd.channel;
-                sReceiveFrame.mPower = rssi;
-                sReceiveFrame.mLqi = crcCorr->status.corr;
-                sReceiveError = OT_ERROR_NONE;
+                if (otPlatRadioGetPromiscuous(aInstance))
+                {
+                    // TODO: Propagate CM0 timestamp
+                    receiveFrame.mInfo.mRxInfo.mMsec = otPlatAlarmMilliGetNow();
+                    receiveFrame.mInfo.mRxInfo.mUsec = 0; // Don't support microsecond timer for now.
+                }
+
+                receiveFrame.mLength             = len;
+                receiveFrame.mPsdu               = &(payload[1]);
+                receiveFrame.mChannel            = sReceiveCmd.channel;
+                receiveFrame.mInfo.mRxInfo.mRssi = rssi;
+                receiveFrame.mInfo.mRxInfo.mLqi  = crcCorr->status.corr;
+
+                receiveError = OT_ERROR_NONE;
             }
             else
             {
-                sReceiveError = OT_ERROR_FCS;
+                receiveError = OT_ERROR_FCS;
+            }
+
+            if ((receiveFrame.mPsdu[0] & IEEE802154_FRAME_TYPE_MASK) == IEEE802154_FRAME_TYPE_ACK)
+            {
+                if (receiveFrame.mPsdu[IEEE802154_DSN_OFFSET] == sTransmitFrame.mPsdu[IEEE802154_DSN_OFFSET])
+                {
+                    sState = cc2650_stateReceive;
+                    cc2650RadioProcessTransmitDone(aInstance, &sTransmitFrame, &receiveFrame, receiveError);
+                }
+            }
+            else
+            {
+                cc2650RadioProcessReceiveDone(aInstance, &receiveFrame, receiveError);
             }
 
             curEntry->status = DATA_ENTRY_PENDING;
@@ -1795,10 +1864,7 @@ static void readFrame(void)
         }
 
         curEntry = (rfc_dataEntryGeneral_t *)(curEntry->pNextEntry);
-    }
-    while (curEntry != startEntry);
-
-    return;
+    } while (curEntry != startEntry);
 }
 
 /**
@@ -1818,43 +1884,22 @@ void cc2650RadioProcess(otInstance *aInstance)
         }
     }
 
-    if (sState == cc2650_stateTransmitComplete || sTransmitError != OT_ERROR_NONE)
-    {
-        /* we are not looking for an ACK packet, or failed */
-        sState = cc2650_stateReceive;
-#if OPENTHREAD_ENABLE_DIAG
-
-        if (otPlatDiagModeGet())
-        {
-            otPlatDiagRadioTransmitDone(aInstance, &sTransmitFrame, sReceivedAckPendingBit, sTransmitError);
-        }
-        else
-#endif /* OPENTHREAD_ENABLE_DIAG */
-        {
-            otPlatRadioTransmitDone(aInstance, &sTransmitFrame, sReceivedAckPendingBit, sTransmitError);
-        }
-    }
-
     if (sState == cc2650_stateReceive || sState == cc2650_stateTransmit)
     {
-        readFrame();
+        cc2650RadioProcessReceiveQueue(aInstance);
+    }
 
-        if (sReceiveFrame.mLength > 0)
+    if (sTxCmdChainDone)
+    {
+        if (sState == cc2650_stateTransmit)
         {
-#if OPENTHREAD_ENABLE_DIAG
-
-            if (otPlatDiagModeGet())
-            {
-                otPlatDiagRadioReceiveDone(aInstance, &sReceiveFrame, sReceiveError);
-            }
-            else
-#endif /* OPENTHREAD_ENABLE_DIAG */
-            {
-                otPlatRadioReceiveDone(aInstance, &sReceiveFrame, sReceiveError);
-            }
+            /* we are not looking for an ACK packet, or failed */
+            sState = cc2650_stateReceive;
+            cc2650RadioProcessTransmitDone(aInstance, &sTransmitFrame, NULL, sTransmitError);
         }
 
-        sReceiveFrame.mLength = 0;
+        sTransmitError  = OT_ERROR_NONE;
+        sTxCmdChainDone = false;
     }
 }
 

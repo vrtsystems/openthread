@@ -35,46 +35,50 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <openthread-config.h>
+#include <openthread/config.h>
 
 #include "utils/code_utils.h"
 #include "utils/flash.h"
 
-static int sFlashFd;
-uint32_t sEraseAddress;
+static int sFlashFd = -1;
+uint32_t   sEraseAddress;
 
 enum
 {
-    FLASH_SIZE = 0x40000,
+    FLASH_SIZE      = 0x40000,
     FLASH_PAGE_SIZE = 0x800,
-    FLASH_PAGE_NUM = 128,
+    FLASH_PAGE_NUM  = 128,
 };
 
 otError utilsFlashInit(void)
 {
-    otError error = OT_ERROR_NONE;
-    char fileName[20];
+    otError     error = OT_ERROR_NONE;
+    const char *path  = OPENTHREAD_CONFIG_POSIX_SETTINGS_PATH;
+    char        fileName[sizeof(OPENTHREAD_CONFIG_POSIX_SETTINGS_PATH) + 32];
     struct stat st;
-    bool create = false;
-    struct timeval tv;
-
-    gettimeofday(&tv, NULL);
+    bool        create = false;
+    const char *offset = getenv("PORT_OFFSET");
 
     memset(&st, 0, sizeof(st));
 
-    if (stat("tmp", &st) == -1)
+    if (stat(path, &st) == -1)
     {
-        mkdir("tmp", 0777);
+        mkdir(path, 0777);
     }
 
-    snprintf(fileName, sizeof(fileName), "tmp/%d_%d.flash", NODE_ID, (uint32_t)tv.tv_usec);
+    if (offset == NULL)
+    {
+        offset = "0";
+    }
+
+    snprintf(fileName, sizeof(fileName), "%s/%s_%d.flash", path, offset, gNodeId);
 
     if (access(fileName, 0))
     {
         create = true;
     }
 
-    sFlashFd = open(fileName, O_RDWR | O_CREAT, 0666);
+    sFlashFd = open(fileName, O_RDWR | O_CREAT, 0600);
     lseek(sFlashFd, 0, SEEK_SET);
 
     otEXPECT_ACTION(sFlashFd >= 0, error = OT_ERROR_FAILED);
@@ -99,9 +103,9 @@ uint32_t utilsFlashGetSize(void)
 
 otError utilsFlashErasePage(uint32_t aAddress)
 {
-    otError error = OT_ERROR_NONE;
+    otError  error = OT_ERROR_NONE;
     uint32_t address;
-    uint8_t dummyPage[ FLASH_SIZE ];
+    uint8_t  dummyPage[FLASH_SIZE];
 
     otEXPECT_ACTION(sFlashFd >= 0, error = OT_ERROR_FAILED);
     otEXPECT_ACTION(aAddress < FLASH_SIZE, error = OT_ERROR_INVALID_ARGS);
@@ -114,9 +118,8 @@ otError utilsFlashErasePage(uint32_t aAddress)
 
     // Write the page
     ssize_t r;
-    r =  pwrite(sFlashFd, &(dummyPage[0]), FLASH_PAGE_SIZE, (off_t)address);
+    r = pwrite(sFlashFd, &(dummyPage[0]), FLASH_PAGE_SIZE, (off_t)address);
     otEXPECT_ACTION(((int)r) == ((int)(FLASH_PAGE_SIZE)), error = OT_ERROR_FAILED);
-
 
 exit:
     return error;
@@ -130,9 +133,9 @@ otError utilsFlashStatusWait(uint32_t aTimeout)
 
 uint32_t utilsFlashWrite(uint32_t aAddress, uint8_t *aData, uint32_t aSize)
 {
-    uint32_t ret = 0;
+    uint32_t ret   = 0;
     uint32_t index = 0;
-    uint8_t byte;
+    uint8_t  byte;
 
     otEXPECT(sFlashFd >= 0 && aAddress < FLASH_SIZE);
 

@@ -786,7 +786,7 @@ otLwfEventWorkerThread(
     NT_ASSERT(otCtxToFilter(pFilter->otCtx) == pFilter);
 
     // Disable Icmp (ping) handling
-    otIcmp6SetEchoEnabled(pFilter->otCtx, FALSE);
+    otIcmp6SetEchoMode(pFilter->otCtx, OT_ICMP6_ECHO_HANDLER_DISABLED);
 
     // Register callbacks with OpenThread
     otSetStateChangedCallback(pFilter->otCtx, otLwfStateChangedCallback, pFilter);
@@ -863,7 +863,7 @@ otLwfEventWorkerThread(
             pFilter->EventTimerState = OT_EVENT_TIMER_NOT_RUNNING;
 
             // Indicate to OpenThread that the alarm has fired
-            otPlatAlarmFired(pFilter->otCtx);
+            otPlatAlarmMilliFired(pFilter->otCtx);
         }
         else if (status == STATUS_WAIT_0 + 1) // EventWorkerThreadProcessNBLs fired
         {
@@ -904,7 +904,7 @@ otLwfEventWorkerThread(
                                 otError error = OT_ERROR_NONE;
 
                                 // Create a new message
-                                otMessage *message = otIp6NewMessage(pFilter->otCtx, TRUE);
+                                otMessage *message = otIp6NewMessage(pFilter->otCtx, NULL);
                                 if (message)
                                 {
                                     // Write to the message
@@ -1019,11 +1019,11 @@ otLwfEventWorkerThread(
                             SPINEL_DATATYPE_STRUCT_S( // Vendor-data
                                 SPINEL_DATATYPE_UINT_PACKED_S
                             ),
-                            &pFilter->otReceiveFrame.mPower,
+                            &pFilter->otReceiveFrame.mInfo.mRxInfo.mRssi,
                             &noiseFloor,
                             &flags,
                             &pFilter->otReceiveFrame.mChannel,
-                            &pFilter->otReceiveFrame.mLqi,
+                            &pFilter->otReceiveFrame.mInfo.mRxInfo.mLqi,
                             &errorCode))
                     {
                         otLwfRadioReceiveFrame(pFilter, errorCode);

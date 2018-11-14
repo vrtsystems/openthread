@@ -43,7 +43,10 @@
   - Preprocessor `#include` directives shall use brace (“<”) and (“>”) style for all public headers, including C and C++ standard library, or other first- and third-party public library headers.
   - Preprocessor `#include` directives should use double quote (‘“‘) and (‘“‘) style for all private or relative headers.
   - Preprocessor `#include` directives should be grouped, ordered, or sorted as follows:
-    - This compilation unit's corresponding header, if any.
+    - If the unit is a core/private header file, `"openthread-core-config.h"` should be the first header file included.
+    - If the unit is a core/private `.c` or `.cpp` file:
+      - If the unit has a corresponding header file, the unit's corresponding header file should be included before any other header file.
+      - If the unit has no corresponding header file, then it should directly include `"openthread-core-config.h"` before any other header file.
     - C++ Standard Library headers
     - C Standard Library headers
     - Third-party library headers
@@ -111,6 +114,8 @@
 
 - OpenThread uses the `make pretty` build target to reformat code and enforce code format and style.  The `make pretty-check` build target is included in OpenThread's continuous integration and must pass before a pull request is merged.
 
+- The `make pretty` and `make pretty-check` build targets require [clang-format v6.0.0](http://releases.llvm.org/download.html#6.0.0).
+
 ### File Names
 - File names should match the names and types of what is described in the file.  If a file contains many declarations and definitions, the author should choose the one that predominantly describes or that makes the most sense.
 - File contents and names should be limited in the scope of what they contain. It may also be possible that there is too much stuff in one file and you need to break it up into multiple files.
@@ -171,7 +176,7 @@
 
 ## Standards
 
-- OpenThread uses and enfores both Python 2 and Python 3.  Support for Python 2 is a result of the fact that some current Linux distributions and Macs are still using 2.x as default.
+- OpenThread uses and enforces both Python 2 and Python 3.  Support for Python 2 is a result of the fact that some current Linux distributions and Macs are still using 2.x as default.
 
 ## Conventions and Best Practices
 

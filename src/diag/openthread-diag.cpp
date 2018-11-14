@@ -31,13 +31,17 @@
  *   This file implements the top-level interface to diagnostics module.
  */
 
+#include "openthread-core-config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
+#include "utils/parse_cmdline.hpp"
 #include "utils/wrap_string.h"
 
 #include <openthread/diag.h>
 
 #include "diag_process.hpp"
+#include "common/code_utils.hpp"
 
 using namespace ot::Diagnostics;
 
@@ -46,37 +50,61 @@ void otDiagInit(otInstance *aInstance)
     Diag::Init(aInstance);
 }
 
-char *otDiagProcessCmd(int argc, char *argv[])
+void otDiagProcessCmd(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
-    return Diag::ProcessCmd(argc, argv);
+    Diag::ProcessCmd(aArgCount, aArgVector, aOutput, aOutputMaxLen);
 }
 
-char *otDiagProcessCmdLine(char *string)
+void otDiagProcessCmdLine(const char *aInput, char *aOutput, size_t aOutputMaxLen)
 {
-    char *argv[8];
-    int argc = 0;
-    int length = static_cast<int>(strlen(string));
-    char *cmd;
-
-    for (; *string == ' '; string++, length--);
-
-    for (cmd = string + 1; (cmd < string + length) && (cmd != NULL); ++cmd)
+    enum
     {
-        if (*cmd == ' ' || *cmd == '\r' || *cmd == '\n')
+        kMaxArgs          = OPENTHREAD_CONFIG_DIAG_CMD_LINE_ARGS_MAX,
+        kMaxCommandBuffer = OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE,
+    };
+
+    otError error = OT_ERROR_NONE;
+    char    buffer[kMaxCommandBuffer];
+    char *  argVector[kMaxArgs];
+    uint8_t argCount = 0;
+
+    VerifyOrExit(strnlen(aInput, kMaxCommandBuffer) < kMaxCommandBuffer, error = OT_ERROR_NO_BUFS);
+
+    strcpy(buffer, aInput);
+    error = ot::Utils::CmdLineParser::ParseCmd(buffer, argCount, argVector, kMaxArgs);
+
+exit:
+
+    switch (error)
+    {
+    case OT_ERROR_NONE:
+
+        if (argCount >= 1)
         {
-            *cmd = '\0';
+            Diag::ProcessCmd(argCount - 1, (argCount == 1) ? NULL : &argVector[1], aOutput, aOutputMaxLen);
+        }
+        else
+        {
+            Diag::ProcessCmd(0, NULL, aOutput, aOutputMaxLen);
         }
 
-        if (*(cmd - 1) == '\0' && *cmd != ' ')
-        {
-            argv[argc++] = cmd;
-        }
+        break;
+
+    case OT_ERROR_NO_BUFS:
+        snprintf(aOutput, aOutputMaxLen, "failed: command string too long\r\n");
+        break;
+
+    case OT_ERROR_INVALID_ARGS:
+        snprintf(aOutput, aOutputMaxLen, "failed: command string contains too many arguments\r\n");
+        break;
+
+    default:
+        snprintf(aOutput, aOutputMaxLen, "failed to parse command string\r\n");
+        break;
     }
-
-    return Diag::ProcessCmd(argc, argv);
 }
 
-bool otDiagIsEnabled()
+bool otDiagIsEnabled(void)
 {
-    return Diag::isEnabled();
+    return Diag::IsEnabled();
 }

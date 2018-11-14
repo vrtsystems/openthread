@@ -34,6 +34,9 @@
 #ifndef NET_NETIF_HPP_
 #define NET_NETIF_HPP_
 
+#include "openthread-core-config.h"
+
+#include "common/locator.hpp"
 #include "common/message.hpp"
 #include "common/tasklet.hpp"
 #include "mac/mac_frame.hpp"
@@ -61,7 +64,7 @@ class Ip6;
  */
 class LinkAddress
 {
-public :
+public:
     /**
      * Hardware types.
      *
@@ -70,16 +73,16 @@ public :
     {
         kEui64 = 27,
     };
-    HardwareType   mType;       ///< Link address type.
-    uint8_t        mLength;     ///< Length of link address.
-    Mac::ExtAddress mExtAddress;  ///< Link address.
+    HardwareType    mType;       ///< Link address type.
+    uint8_t         mLength;     ///< Length of link address.
+    Mac::ExtAddress mExtAddress; ///< Link address.
 };
 
 /**
  * This class implements an IPv6 network interface unicast address.
  *
  */
-class NetifUnicastAddress: public otNetifAddress
+class NetifUnicastAddress : public otNetifAddress
 {
     friend class Netif;
 
@@ -90,7 +93,7 @@ public:
      * @returns The unicast address.
      *
      */
-    const Address &GetAddress(void) const { return *static_cast<const Address *>(&mAddress); }
+    const Address &GetAddress(void) const { return static_cast<const Address &>(mAddress); }
 
     /**
      * This method returns the unicast address.
@@ -98,7 +101,7 @@ public:
      * @returns The unicast address.
      *
      */
-    Address &GetAddress(void) { return *static_cast<Address *>(&mAddress); }
+    Address &GetAddress(void) { return static_cast<Address &>(mAddress); }
 
     /**
      * This method returns the IPv6 scope value.
@@ -106,7 +109,8 @@ public:
      * @returns The IPv6 scope value.
      *
      */
-    uint8_t GetScope(void) const {
+    uint8_t GetScope(void) const
+    {
         return mScopeOverrideValid ? static_cast<uint8_t>(mScopeOverride) : GetAddress().GetScope();
     }
 
@@ -131,7 +135,7 @@ public:
  * This class implements an IPv6 network interface multicast address.
  *
  */
-class NetifMulticastAddress: public otNetifMulticastAddress
+class NetifMulticastAddress : public otNetifMulticastAddress
 {
     friend class Netif;
 
@@ -142,7 +146,7 @@ public:
      * @returns The multicast address.
      *
      */
-    const Address &GetAddress(void) const { return *static_cast<const Address *>(&mAddress); }
+    const Address &GetAddress(void) const { return static_cast<const Address &>(mAddress); }
 
     /**
      * This method returns the multicast address.
@@ -150,7 +154,7 @@ public:
      * @returns The multicast address.
      *
      */
-    Address &GetAddress(void) { return *static_cast<Address *>(&mAddress); }
+    Address &GetAddress(void) { return static_cast<Address &>(mAddress); }
 
     /**
      * This method returns the next multicast address subscribed to the interface.
@@ -158,7 +162,7 @@ public:
      * @returns A pointer to the next multicast address.
      *
      */
-    const NetifMulticastAddress *GetNext(void) const { return static_cast<NetifMulticastAddress *>(mNext); }
+    const NetifMulticastAddress *GetNext(void) const { return static_cast<const NetifMulticastAddress *>(mNext); }
 
     /**
      * This method returns the next multicast address subscribed to the interface.
@@ -166,88 +170,17 @@ public:
      * @returns A pointer to the next multicast address.
      *
      */
-    NetifMulticastAddress *GetNext(void) { return static_cast<NetifMulticastAddress *>(mNext); }
-};
-
-/**
- * This class implements network interface handlers.
- *
- */
-class NetifCallback
-{
-    friend class Netif;
-
-public:
-    /**
-     * This constructor initializes the object.
-     *
-     */
-    NetifCallback(void):
-        mCallback(NULL),
-        mContext(NULL),
-        mNext(NULL) {
+    NetifMulticastAddress *GetNext(void)
+    {
+        return static_cast<NetifMulticastAddress *>(const_cast<otNetifMulticastAddress *>(mNext));
     }
-
-    /**
-     * This method sets the callback information.
-     *
-     * @param[in]  aCallback  A pointer to a function that is called when configuration or state changes.
-     * @param[in]  aContext   A pointer to arbitrary context information.
-     *
-     */
-    void Set(otStateChangedCallback aCallback, void *aContext) {
-        mCallback = aCallback;
-        mContext = aContext;
-    }
-
-    /**
-     * This method tests whether the object is free or in use.
-     *
-     * @returns True if the object is free, false otherwise.
-     *
-     */
-    bool IsFree(void) { return (mCallback == NULL); }
-
-    /**
-     * This method frees the object.
-     *
-     */
-    void Free(void) {
-        mCallback = NULL;
-        mContext = NULL;
-        mNext = NULL;
-    }
-
-    /**
-     * This method tests whether the object is set to the provided elements.
-     *
-     * @param[in]  aCallback  A pointer to a function that is called when configuration or state changes.
-     * @param[in]  aContext   A pointer to arbitrary context information.
-     *
-     * @returns True if the object elements equal the input params, false otherwise.
-     *
-     */
-    bool IsServing(otStateChangedCallback aCallback, void *aContext) {
-        return (aCallback == mCallback && aContext == mContext);
-    }
-
-private:
-    void Callback(uint32_t aFlags) {
-        if (mCallback != NULL) {
-            mCallback(aFlags, mContext);
-        }
-    }
-
-    otStateChangedCallback mCallback;
-    void *mContext;
-    NetifCallback *mNext;
 };
 
 /**
  * This class implements an IPv6 network interface.
  *
  */
-class Netif
+class Netif : public InstanceLocator
 {
     friend class Ip6;
 
@@ -255,19 +188,11 @@ public:
     /**
      * This constructor initializes the network interface.
      *
-     * @param[in]  aIp6             A reference to the IPv6 network object.
+     * @param[in]  aInstance        A reference to the OpenThread instance.
      * @param[in]  aInterfaceId     The interface ID for this object.
      *
      */
-    Netif(Ip6 &aIp6, int8_t aInterfaceId);
-
-    /**
-     * This method returns a reference to the IPv6 network object.
-     *
-     * @returns A reference to the IPv6 network object.
-     *
-     */
-    Ip6 &GetIp6(void) { return mIp6; }
+    Netif(Instance &aInstance, int8_t aInterfaceId);
 
     /**
      * This method returns the next network interface in the list.
@@ -283,6 +208,15 @@ public:
      *
      */
     int8_t GetInterfaceId(void) const { return mInterfaceId; }
+
+    /**
+     * This method registers a callback to notify internal IPv6 address changes.
+     *
+     * @param[in]  aCallback         A pointer to a function that is called when an IPv6 address is added or removed.
+     * @param[in]  aCallbackContext  A pointer to application-specific context.
+     *
+     */
+    void SetAddressCallback(otIp6AddressCallback aCallback, void *aCallbackContext);
 
     /**
      * This method returns a pointer to the list of unicast addresses.
@@ -369,14 +303,20 @@ public:
     /**
      * This method subscribes the network interface to the link-local and realm-local all routers address.
      *
+     * @retval OT_ERROR_NONE     Successfully subscribed to the link-local and realm-local all routers address
+     * @retval OT_ERROR_ALREADY  The multicast addresses are already subscribed.
+     *
      */
-    void SubscribeAllRoutersMulticast(void) { mAllRoutersSubscribed = true; }
+    otError SubscribeAllRoutersMulticast(void);
 
     /**
      * This method unsubscribes the network interface to the link-local and realm-local all routers address.
      *
+     * @retval OT_ERROR_NONE       Successfully unsubscribed from the link-local and realm-local all routers address
+     * @retval OT_ERROR_NOT_FOUND  The multicast addresses were not found.
+     *
      */
-    void UnsubscribeAllRoutersMulticast(void) { mAllRoutersSubscribed = false; }
+    otError UnsubscribeAllRoutersMulticast(void);
 
     /**
      * This method returns a pointer to the list of multicast addresses.
@@ -402,11 +342,25 @@ public:
      *
      * @param[in]  aAddress  A reference to the multicast address.
      *
-     * @retval OT_ERROR_NONE     Successfully unsubscribed to @p aAddress.
-     * @retval OT_ERROR_ALREADY  The multicast address is already unsubscribed.
+     * @retval OT_ERROR_NONE       Successfully unsubscribed @p aAddress.
+     * @retval OT_ERROR_NOT_FOUND  The multicast address was not found.
      *
      */
     otError UnsubscribeMulticast(const NetifMulticastAddress &aAddress);
+
+    /**
+     * This method provides the next external multicast address that the network interface subscribed.
+     * It is used to iterate through the entries of the external multicast address table.
+     *
+     * @param[inout] aIterator A reference to the iterator context. To get the first
+     *                         external multicast address, it should be set to 0.
+     * @param[out]   aAddress  A reference where to place the external multicast address.
+     *
+     * @retval OT_ERROR_NONE       Successfully found the next external multicast address.
+     * @retval OT_ERROR_NOT_FOUND  No subsequent external multicast address.
+     *
+     */
+    otError GetNextExternalMulticast(uint8_t &aIterator, Address &aAddress);
 
     /**
      * This method subscribes the network interface to the external (to OpenThread) multicast address.
@@ -456,44 +410,6 @@ public:
     void SetMulticastPromiscuous(bool aEnabled) { mMulticastPromiscuous = aEnabled; }
 
     /**
-     * This method registers a network interface callback.
-     *
-     * @param[in]  aCallback  A reference to the callback.
-     *
-     * @retval OT_ERROR_NONE    Successfully registered the callback.
-     * @retval OT_ERROR_ALREADY The callback was already registered.
-     */
-    otError RegisterCallback(NetifCallback &aCallback);
-
-    /**
-     * This method removes a network interface callback.
-     *
-     * @param[in]  aCallback  A reference to the callback.
-     *
-     * @retval OT_ERROR_NONE    Successfully removed the callback.
-     * @retval OT_ERROR_ALREADY The callback was not in the list.
-     */
-    otError RemoveCallback(NetifCallback &aCallback);
-
-    /**
-     * This method indicates whether or not a state changed callback is pending.
-     *
-     * @retval TRUE if a state changed callback is pending, FALSE otherwise.
-     *
-     */
-    bool IsStateChangedCallbackPending(void) { return mStateChangedFlags != 0; }
-
-    /**
-     * This method schedules notification of @p aFlags.
-     *
-     * The @p aFlags are combined (bitwise-or) with other flags that have not been provided in a callback yet.
-     *
-     * @param[in]  aFlags  A bit-field indicating what configuration or state has changed.
-     *
-     */
-    void SetStateChangedFlags(uint32_t aFlags);
-
-    /**
      * This virtual method enqueues an IPv6 messages on this network interface.
      *
      * @param[in]  aMessage  A reference to the IPv6 message.
@@ -501,7 +417,11 @@ public:
      * @retval OT_ERROR_NONE  Successfully enqueued the IPv6 message.
      *
      */
-    virtual otError SendMessage(Message &aMessage) = 0;
+    virtual otError SendMessage(Message &aMessage)
+    {
+        OT_UNUSED_VARIABLE(aMessage);
+        return OT_ERROR_NOT_IMPLEMENTED;
+    }
 
     /**
      * This virtual method fills out @p aAddress with the link address.
@@ -511,7 +431,11 @@ public:
      * @retval OT_ERROR_NONE  Successfully retrieved the link address.
      *
      */
-    virtual otError GetLinkAddress(LinkAddress &aAddress) const = 0;
+    virtual otError GetLinkAddress(LinkAddress &aAddress) const
+    {
+        OT_UNUSED_VARIABLE(aAddress);
+        return OT_ERROR_NOT_IMPLEMENTED;
+    }
 
     /**
      * This virtual method performs a source-destination route lookup.
@@ -524,29 +448,52 @@ public:
      * @retval OT_ERROR_NO_ROUTE  No route to destination.
      *
      */
-    virtual otError RouteLookup(const Address &aSource, const Address &aDestination,
-                                uint8_t *aPrefixMatch) = 0;
+    virtual otError RouteLookup(const Address &aSource, const Address &aDestination, uint8_t *aPrefixMatch)
+    {
+        OT_UNUSED_VARIABLE(aSource);
+        OT_UNUSED_VARIABLE(aDestination);
+        OT_UNUSED_VARIABLE(aPrefixMatch);
+        return OT_ERROR_NOT_IMPLEMENTED;
+    }
 
 protected:
-    Ip6 &mIp6;
+    /**
+     * This method subscribes the network interface to the realm-local all MPL forwarders, link-local and
+     * realm-local all nodes address.
+     *
+     */
+    void SubscribeAllNodesMulticast(void);
+
+    /**
+     * This method unsubscribes the network interface from the realm-local all MPL forwarders, link-local and
+     * realm-local all nodes address.
+     *
+     */
+    void UnsubscribeAllNodesMulticast(void);
 
 private:
-    static void HandleStateChangedTask(void *aContext);
-    void HandleStateChangedTask(void);
+    enum
+    {
+        kMulticastPrefixLength = 128, ///< Multicast prefix length used to notify internal address changes.
+    };
 
-    NetifCallback *mCallbacks;
-    NetifUnicastAddress *mUnicastAddresses;
+    NetifUnicastAddress *  mUnicastAddresses;
     NetifMulticastAddress *mMulticastAddresses;
-    int8_t mInterfaceId;
-    bool mAllRoutersSubscribed;
-    bool mMulticastPromiscuous;
-    Tasklet mStateChangedTask;
-    Netif *mNext;
+    int8_t                 mInterfaceId;
+    bool                   mMulticastPromiscuous;
+    Netif *                mNext;
 
-    uint32_t mStateChangedFlags;
+    otIp6AddressCallback mAddressCallback;
+    void *               mAddressCallbackContext;
 
-    NetifUnicastAddress mExtUnicastAddresses[OPENTHREAD_CONFIG_MAX_EXT_IP_ADDRS];
+    NetifUnicastAddress   mExtUnicastAddresses[OPENTHREAD_CONFIG_MAX_EXT_IP_ADDRS];
     NetifMulticastAddress mExtMulticastAddresses[OPENTHREAD_CONFIG_MAX_EXT_MULTICAST_IP_ADDRS];
+
+    static const otNetifMulticastAddress kRealmLocalAllMplForwardersMulticastAddress;
+    static const otNetifMulticastAddress kLinkLocalAllNodesMulticastAddress;
+    static const otNetifMulticastAddress kRealmLocalAllNodesMulticastAddress;
+    static const otNetifMulticastAddress kLinkLocalAllRoutersMulticastAddress;
+    static const otNetifMulticastAddress kRealmLocalAllRoutersMulticastAddress;
 };
 
 /**
@@ -554,7 +501,7 @@ private:
  *
  */
 
-}  // namespace Ip6
-}  // namespace ot
+} // namespace Ip6
+} // namespace ot
 
-#endif  // NET_NETIF_HPP_
+#endif // NET_NETIF_HPP_

@@ -35,9 +35,13 @@
 #ifndef PLATFORM_KW41Z_H_
 #define PLATFORM_KW41Z_H_
 
+#include <openthread/config.h>
+#include <openthread-core-config.h>
+
 #include <stdint.h>
 
-#include "openthread/types.h"
+#include <openthread/instance.h>
+
 /**
  * This function initializes the alarm service used by OpenThread.
  *

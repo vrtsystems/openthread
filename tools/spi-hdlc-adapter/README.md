@@ -1,4 +1,4 @@
-SPI/HDLC Adaptor
+SPI/HDLC Adapter
 ================
 
 `spi-hdlc-adapter` is an adapter tool for using a SPI interface as if
@@ -38,11 +38,11 @@ protocol document.
 *   `--spi-cs-delay[=usec]`: Specify the delay after C̅S̅ assertion,
     in microseconds. Default is 20µs. Note that this may need to be
     set to zero for spi-hdlc-adapter to work with some SPI drivers.
-*   `--spi-align-allowance[=n]`: Specify the the maximum number of 0xFF
+*   `--spi-align-allowance[=n]`: Specify the maximum number of 0xFF
     bytes to clip from start of MISO frame. This makes this tool usable
-    with SPI slaves which have buggy SPI blocks that prepend up to
-    three 0xFF bytes to the start of MISO frame. Default value is `0`.
-    Maximum value is `6`. *This must be set to `4` for chips in the
+    with SPI slaves which have buggy SPI blocks that prepend a variable
+    number of 0xFF bytes to the start of MISO frame. Default value is `0`.
+    Maximum value is `16`. *This should be set to `7` for chips in the
     SiLabs EM35x family.*
 *   `--spi-small-packet=[n]`: Specify the smallest packet we can receive
     in a single SPI transaction. Packets sent by the slave which are smaller
@@ -50,7 +50,8 @@ protocol document.
     to be successfully transmitted. Increasing this value will (up to a point)
     decrease latency for smaller packets at the expense of overall bandwidth.
     Default value is 32. The minimum value is 0. The maximum value is 2043.
-*   `--verbose`: Increase debug verbosity.
+*   `--verbose`: Increase debug verbosity (can be repeated up to 3 times,
+    each time increasing the verbosity of the logs).
 *   `--help`: Print out usage information to `stdout` and exit.
 
 `spi-device-path` is a required argument since it indicates which SPI

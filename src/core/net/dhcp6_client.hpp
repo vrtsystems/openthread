@@ -34,8 +34,11 @@
 #ifndef DHCP6_CLIENT_HPP_
 #define DHCP6_CLIENT_HPP_
 
+#include "openthread-core-config.h"
+
 #include <openthread/dhcp6_client.h>
 
+#include "common/locator.hpp"
 #include "common/message.hpp"
 #include "common/timer.hpp"
 #include "common/trickle_timer.hpp"
@@ -45,9 +48,6 @@
 #include "net/udp6.hpp"
 
 namespace ot {
-
-class ThreadNetif;
-namespace Mle { class MleRouter; }
 
 namespace Dhcp6 {
 
@@ -60,7 +60,6 @@ namespace Dhcp6 {
  * @{
  *
  */
-
 
 /**
  * Some constants
@@ -80,7 +79,6 @@ OT_TOOL_PACKED_BEGIN
 class IdentityAssociation
 {
 public:
-
     /**
      * Status of IdentityAssociation
      *
@@ -156,40 +154,31 @@ public:
     void SetNext(IdentityAssociation *aNext) { mNext = aNext; }
 
 private:
-    uint8_t       mStatus;                         ///< Status of IdentityAssocation
-    uint16_t      mPrefixAgentRloc;                ///< Rloc of Prefix Agent
-    otIp6Prefix   mIp6Prefix;                      ///< Prefix
-    IdentityAssociation *mNext;                    ///< Pointer to next IdentityAssocation
+    uint8_t              mStatus;          ///< Status of IdentityAssocation
+    uint16_t             mPrefixAgentRloc; ///< Rloc of Prefix Agent
+    otIp6Prefix          mIp6Prefix;       ///< Prefix
+    IdentityAssociation *mNext;            ///< Pointer to next IdentityAssocation
 } OT_TOOL_PACKED_END;
-
 
 /**
  * This class implements DHCPv6 Client.
  *
  */
-class Dhcp6Client
+class Dhcp6Client : public InstanceLocator
 {
 public:
     /**
      * This constructor initializes the object.
      *
-     * @param[in]  aThreadNetif  A reference to the Thread network interface.
+     * @param[in]  aInstance     A reference to the OpenThread instance.
      *
      */
-    explicit Dhcp6Client(ThreadNetif &aThreadNetif);
-
-    /**
-     * This method returns the pointer to the parent otInstance structure.
-     *
-     * @returns The pointer to the parent otInstance structure.
-     *
-     */
-    otInstance *GetInstance(void);
+    explicit Dhcp6Client(Instance &aInstance);
 
     /**
      * This method update addresses that shall be automatically created using DHCP.
      *
-     * @param[in]     aInstance     A pointer to openThread instance.
+     * @param[in]     aInstance     A pointer to OpenThread instance.
      * @param[inout]  aAddresses    A pointer to an array containing addresses created by this module.
      * @param[in]     aNumAddresses The number of elements in aAddresses array.
      * @param[in]     aContext      A pointer to IID creator-specific context data.
@@ -216,35 +205,34 @@ private:
     otError AppendRapidCommit(Message &aMessage);
 
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
-    void HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    void        HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
-    void ProcessReply(Message &aMessage);
+    void     ProcessReply(Message &aMessage);
     uint16_t FindOption(Message &aMessage, uint16_t aOffset, uint16_t aLength, Code aCode);
-    otError ProcessServerIdentifier(Message &aMessage, uint16_t aOffset);
-    otError ProcessClientIdentifier(Message &aMessage, uint16_t aOffset);
-    otError ProcessIaNa(Message &aMessage, uint16_t aOffset);
-    otError ProcessStatusCode(Message &aMessage, uint16_t aOffset);
-    otError ProcessIaAddress(Message &aMessage, uint16_t aOffset);
+    otError  ProcessServerIdentifier(Message &aMessage, uint16_t aOffset);
+    otError  ProcessClientIdentifier(Message &aMessage, uint16_t aOffset);
+    otError  ProcessIaNa(Message &aMessage, uint16_t aOffset);
+    otError  ProcessStatusCode(Message &aMessage, uint16_t aOffset);
+    otError  ProcessIaAddress(Message &aMessage, uint16_t aOffset);
 
-    static bool HandleTrickleTimer(void *aContext);
-    bool HandleTrickleTimer(void);
+    static bool HandleTrickleTimer(TrickleTimer &aTrickleTimer);
+    bool        HandleTrickleTimer(void);
+
+    Ip6::UdpSocket mSocket;
 
     TrickleTimer mTrickleTimer;
 
-    Ip6::UdpSocket mSocket;
-    ThreadNetif &mNetif;
-
-    uint8_t mTransactionId[kTransactionIdSize];
-    uint32_t mStartTime;
+    uint8_t        mTransactionId[kTransactionIdSize];
+    uint32_t       mStartTime;
     otDhcpAddress *mAddresses;
-    uint32_t mNumAddresses;
+    uint32_t       mNumAddresses;
 
-    IdentityAssociation mIdentityAssociations[OPENTHREAD_CONFIG_NUM_DHCP_PREFIXES];
+    IdentityAssociation  mIdentityAssociations[OPENTHREAD_CONFIG_NUM_DHCP_PREFIXES];
     IdentityAssociation *mIdentityAssociationHead;
     IdentityAssociation *mIdentityAssociationAvail;
 };
 
-}  // namespace Dhcp6
-}  // namespace ot
+} // namespace Dhcp6
+} // namespace ot
 
-# endif  // DHCP6_CLIENT_HPP_
+#endif // DHCP6_CLIENT_HPP_

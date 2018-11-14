@@ -26,43 +26,68 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <openthread-core-config.h>
+#include <openthread/config.h>
+
+#include <assert.h>
 #include <stdint.h>
 #include <string.h>
-#include <assert.h>
 
-#include <openthread/types.h>
-#include <openthread/platform/alarm.h>
-#include <utils/flash.h>
 #include <utils/code_utils.h>
+#include <utils/flash.h>
+#include <openthread/platform/alarm-milli.h>
 
-#include "hal/nrf_nvmc.h"
 #include "platform-nrf5.h"
 
-extern uint32_t __flash_data_start;
-extern uint32_t __flash_data_end;
-
 #define FLASH_PAGE_ADDR_MASK 0xFFFFF000
-#define FLASH_PAGE_SIZE      4096
-#define FLASH_START_ADDR     ((uint32_t)&__flash_data_start)
-#define FLASH_END_ADDR       ((uint32_t)&__flash_data_end)
+#define FLASH_PAGE_SIZE 4096
+
+static uint32_t sFlashDataStart;
+static uint32_t sFlashDataEnd;
 
 static inline uint32_t mapAddress(uint32_t aAddress)
 {
-    return aAddress + FLASH_START_ADDR;
+    return aAddress + sFlashDataStart;
 }
 
 otError utilsFlashInit(void)
 {
+#if defined(__CC_ARM)
+    // Temporary solution for Keil compiler.
+    uint32_t const bootloaderAddr = NRF_UICR->NRFFW[0];
+    uint32_t const pageSize       = NRF_FICR->CODEPAGESIZE;
+    uint32_t const codeSize       = NRF_FICR->CODESIZE;
+
+    if (bootloaderAddr != 0xFFFFFFFF)
+    {
+        sFlashDataEnd = bootloaderAddr;
+    }
+    else
+    {
+        sFlashDataEnd = pageSize * codeSize;
+    }
+
+    sFlashDataStart = sFlashDataEnd - (pageSize * SETTINGS_CONFIG_PAGE_NUM);
+
+#elif defined(__GNUC__) || defined(__ICCARM__)
+    extern uint32_t __start_ot_flash_data;
+    extern uint32_t __stop_ot_flash_data;
+
+    sFlashDataStart = (uint32_t)&__start_ot_flash_data;
+    sFlashDataEnd   = (uint32_t)&__stop_ot_flash_data;
+
+#endif
+
     // Just ensure that the start and end addresses are page-aligned.
-    assert((FLASH_START_ADDR % FLASH_PAGE_SIZE) == 0);
-    assert((FLASH_END_ADDR % FLASH_PAGE_SIZE) == 0);
+    assert((sFlashDataStart % FLASH_PAGE_SIZE) == 0);
+    assert((sFlashDataEnd % FLASH_PAGE_SIZE) == 0);
 
     return OT_ERROR_NONE;
 }
 
 uint32_t utilsFlashGetSize(void)
 {
-    return FLASH_END_ADDR - FLASH_START_ADDR;
+    return sFlashDataEnd - sFlashDataStart;
 }
 
 otError utilsFlashErasePage(uint32_t aAddress)
@@ -70,7 +95,7 @@ otError utilsFlashErasePage(uint32_t aAddress)
     otError error = OT_ERROR_NONE;
     otEXPECT_ACTION(aAddress < utilsFlashGetSize(), error = OT_ERROR_INVALID_ARGS);
 
-    nrf_nvmc_page_erase(mapAddress(aAddress & FLASH_PAGE_ADDR_MASK));
+    error = nrf5FlashPageErase(mapAddress(aAddress & FLASH_PAGE_ADDR_MASK));
 
 exit:
     return error;
@@ -82,24 +107,23 @@ otError utilsFlashStatusWait(uint32_t aTimeout)
 
     if (aTimeout == 0)
     {
-        if (NRF_NVMC->READY == NVMC_READY_READY_Ready)
+        if (!nrf5FlashIsBusy())
         {
             error = OT_ERROR_NONE;
         }
     }
     else
     {
-        uint32_t startTime = otPlatAlarmGetNow();
+        uint32_t startTime = otPlatAlarmMilliGetNow();
 
         do
         {
-            if (NRF_NVMC->READY == NVMC_READY_READY_Ready)
+            if (!nrf5FlashIsBusy())
             {
                 error = OT_ERROR_NONE;
                 break;
             }
-        }
-        while (otPlatAlarmGetNow() - startTime < aTimeout);
+        } while (otPlatAlarmMilliGetNow() - startTime < aTimeout);
     }
 
     return error;
@@ -110,9 +134,9 @@ uint32_t utilsFlashWrite(uint32_t aAddress, uint8_t *aData, uint32_t aSize)
     uint32_t result = 0;
     otEXPECT(aData);
     otEXPECT(aAddress < utilsFlashGetSize());
+    otEXPECT(aSize);
 
-    nrf_nvmc_write_bytes(mapAddress(aAddress), aData, aSize);
-    result = aSize;
+    result = nrf5FlashWrite(mapAddress(aAddress), aData, aSize);
 
 exit:
     return result;

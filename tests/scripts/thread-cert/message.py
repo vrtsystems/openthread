@@ -45,9 +45,10 @@ class MessageType(IntEnum):
     MLE = 0
     COAP = 1
     ICMP = 2
-    ACK = 3 
+    ACK = 3
     BEACON = 4
     DATA = 5
+    COMMAND = 6
 
 
 class Message(object):
@@ -110,6 +111,10 @@ class Message(object):
 
         elif self._mac_header.frame_type == mac802154.MacHeader.FrameType.DATA:
             self._type = MessageType.DATA
+        elif self._mac_header.frame_type == mac802154.MacHeader.FrameType.COMMAND:
+            self._type = MessageType.COMMAND
+        else:
+            raise ValueError('Invalid mac frame type %d' % self._mac_header.frame_type)
 
     @property
     def ipv6_packet(self):
@@ -151,6 +156,14 @@ class Message(object):
         assert(self.mle.command.type == command_type)
 
     def assertMleMessageContainsTlv(self, tlv_class_type):
+        """To confirm if Mle message contains the TLV type.
+
+        Args:
+            tlv_class_type: tlv's type.
+
+        Returns:
+            mle.Route64: If contains the TLV, return it.
+        """
         if self.type != MessageType.MLE:
             raise ValueError("Invalid message type. Expected MLE message.")
 
@@ -161,6 +174,22 @@ class Message(object):
                 break
 
         assert(contains_tlv == True)
+        return tlv
+
+    def assertAssignedRouterQuantity(self, router_quantity):
+        """Confirm if Leader contains the Route64 TLV with router_quantity assigned Router IDs.
+
+        Args:
+            router_quantity: the quantity of router.
+        """
+        tlv = self.assertMleMessageContainsTlv(mle.Route64)
+        router_id_mask = tlv.router_id_mask
+
+        count = 0
+        for i in range(1, 65):
+            count += (router_id_mask & 1)
+            router_id_mask = (router_id_mask >> 1)
+        assert(count == router_quantity)
 
     def assertMleMessageDoesNotContainTlv(self, tlv_class_type):
         if self.type != MessageType.MLE:
@@ -184,7 +213,10 @@ class Message(object):
                 contains_tlv = True
                 break
 
-        print("MleMessage doesn't contain optional TLV: {}".format(tlv_class_type))
+        if contains_tlv == True:
+            print("MleMessage contains optional TLV: {}".format(tlv_class_type))
+        else:
+            print("MleMessage doesn't contain optional TLV: {}".format(tlv_class_type))
 
     def get_coap_message_tlv(self, tlv_class_type):
         if self.type != MessageType.COAP:
@@ -205,6 +237,18 @@ class Message(object):
                 break
 
         assert(contains_tlv == True)
+
+    def assertCoapMessageDoesNotContainTlv(self, tlv_class_type):
+        if self.type != MessageType.COAP:
+            raise ValueError("Invalid message type. Expected COAP message.")
+
+        contains_tlv = False
+        for tlv in self.coap.payload:
+            if isinstance(tlv, tlv_class_type):
+                contains_tlv = True
+                break
+
+        assert(contains_tlv == False)
 
     def assertCoapMessageContainsOptionalTlv(self, tlv_class_type):
         if self.type != MessageType.COAP:
@@ -236,6 +280,16 @@ class Message(object):
 
         for addr in node.get_addrs():
             if dst_addr == ipaddress.ip_address(addr):
+                sent_to_node = True
+
+        if self.mac_header.dest_address.type == common.MacAddressType.SHORT:
+            mac_address = common.MacAddress.from_rloc16(node.get_addr16())
+            if self.mac_header.dest_address == mac_address:
+                sent_to_node = True
+
+        elif self.mac_header.dest_address.type == common.MacAddressType.LONG:
+            mac_address = common.MacAddress.from_eui64(bytearray(node.get_addr64(), encoding="utf-8"))
+            if self.mac_header.dest_address == mac_address:
                 sent_to_node = True
 
         assert sent_to_node == True
@@ -286,8 +340,37 @@ class MessagesSet(object):
 
         return message
 
+    def last_mle_message(self, command_type, assert_enabled = True):
+        """Get the last Mle Message with specified type from existing capture.
+
+        Args:
+            command_type: the specified mle type.
+            assert_enabled: interrupt or not when get the mle.
+
+        Returns:
+            message.Message: the last Mle Message with specified type.
+        """
+        message = None
+        size = len(self.messages)
+
+        for i in range(size - 1, -1, -1):
+            m = self.messages[i]
+
+            if m.type != MessageType.MLE:
+                continue
+
+            #for command_type in command_types:
+            if m.mle.command.type == command_type:
+                message = m
+                break
+
+        if assert_enabled:
+            assert message is not None, "Could not find MleMessage with type: {}".format(command_type)
+
+        return message
+
     def next_mle_message(self, command_type, assert_enabled=True):
-        message = self.next_mle_message_of_one_of_command_types(command_type,)
+        message = self.next_mle_message_of_one_of_command_types(command_type)
 
         if assert_enabled:
             assert message is not None, "Could not find MleMessage of the type: {}".format(command_type)
@@ -315,6 +398,23 @@ class MessagesSet(object):
                 break
 
         return message
+
+    def contains_icmp_message(self):
+        for m in self.messages:
+            if m.type == MessageType.ICMP:
+                return True
+
+        return False
+
+    def get_icmp_message(self, icmp_type):
+        for m in self.messages:
+            if m.type != MessageType.ICMP:
+                continue
+
+            if m.icmp.header.type == icmp_type:
+                return m
+
+        return None
 
     def contains_mle_message(self, command_type):
         for m in self.messages:
@@ -354,6 +454,9 @@ class MessageFactory:
         mac_frame = mac802154.MacFrame()
         mac_frame.parse(data)
         return mac_frame
+
+    def set_lowpan_context(self, cid, prefix):
+        self._lowpan_parser.set_lowpan_context(cid, prefix)
 
     def create(self, data):
         message = Message()

@@ -31,20 +31,17 @@
  *   This file implements the Thread IPv6 global addresses configuration utilities.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "slaac_address.hpp"
 
 #include "utils/wrap_string.h"
 
-#include <openthread/openthread.h>
+#include <openthread/ip6.h>
+#include <openthread/netdata.h>
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
+#include "common/instance.hpp"
+#include "common/random.hpp"
 #include "crypto/sha256.hpp"
 #include "mac/mac.hpp"
 #include "net/ip6_address.hpp"
@@ -52,17 +49,20 @@
 namespace ot {
 namespace Utils {
 
-void Slaac::UpdateAddresses(otInstance *aInstance, otNetifAddress *aAddresses, uint32_t aNumAddresses,
-                            IidCreator aIidCreator, void *aContext)
+void Slaac::UpdateAddresses(otInstance *    aInstance,
+                            otNetifAddress *aAddresses,
+                            uint32_t        aNumAddresses,
+                            IidCreator      aIidCreator,
+                            void *          aContext)
 {
     otNetworkDataIterator iterator;
-    otBorderRouterConfig config;
+    otBorderRouterConfig  config;
 
     // remove addresses
     for (size_t i = 0; i < aNumAddresses; i++)
     {
         otNetifAddress *address = &aAddresses[i];
-        bool found = false;
+        bool            found   = false;
 
         if (!address->mValid)
         {
@@ -71,7 +71,7 @@ void Slaac::UpdateAddresses(otInstance *aInstance, otNetifAddress *aAddresses, u
 
         iterator = OT_NETWORK_DATA_ITERATOR_INIT;
 
-        while (otNetDataGetNextPrefixInfo(aInstance, false, &iterator, &config) == OT_ERROR_NONE)
+        while (otNetDataGetNextOnMeshPrefix(aInstance, &iterator, &config) == OT_ERROR_NONE)
         {
             if (config.mSlaac == false)
             {
@@ -88,7 +88,8 @@ void Slaac::UpdateAddresses(otInstance *aInstance, otNetifAddress *aAddresses, u
 
         if (!found)
         {
-            otIp6RemoveUnicastAddress(aInstance, &address->mAddress);
+            static_cast<Instance *>(aInstance)->GetThreadNetif().RemoveUnicastAddress(
+                *static_cast<Ip6::NetifUnicastAddress *>(address));
             address->mValid = false;
         }
     }
@@ -96,7 +97,7 @@ void Slaac::UpdateAddresses(otInstance *aInstance, otNetifAddress *aAddresses, u
     // add addresses
     iterator = OT_NETWORK_DATA_ITERATOR_INIT;
 
-    while (otNetDataGetNextPrefixInfo(aInstance, false, &iterator, &config) == OT_ERROR_NONE)
+    while (otNetDataGetNextOnMeshPrefix(aInstance, &iterator, &config) == OT_ERROR_NONE)
     {
         bool found = false;
 
@@ -117,6 +118,8 @@ void Slaac::UpdateAddresses(otInstance *aInstance, otNetifAddress *aAddresses, u
             if (otIp6PrefixMatch(&config.mPrefix.mPrefix, &address->mAddress) >= config.mPrefix.mLength &&
                 config.mPrefix.mLength == address->mPrefixLength)
             {
+                static_cast<Instance *>(aInstance)->GetThreadNetif().AddUnicastAddress(
+                    *static_cast<Ip6::NetifUnicastAddress *>(address));
                 found = true;
                 break;
             }
@@ -137,15 +140,16 @@ void Slaac::UpdateAddresses(otInstance *aInstance, otNetifAddress *aAddresses, u
                 memcpy(&address->mAddress, &config.mPrefix.mPrefix, 8);
 
                 address->mPrefixLength = config.mPrefix.mLength;
-                address->mPreferred = config.mPreferred;
-                address->mValid = true;
+                address->mPreferred    = config.mPreferred;
+                address->mValid        = true;
 
                 if (aIidCreator(aInstance, address, aContext) != OT_ERROR_NONE)
                 {
                     CreateRandomIid(aInstance, address, aContext);
                 }
 
-                otIp6AddUnicastAddress(aInstance, address);
+                static_cast<Instance *>(aInstance)->GetThreadNetif().AddUnicastAddress(
+                    *static_cast<Ip6::NetifUnicastAddress *>(address));
                 break;
             }
         }
@@ -154,11 +158,7 @@ void Slaac::UpdateAddresses(otInstance *aInstance, otNetifAddress *aAddresses, u
 
 otError Slaac::CreateRandomIid(otInstance *, otNetifAddress *aAddress, void *)
 {
-    for (size_t i = sizeof(aAddress[i].mAddress) - OT_IP6_IID_SIZE; i < sizeof(aAddress[i].mAddress); i++)
-    {
-        aAddress->mAddress.mFields.m8[i] = static_cast<uint8_t>(otPlatRandomGet());
-    }
-
+    Random::FillBuffer(aAddress->mAddress.mFields.m8 + OT_IP6_ADDRESS_SIZE - OT_IP6_IID_SIZE, OT_IP6_IID_SIZE);
     return OT_ERROR_NONE;
 }
 
@@ -180,10 +180,10 @@ exit:
 
 otError SemanticallyOpaqueIidGenerator::CreateIidOnce(otInstance *aInstance, otNetifAddress *aAddress)
 {
-    otError error = OT_ERROR_NONE;
+    otError        error = OT_ERROR_NONE;
     Crypto::Sha256 sha256;
-    uint8_t hash[Crypto::Sha256::kHashSize];
-    Ip6::Address *address = static_cast<Ip6::Address *>(&aAddress->mAddress);
+    uint8_t        hash[Crypto::Sha256::kHashSize];
+    Ip6::Address * address = static_cast<Ip6::Address *>(&aAddress->mAddress);
 
     sha256.Start();
 
@@ -205,8 +205,8 @@ otError SemanticallyOpaqueIidGenerator::CreateIidOnce(otInstance *aInstance, otN
 
     sha256.Finish(hash);
 
-    memcpy(&aAddress->mAddress.mFields.m8[OT_IP6_ADDRESS_SIZE - OT_IP6_IID_SIZE],
-           &hash[sizeof(hash) - OT_IP6_IID_SIZE], OT_IP6_IID_SIZE);
+    memcpy(&aAddress->mAddress.mFields.m8[OT_IP6_ADDRESS_SIZE - OT_IP6_IID_SIZE], &hash[sizeof(hash) - OT_IP6_IID_SIZE],
+           OT_IP6_IID_SIZE);
 
     VerifyOrExit(!IsAddressRegistered(aInstance, aAddress), error = OT_ERROR_IP6_ADDRESS_CREATION_FAILURE);
     VerifyOrExit(!address->IsIidReserved(), error = OT_ERROR_IP6_ADDRESS_CREATION_FAILURE);
@@ -217,7 +217,7 @@ exit:
 
 bool SemanticallyOpaqueIidGenerator::IsAddressRegistered(otInstance *aInstance, otNetifAddress *aCreatedAddress)
 {
-    bool result = false;
+    bool                  result  = false;
     const otNetifAddress *address = otIp6GetUnicastAddresses(aInstance);
 
     while (address != NULL)
@@ -235,6 +235,5 @@ exit:
     return result;
 }
 
-
-}  // namespace Slaac
-}  // namespace ot
+} // namespace Utils
+} // namespace ot

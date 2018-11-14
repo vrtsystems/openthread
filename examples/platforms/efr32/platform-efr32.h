@@ -35,8 +35,11 @@
 #ifndef PLATFORM_EFR32_H_
 #define PLATFORM_EFR32_H_
 
+#include <openthread/instance.h>
+
 #include "em_device.h"
 #include "em_system.h"
+
 #include "core_cm4.h"
 
 // Global OpenThread instance structure
@@ -94,10 +97,4 @@ void efr32MiscInit(void);
  */
 void efr32RandomInit(void);
 
-/**
- * Initialization of EFR32 Hardware Abstract Layer.
- *
- */
-void efr32HalInit(void);
-
-#endif  // PLATFORM_EFR32_H_
+#endif // PLATFORM_EFR32_H_

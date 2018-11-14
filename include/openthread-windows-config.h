@@ -32,8 +32,12 @@
 /* Define to 1 to enable the NCP SPI interface. */
 // On the command line: #define OPENTHREAD_ENABLE_NCP_SPI  1
 
-/* Define to 1 if you want to enable default logging */
-#define OPENTHREAD_ENABLE_DEFAULT_LOGGING 1
+/* Define to 1 if you want to enable support for multiple OpenThread
+   instances. */
+#define OPENTHREAD_ENABLE_MULTIPLE_INSTANCES 1
+
+/* Define to 1 if you want to enable default log output. */
+#define OPENTHREAD_CONFIG_LOG_OUTPUT OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED
 
 /* Define to 1 to enable the commissioner role. */
 #define OPENTHREAD_ENABLE_COMMISSIONER 1
@@ -60,10 +64,10 @@
 #define OPENTHREAD_ENABLE_DHCP6_SERVER 1
 
 /* Define to 1 to enable MAC whitelist/blacklist feature. */
-#define OPENTHREAD_ENABLE_MAC_WHITELIST 1
+#define OPENTHREAD_ENABLE_MAC_FILTER 1
 
-/* Define to 1 to enable border agent proxy feature. */
-#define OPENTHREAD_ENABLE_BORDER_AGENT_PROXY 0
+/* Define to 1 to enable TMF proxy feature. */
+#define OPENTHREAD_ENABLE_TMF_PROXY 0
 
 /* Define to 1 to enable raw link-layer API. */
 #ifdef _KERNEL_MODE
@@ -71,6 +75,18 @@
 #else
 #define OPENTHREAD_ENABLE_RAW_LINK_API 1
 #endif
+
+/* Define to the platform name. */
+#define OPENTHREAD_CONFIG_PLATFORM_INFO "Windows"
+
+/* Define to 1 to enable Border Router feature. */
+#define OPENTHREAD_ENABLE_BORDER_ROUTER 1
+
+/* Define to 1 to enable Service feature. */
+#define OPENTHREAD_ENABLE_SERVICE 0
+
+/* Define to 1 to enable long routes support. */
+#define OPENTHREAD_CONFIG_ENABLE_LONG_ROUTES 0
 
 /* Name of package */
 #define PACKAGE "openthread"
@@ -95,9 +111,6 @@
 
 /* Version number of package */
 #define VERSION "0.01.00"
-
-/* Platform version information */
-#define PLATFORM_INFO "Windows"
 
 // Windows Kernel only has sprintf_s
 #ifdef _KERNEL_MODE

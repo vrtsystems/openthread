@@ -35,21 +35,18 @@
 #ifndef PLATFORM_POSIX_H_
 #define PLATFORM_POSIX_H_
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
+#include <openthread-core-config.h>
+#include <openthread/config.h>
 
 #include <assert.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #if _WIN32
-#include <WinSock2.h>
 #include <WS2tcpip.h>
+#include <WinSock2.h>
 #include <windows.h>
 #define POLL WSAPoll
 #define ssize_t int
@@ -59,13 +56,13 @@
 __forceinline int gettimeofday(struct timeval *tv, struct timezone *tz)
 {
     (void)tz;
-    tv->tv_sec = _time32(NULL);
+    tv->tv_sec  = _time32(NULL);
     tv->tv_usec = 0;
     return 0;
 }
 __forceinline void timersub(struct timeval *a, struct timeval *b, struct timeval *res)
 {
-    res->tv_sec = (long)_difftime32(a->tv_sec, b->tv_sec);
+    res->tv_sec  = (long)_difftime32(a->tv_sec, b->tv_sec);
     res->tv_usec = 0;
 }
 #else
@@ -73,6 +70,7 @@ __forceinline void timersub(struct timeval *a, struct timeval *b, struct timeval
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <signal.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -81,25 +79,45 @@ __forceinline void timersub(struct timeval *a, struct timeval *b, struct timeval
 #define POLL poll
 #endif
 
-#include <openthread/openthread.h>
+#include <openthread/instance.h>
+
+#include "openthread-core-config.h"
+#include "platform-config.h"
+
+enum
+{
+    OT_SIM_EVENT_ALARM_FIRED        = 0,
+    OT_SIM_EVENT_RADIO_RECEIVED     = 1,
+    OT_SIM_EVENT_UART_WRITE         = 2,
+    OT_SIM_EVENT_RADIO_SPINEL_WRITE = 3,
+    OT_EVENT_DATA_MAX_SIZE          = 1024,
+};
+
+OT_TOOL_PACKED_BEGIN
+struct Event
+{
+    uint64_t mDelay;
+    uint8_t  mEvent;
+    uint16_t mDataLength;
+    uint8_t  mData[OT_EVENT_DATA_MAX_SIZE];
+} OT_TOOL_PACKED_END;
+
+enum
+{
+    WELLKNOWN_NODE_ID = 34, ///< Well-known Unique ID used by a simulated radio that supports promiscuous mode.
+};
 
 /**
  * Unique node ID.
  *
  */
-extern uint32_t NODE_ID;
-
-/**
- * Well-known Unique ID used by a simulated radio that supports promiscuous mode.
- *
- */
-extern uint32_t WELLKNOWN_NODE_ID;
+extern uint32_t gNodeId;
 
 /**
  * This function initializes the alarm service used by OpenThread.
  *
  */
-void platformAlarmInit(void);
+void platformAlarmInit(uint32_t aSpeedUpFactor);
 
 /**
  * This function retrieves the time remaining until the alarm fires.
@@ -118,10 +136,50 @@ void platformAlarmUpdateTimeout(struct timeval *tv);
 void platformAlarmProcess(otInstance *aInstance);
 
 /**
+ * This function returns the next alarm event time.
+ *
+ * @returns The next alarm fire time.
+ *
+ */
+int32_t platformAlarmGetNext(void);
+
+/**
+ * This function returns the current alarm time.
+ *
+ * @returns The current alarm time.
+ *
+ */
+uint64_t platformAlarmGetNow(void);
+
+/**
+ * This function advances the alarm time by @p aDelta.
+ *
+ * @param[in]  aDelta  The amount of time to advance.
+ *
+ */
+void platformAlarmAdvanceNow(uint64_t aDelta);
+
+/**
  * This function initializes the radio service used by OpenThread.
  *
  */
 void platformRadioInit(void);
+
+/**
+ * This function shuts down the radio service used by OpenThread.
+ *
+ */
+void platformRadioDeinit(void);
+
+/**
+ * This function inputs a received radio frame.
+ *
+ * @param[in]  aInstance   A pointer to the OpenThread instance.
+ * @param[in]  aBuf        A pointer to the received radio frame.
+ * @param[in]  aBufLength  The size of the received radio frame.
+ *
+ */
+void platformRadioReceive(otInstance *aInstance, uint8_t *aBuf, uint16_t aBufLength);
 
 /**
  * This function updates the file descriptor sets with file descriptors used by the radio driver.
@@ -163,4 +221,35 @@ void platformUartUpdateFdSet(fd_set *aReadFdSet, fd_set *aWriteFdSet, fd_set *aE
  */
 void platformUartProcess(void);
 
-#endif  // PLATFORM_POSIX_H_
+/**
+ * This function restores the Uart.
+ *
+ */
+void platformUartRestore(void);
+
+/**
+ * This function sends a simulation event.
+ *
+ * @param[in]   aEvent  A pointer to the simulation event to send
+ *
+ */
+void otSimSendEvent(const struct Event *aEvent);
+
+/**
+ * This function sends Uart data through simulation.
+ *
+ * @param[in]   aData       A pointer to the UART data.
+ * @param[in]   aLength     Length of UART data.
+ *
+ */
+void otSimSendUartWriteEvent(const uint8_t *aData, uint16_t aLength);
+
+/**
+ * This function checks if radio transmitting is pending.
+ *
+ * @returns Whether radio transmitting is pending.
+ *
+ */
+bool platformRadioIsTransmitPending(void);
+
+#endif // PLATFORM_POSIX_H_

@@ -31,12 +31,6 @@
  *   This file implements the CLI server on the UART service.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "cli_uart.hpp"
 
 #include <stdarg.h>
@@ -47,35 +41,75 @@
 #include <openthread/cli.h>
 #include <openthread/platform/logging.h>
 #include <openthread/platform/uart.h>
-
 #include "cli/cli.hpp"
 #include "common/code_utils.hpp"
 #include "common/encoding.hpp"
+#include "common/logging.hpp"
 #include "common/new.hpp"
 #include "common/tasklet.hpp"
+
+#if OPENTHREAD_CONFIG_ENABLE_DEBUG_UART
+#include <openthread/platform/debug_uart.h>
+#endif
 
 namespace ot {
 namespace Cli {
 
 static const char sCommandPrompt[] = {'>', ' '};
-static const char sEraseString[] = {'\b', ' ', '\b'};
-static const char CRNL[] = {'\r', '\n'};
-Uart *Uart::sUartServer;
+static const char sEraseString[]   = {'\b', ' ', '\b'};
+static const char CRNL[]           = {'\r', '\n'};
+Uart *            Uart::sUartServer;
 
 static otDEFINE_ALIGNED_VAR(sCliUartRaw, sizeof(Uart), uint64_t);
 
-extern "C" void otCliUartInit(otInstance *aInstance)
+extern "C" bool otCliUartGetLineEchoEnabled()
 {
-    Uart::sUartServer = new(&sCliUartRaw) Uart(aInstance);
+    return Uart::sUartServer->GetLineEchoEnabled();
 }
 
-Uart::Uart(otInstance *aInstance):
-    mInterpreter(aInstance)
+extern "C" void otCliUartEnableLineEcho(bool aEnable)
 {
-    mRxLength = 0;
-    mTxHead = 0;
-    mTxLength = 0;
-    mSendLength = 0;
+    Uart::sUartServer->EnableLineEcho(aEnable);
+}
+
+extern "C" void otCliUartInit(otInstance *aInstance)
+{
+    Instance *instance = static_cast<Instance *>(aInstance);
+
+    Uart::sUartServer = new (&sCliUartRaw) Uart(instance);
+}
+
+extern "C" void otCliUartSetUserCommands(const otCliCommand *aUserCommands, uint8_t aLength)
+{
+    Uart::sUartServer->GetInterpreter().SetUserCommands(aUserCommands, aLength);
+}
+
+extern "C" void otCliUartOutputBytes(const uint8_t *aBytes, uint8_t aLength)
+{
+    Uart::sUartServer->GetInterpreter().OutputBytes(aBytes, aLength);
+}
+
+extern "C" void otCliUartOutputFormat(const char *aFmt, ...)
+{
+    va_list aAp;
+    va_start(aAp, aFmt);
+    Uart::sUartServer->OutputFormatV(aFmt, aAp);
+    va_end(aAp);
+}
+
+extern "C" void otCliUartAppendResult(otError aError)
+{
+    Uart::sUartServer->GetInterpreter().AppendResult(aError);
+}
+
+Uart::Uart(Instance *aInstance)
+    : mInterpreter(aInstance)
+{
+    mRxLength       = 0;
+    mTxHead         = 0;
+    mTxLength       = 0;
+    mSendLength     = 0;
+    mEnableLineEcho = true;
 
     otPlatUartEnable();
 }
@@ -83,6 +117,16 @@ Uart::Uart(otInstance *aInstance):
 extern "C" void otPlatUartReceived(const uint8_t *aBuf, uint16_t aBufLength)
 {
     Uart::sUartServer->ReceiveTask(aBuf, aBufLength);
+}
+
+bool Uart::GetLineEchoEnabled()
+{
+    return mEnableLineEcho;
+}
+
+void Uart::EnableLineEcho(bool aEnable)
+{
+    mEnableLineEcho = aEnable;
 }
 
 void Uart::ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength)
@@ -109,9 +153,9 @@ void Uart::ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength)
 
             break;
 
-#ifdef OPENTHREAD_EXAMPLES_POSIX
+#if OPENTHREAD_POSIX
 
-        case 0x03: // ASCII for Ctrl-C
+        case 0x04: // ASCII for Ctrl-D
             exit(EXIT_SUCCESS);
             break;
 #endif
@@ -129,7 +173,10 @@ void Uart::ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength)
         default:
             if (mRxLength < kRxBufferSize)
             {
-                Output(reinterpret_cast<const char *>(aBuf), 1);
+                if (mEnableLineEcho)
+                {
+                    Output(reinterpret_cast<const char *>(aBuf), 1);
+                }
                 mRxBuffer[mRxLength++] = static_cast<char>(*aBuf);
             }
 
@@ -152,6 +199,34 @@ otError Uart::ProcessCommand(void)
         mRxBuffer[--mRxLength] = '\0';
     }
 
+#if OPENTHREAD_CONFIG_LOG_OUTPUT != OPENTHREAD_CONFIG_LOG_OUTPUT_NONE
+    /*
+     * Note this is here for this reason:
+     *
+     * TEXT (command) input ... in a test automation script occurs
+     * rapidly and often without gaps between the command and the
+     * terminal CR
+     *
+     * In contrast as a human is typing there is a delay between the
+     * last character of a command and the terminal CR which executes
+     * a command.
+     *
+     * During that human induced delay a tasklet may be scheduled and
+     * the LOG becomes confusing and it is hard to determine when
+     * something happened.  Which happened first? the command-CR or
+     * the tasklet.
+     *
+     * Yes, while rare it is a race condition that is hard to debug.
+     *
+     * Thus this is here to affirmatively LOG exactly when the CLI
+     * command is being executed.
+     */
+#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+    /* TODO: how exactly do we get the instance here? */
+#else
+    otLogInfoCli("execute command: %s", mRxBuffer);
+#endif
+#endif
     mInterpreter.ProcessLine(mRxBuffer, mRxLength, *this);
 
     mRxLength = 0;
@@ -171,7 +246,7 @@ int Uart::Output(const char *aBuf, uint16_t aBufLength)
 
     for (int i = 0; i < aBufLength; i++)
     {
-        tail = (mTxHead + mTxLength) % kTxBufferSize;
+        tail            = (mTxHead + mTxLength) % kTxBufferSize;
         mTxBuffer[tail] = *aBuf++;
         mTxLength++;
     }
@@ -183,7 +258,7 @@ int Uart::Output(const char *aBuf, uint16_t aBufLength)
 
 int Uart::OutputFormat(const char *fmt, ...)
 {
-    char buf[kMaxLineLength];
+    char    buf[kMaxLineLength];
     va_list ap;
 
     va_start(ap, fmt);
@@ -217,6 +292,10 @@ void Uart::Send(void)
 
     if (mSendLength > 0)
     {
+#if OPENTHREAD_CONFIG_ENABLE_DEBUG_UART
+        /* duplicate the output to the debug uart */
+        otPlatDebugUart_write_bytes(reinterpret_cast<uint8_t *>(mTxBuffer + mTxHead), mSendLength);
+#endif
         otPlatUartSend(reinterpret_cast<uint8_t *>(mTxBuffer + mTxHead), mSendLength);
     }
 
@@ -238,30 +317,19 @@ void Uart::SendDoneTask(void)
     Send();
 }
 
-#if OPENTHREAD_ENABLE_DEFAULT_LOGGING
-#ifdef __cplusplus
-extern "C" {
-#endif
-void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
+extern "C" void otCliPlatLogv(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, va_list aArgs)
 {
-    if (NULL == Uart::sUartServer)
-    {
-        return;
-    }
+    VerifyOrExit(Uart::sUartServer != NULL);
 
-    va_list args;
-    va_start(args, aFormat);
-    Uart::sUartServer->OutputFormatV(aFormat, args);
+    Uart::sUartServer->OutputFormatV(aFormat, aArgs);
     Uart::sUartServer->OutputFormat("\r\n");
-    va_end(args);
 
-    (void)aLogLevel;
-    (void)aLogRegion;
+    OT_UNUSED_VARIABLE(aLogLevel);
+    OT_UNUSED_VARIABLE(aLogRegion);
+
+exit:
+    return;
 }
-#ifdef __cplusplus
-}  // extern "C"
-#endif
-#endif // OPENTHREAD_ENABLE_DEFAULT_LOGGING
 
-}  // namespace Cli
-}  // namespace ot
+} // namespace Cli
+} // namespace ot

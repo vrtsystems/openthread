@@ -32,33 +32,33 @@
  *
  */
 
+#include "platform-emsk.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include "openthread/platform/alarm.h"
-#include "platform-emsk.h"
+#include "openthread/platform/alarm-milli.h"
 
 static uint32_t sCounter = 0;
 static uint32_t expires;
-static bool sIsRunning = false;
+static bool     sIsRunning = false;
 
 void emskAlarmInit(void)
 {
     sCounter = OSP_GET_CUR_MS();
 }
 
-uint32_t otPlatAlarmGetNow(void)
+uint32_t otPlatAlarmMilliGetNow(void)
 {
     return (OSP_GET_CUR_MS() - sCounter);
 }
 
-void otPlatAlarmStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
+void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
 {
     (void)aInstance;
-    expires = t0 + dt;
+    expires    = t0 + dt;
     sIsRunning = true;
 }
 
-void otPlatAlarmStop(otInstance *aInstance)
+void otPlatAlarmMilliStop(otInstance *aInstance)
 {
     (void)aInstance;
     sIsRunning = false;
@@ -72,7 +72,7 @@ void emskAlarmUpdateTimeout(int32_t *aTimeout)
 
     if (sIsRunning)
     {
-        remaining = (int32_t)(expires - otPlatAlarmGetNow());
+        remaining = (int32_t)(expires - otPlatAlarmMilliGetNow());
 
         if (remaining > 0)
         {
@@ -90,7 +90,6 @@ void emskAlarmUpdateTimeout(int32_t *aTimeout)
 
 exit:
     return;
-
 }
 
 void emskAlarmProcess(otInstance *aInstance)
@@ -99,14 +98,12 @@ void emskAlarmProcess(otInstance *aInstance)
 
     if (sIsRunning)
     {
-        remaining = (int32_t)(expires - otPlatAlarmGetNow());
+        remaining = (int32_t)(expires - otPlatAlarmMilliGetNow());
 
         if (remaining <= 0)
         {
             sIsRunning = false;
-            otPlatAlarmFired(aInstance);
+            otPlatAlarmMilliFired(aInstance);
         }
-
     }
-
 }

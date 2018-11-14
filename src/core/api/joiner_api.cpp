@@ -31,27 +31,88 @@
  *   This file implements the OpenThread Joiner API.
  */
 
+#include "openthread-core-config.h"
+
 #include <openthread/joiner.h>
 
-#include "openthread-instance.h"
+#include "common/instance.hpp"
 
 using namespace ot;
 
-#if OPENTHREAD_ENABLE_JOINER
-
-otError otJoinerStart(otInstance *aInstance, const char *aPSKd, const char *aProvisioningUrl,
-                      const char *aVendorName, const char *aVendorModel,
-                      const char *aVendorSwVersion, const char *aVendorData,
-                      otJoinerCallback aCallback, void *aContext)
+otError otJoinerStart(otInstance *     aInstance,
+                      const char *     aPSKd,
+                      const char *     aProvisioningUrl,
+                      const char *     aVendorName,
+                      const char *     aVendorModel,
+                      const char *     aVendorSwVersion,
+                      const char *     aVendorData,
+                      otJoinerCallback aCallback,
+                      void *           aContext)
 {
-    return aInstance->mThreadNetif.GetJoiner().Start(aPSKd, aProvisioningUrl,
-                                                     aVendorName, aVendorModel, aVendorSwVersion, aVendorData,
-                                                     aCallback, aContext);
+    otError error = OT_ERROR_DISABLED_FEATURE;
+#if OPENTHREAD_ENABLE_JOINER
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    error = instance.GetThreadNetif().GetJoiner().Start(aPSKd, aProvisioningUrl, aVendorName, aVendorModel,
+                                                        aVendorSwVersion, aVendorData, aCallback, aContext);
+#else
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(aPSKd);
+    OT_UNUSED_VARIABLE(aProvisioningUrl);
+    OT_UNUSED_VARIABLE(aVendorName);
+    OT_UNUSED_VARIABLE(aVendorModel);
+    OT_UNUSED_VARIABLE(aVendorSwVersion);
+    OT_UNUSED_VARIABLE(aVendorData);
+    OT_UNUSED_VARIABLE(aCallback);
+    OT_UNUSED_VARIABLE(aContext);
+#endif
+
+    return error;
 }
 
 otError otJoinerStop(otInstance *aInstance)
 {
-    return aInstance->mThreadNetif.GetJoiner().Stop();
+    otError error = OT_ERROR_DISABLED_FEATURE;
+
+#if OPENTHREAD_ENABLE_JOINER
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    error = instance.GetThreadNetif().GetJoiner().Stop();
+#else
+    OT_UNUSED_VARIABLE(aInstance);
+#endif
+
+    return error;
 }
 
-#endif  // OPENTHREAD_ENABLE_JOINER
+otJoinerState otJoinerGetState(otInstance *aInstance)
+{
+    otJoinerState state = OT_JOINER_STATE_IDLE;
+
+#if OPENTHREAD_ENABLE_JOINER
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    state = instance.GetThreadNetif().GetJoiner().GetState();
+#else
+    OT_UNUSED_VARIABLE(aInstance);
+#endif
+
+    return state;
+}
+
+otError otJoinerGetId(otInstance *aInstance, otExtAddress *aJoinerId)
+{
+    otError error = OT_ERROR_DISABLED_FEATURE;
+
+#if OPENTHREAD_ENABLE_JOINER
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    instance.GetThreadNetif().GetJoiner().GetJoinerId(*static_cast<Mac::ExtAddress *>(aJoinerId));
+    error = OT_ERROR_NONE;
+#else
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(aJoinerId);
+#endif
+
+    return error;
+}

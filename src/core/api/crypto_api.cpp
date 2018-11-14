@@ -31,19 +31,23 @@
  *   This file implements the OpenThread Crypto API.
  */
 
+#include "openthread-core-config.h"
 #include <openthread/crypto.h>
+#include <openthread/error.h>
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "crypto/aes_ccm.hpp"
+#include "crypto/ecdsa.hpp"
 #include "crypto/hmac_sha256.hpp"
 
 using namespace ot::Crypto;
 
-void otCryptoHmacSha256(
-    const uint8_t *aKey, uint16_t aKeyLength,
-    const uint8_t *aBuf, uint16_t aBufLength,
-    uint8_t *aHash)
+void otCryptoHmacSha256(const uint8_t *aKey,
+                        uint16_t       aKeyLength,
+                        const uint8_t *aBuf,
+                        uint16_t       aBufLength,
+                        uint8_t *      aHash)
 {
     HmacSha256 hmac;
 
@@ -54,21 +58,26 @@ void otCryptoHmacSha256(
     hmac.Finish(aHash);
 }
 
-void otCryptoAesCcm(
-    const uint8_t *aKey, uint16_t aKeyLength,
-    uint8_t aTagLength,
-    const void *aNonce, uint8_t aNonceLength,
-    const void *aHeader, uint32_t aHeaderLength,
-    void *aPlainText, void *aCipherText, uint32_t aLength, bool aEncrypt,
-    void *aTag)
+void otCryptoAesCcm(const uint8_t *aKey,
+                    uint16_t       aKeyLength,
+                    uint8_t        aTagLength,
+                    const void *   aNonce,
+                    uint8_t        aNonceLength,
+                    const void *   aHeader,
+                    uint32_t       aHeaderLength,
+                    void *         aPlainText,
+                    void *         aCipherText,
+                    uint32_t       aLength,
+                    bool           aEncrypt,
+                    void *         aTag)
 {
-    AesCcm aesCcm;
+    AesCcm  aesCcm;
     uint8_t tagLength;
 
     assert((aKey != NULL) && (aNonce != NULL) && (aPlainText != NULL) && (aCipherText != NULL) && (aTag != NULL));
 
     SuccessOrExit(aesCcm.SetKey(aKey, aKeyLength));
-    aesCcm.Init(aHeaderLength, aLength, aTagLength, aNonce, aNonceLength);
+    SuccessOrExit(aesCcm.Init(aHeaderLength, aLength, aTagLength, aNonce, aNonceLength));
 
     if (aHeaderLength != 0)
     {
@@ -84,3 +93,17 @@ void otCryptoAesCcm(
 exit:
     return;
 }
+
+#if OPENTHREAD_ENABLE_ECDSA
+
+otError otCryptoEcdsaSign(uint8_t *      aOutput,
+                          uint16_t *     aOutputLength,
+                          const uint8_t *aInputHash,
+                          uint16_t       aInputHashLength,
+                          const uint8_t *aPrivateKey,
+                          uint16_t       aPrivateKeyLength)
+{
+    return Ecdsa::Sign(aOutput, aOutputLength, aInputHash, aInputHashLength, aPrivateKey, aPrivateKeyLength);
+}
+
+#endif // OPENTHREAD_ENABLE_ECDSA

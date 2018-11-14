@@ -33,12 +33,6 @@
 
 #define WPP_NAME "joiner.tmh"
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "joiner.hpp"
 
 #include <stdio.h>
@@ -50,7 +44,9 @@
 #include "common/crc16.hpp"
 #include "common/debug.hpp"
 #include "common/encoding.hpp"
+#include "common/instance.hpp"
 #include "common/logging.hpp"
+#include "common/owner-locator.hpp"
 #include "mac/mac_frame.hpp"
 #include "meshcop/meshcop.hpp"
 #include "thread/thread_netif.hpp"
@@ -59,119 +55,132 @@
 #if OPENTHREAD_ENABLE_JOINER
 
 using ot::Encoding::BigEndian::HostSwap16;
-using ot::Encoding::BigEndian::HostSwap64;
 
 namespace ot {
 namespace MeshCoP {
 
-Joiner::Joiner(ThreadNetif &aNetif):
-    mState(kStateIdle),
-    mCallback(NULL),
-    mContext(NULL),
-    mCcitt(0),
-    mAnsi(0),
-    mJoinerRouterChannel(0),
-    mJoinerRouterPanId(0),
-    mJoinerUdpPort(0),
-    mVendorName(NULL),
-    mVendorModel(NULL),
-    mVendorSwVersion(NULL),
-    mVendorData(NULL),
-    mTimer(aNetif.GetIp6().mTimerScheduler, &Joiner::HandleTimer, this),
-    mJoinerEntrust(OT_URI_PATH_JOINER_ENTRUST, &Joiner::HandleJoinerEntrust, this),
-    mNetif(aNetif)
+Joiner::Joiner(Instance &aInstance)
+    : InstanceLocator(aInstance)
+    , mState(OT_JOINER_STATE_IDLE)
+    , mCallback(NULL)
+    , mContext(NULL)
+    , mCcitt(0)
+    , mAnsi(0)
+    , mVendorName(NULL)
+    , mVendorModel(NULL)
+    , mVendorSwVersion(NULL)
+    , mVendorData(NULL)
+    , mTimer(aInstance, &Joiner::HandleTimer, this)
+    , mJoinerEntrust(OT_URI_PATH_JOINER_ENTRUST, &Joiner::HandleJoinerEntrust, this)
 {
-    mNetif.GetCoap().AddResource(mJoinerEntrust);
+    memset(mJoinerRouters, 0, sizeof(mJoinerRouters));
+    GetNetif().GetCoap().AddResource(mJoinerEntrust);
 }
 
-otInstance *Joiner::GetInstance(void)
+void Joiner::GetJoinerId(Mac::ExtAddress &aJoinerId) const
 {
-    return mNetif.GetInstance();
+    otPlatRadioGetIeeeEui64(&GetInstance(), aJoinerId.m8);
+    ComputeJoinerId(aJoinerId, aJoinerId);
 }
 
-otError Joiner::Start(const char *aPSKd, const char *aProvisioningUrl,
-                      const char *aVendorName, const char *aVendorModel, const char *aVendorSwVersion,
-                      const char *aVendorData, otJoinerCallback aCallback, void *aContext)
+otError Joiner::Start(const char *     aPSKd,
+                      const char *     aProvisioningUrl,
+                      const char *     aVendorName,
+                      const char *     aVendorModel,
+                      const char *     aVendorSwVersion,
+                      const char *     aVendorData,
+                      otJoinerCallback aCallback,
+                      void *           aContext)
 {
-    otError error;
-    Mac::ExtAddress extAddress;
-    Crc16 ccitt(Crc16::kCcitt);
-    Crc16 ansi(Crc16::kAnsi);
+    ThreadNetif &   netif = GetNetif();
+    otError         error;
+    Mac::ExtAddress joinerId;
+    Crc16           ccitt(Crc16::kCcitt);
+    Crc16           ansi(Crc16::kAnsi);
 
-    otLogFuncEntry();
+    VerifyOrExit(mState == OT_JOINER_STATE_IDLE, error = OT_ERROR_BUSY);
 
-    VerifyOrExit(mState == kStateIdle, error = OT_ERROR_BUSY);
+    GetNotifier().Signal(OT_CHANGED_JOINER_STATE);
 
     // use extended address based on factory-assigned IEEE EUI-64
-    mNetif.GetMac().GetHashMacAddress(&extAddress);
-    mNetif.GetMac().SetExtAddress(extAddress);
-    mNetif.GetMle().UpdateLinkLocalAddress();
+    GetJoinerId(joinerId);
+    netif.GetMac().SetExtAddress(joinerId);
+    netif.GetMle().UpdateLinkLocalAddress();
 
-    for (size_t i = 0; i < sizeof(extAddress); i++)
+    for (size_t i = 0; i < sizeof(joinerId); i++)
     {
-        ccitt.Update(extAddress.m8[i]);
-        ansi.Update(extAddress.m8[i]);
+        ccitt.Update(joinerId.m8[i]);
+        ansi.Update(joinerId.m8[i]);
     }
 
     mCcitt = ccitt.Get();
-    mAnsi = ansi.Get();
+    mAnsi  = ansi.Get();
 
-    error = mNetif.GetCoapSecure().Start(OPENTHREAD_CONFIG_JOINER_UDP_PORT);
+    error = netif.GetCoapSecure().Start(OPENTHREAD_CONFIG_JOINER_UDP_PORT);
     SuccessOrExit(error);
 
-    error = mNetif.GetCoapSecure().GetDtls().SetPsk(reinterpret_cast<const uint8_t *>(aPSKd),
-                                                    static_cast<uint8_t>(strlen(aPSKd)));
+    error = netif.GetCoapSecure().SetPsk(reinterpret_cast<const uint8_t *>(aPSKd), static_cast<uint8_t>(strlen(aPSKd)));
     SuccessOrExit(error);
 
-    error = mNetif.GetCoapSecure().GetDtls().mProvisioningUrl.SetProvisioningUrl(aProvisioningUrl);
+    error = netif.GetCoapSecure().GetDtls().mProvisioningUrl.SetProvisioningUrl(aProvisioningUrl);
     SuccessOrExit(error);
 
-    mJoinerRouterPanId = Mac::kPanIdBroadcast;
-    SuccessOrExit(error = mNetif.GetMle().Discover(0, mNetif.GetMac().GetPanId(), true, false, HandleDiscoverResult, this));
+    memset(mJoinerRouters, 0, sizeof(mJoinerRouters));
 
-    mVendorName = aVendorName;
-    mVendorModel = aVendorModel;
+    SuccessOrExit(error =
+                      netif.GetMle().Discover(0, netif.GetMac().GetPanId(), true, false, HandleDiscoverResult, this));
+
+    mVendorName      = aVendorName;
+    mVendorModel     = aVendorModel;
     mVendorSwVersion = aVendorSwVersion;
-    mVendorData = aVendorData;
-    mCallback = aCallback;
-    mContext = aContext;
-    mState = kStateDiscover;
+    mVendorData      = aVendorData;
+    mCallback        = aCallback;
+    mContext         = aContext;
+    mState           = OT_JOINER_STATE_DISCOVER;
 
 exit:
-    otLogFuncExitErr(error);
     return error;
 }
 
 otError Joiner::Stop(void)
 {
-    otLogFuncEntry();
-
     Close();
 
-    otLogFuncExit();
     return OT_ERROR_NONE;
+}
+
+otJoinerState Joiner::GetState(void) const
+{
+    return mState;
 }
 
 void Joiner::Close(void)
 {
-    otLogFuncEntry();
+    ThreadNetif &netif = GetNetif();
 
-    mNetif.GetCoapSecure().Disconnect();
-    mNetif.GetIp6Filter().RemoveUnsecurePort(mNetif.GetCoapSecure().GetPort());
-
-    otLogFuncExit();
+    netif.GetCoapSecure().Disconnect();
+    netif.GetIp6Filter().RemoveUnsecurePort(OPENTHREAD_CONFIG_JOINER_UDP_PORT);
 }
 
 void Joiner::Complete(otError aError)
 {
-    mState = kStateIdle;
+    ThreadNetif &netif = GetNetif();
+    mState             = OT_JOINER_STATE_IDLE;
+    otError error      = OT_ERROR_NOT_FOUND;
+    GetNotifier().Signal(OT_CHANGED_JOINER_STATE);
 
-    mNetif.GetCoapSecure().Stop();
+    netif.GetCoapSecure().Disconnect();
 
-    if (mCallback)
+    if (aError != OT_ERROR_NONE && aError != OT_ERROR_NOT_FOUND)
     {
+        error = TryNextJoin();
+    }
+
+    if (error == OT_ERROR_NOT_FOUND && mCallback)
+    {
+        netif.GetCoapSecure().Stop();
         otJoinerCallback callback = mCallback;
-        mCallback = NULL;
+        mCallback                 = NULL;
         callback(aError, mContext);
     }
 }
@@ -183,18 +192,17 @@ void Joiner::HandleDiscoverResult(otActiveScanResult *aResult, void *aContext)
 
 void Joiner::HandleDiscoverResult(otActiveScanResult *aResult)
 {
-    Ip6::MessageInfo messageInfo;
-
-    otLogFuncEntry();
-
     if (aResult != NULL)
     {
-        otLogFuncEntryMsg("aResult = %llX", HostSwap64(*reinterpret_cast<uint64_t *>(&aResult->mExtAddress)));
+        JoinerRouter joinerRouter;
+
+        otLogDebgMeshCoP("Received Discovery Response (%s)",
+                         static_cast<Mac::ExtAddress &>(aResult->mExtAddress).ToString().AsCString());
 
         // Joining is disabled if the Steering Data is not included
         if (aResult->mSteeringData.mLength == 0)
         {
-            otLogDebgMeshCoP(GetInstance(), "No steering data, joining disabled");
+            otLogDebgMeshCoP("No steering data, joining disabled");
             ExitNow();
         }
 
@@ -202,44 +210,103 @@ void Joiner::HandleDiscoverResult(otActiveScanResult *aResult)
         steeringData.SetLength(aResult->mSteeringData.mLength);
         memcpy(steeringData.GetValue(), aResult->mSteeringData.m8, steeringData.GetLength());
 
-        if (steeringData.DoesAllowAny() ||
-            (steeringData.GetBit(mCcitt % steeringData.GetNumBits()) &&
-             steeringData.GetBit(mAnsi % steeringData.GetNumBits())))
+        if (!steeringData.GetBit(mCcitt % steeringData.GetNumBits()) ||
+            !steeringData.GetBit(mAnsi % steeringData.GetNumBits()))
         {
-            mJoinerUdpPort = aResult->mJoinerUdpPort;
-            mJoinerRouterPanId = aResult->mPanId;
-            mJoinerRouterChannel = aResult->mChannel;
-            memcpy(&mJoinerRouter, &aResult->mExtAddress, sizeof(mJoinerRouter));
+            otLogDebgMeshCoP("Steering data does not include this device");
+            ExitNow();
         }
-        else
+
+        joinerRouter.mPriority = static_cast<uint16_t>(aResult->mRssi) + 0x80;
+
+        if (!steeringData.DoesAllowAny())
         {
-            otLogDebgMeshCoP(GetInstance(), "Steering data does not include this device");
+            joinerRouter.mPriority += kSpecificPriorityBonus;
         }
-    }
-    else if (mJoinerRouterPanId != Mac::kPanIdBroadcast)
-    {
-        otLogFuncEntryMsg("aResult = NULL");
 
-        mNetif.GetMac().SetPanId(mJoinerRouterPanId);
-        mNetif.GetMac().SetChannel(mJoinerRouterChannel);
-        mNetif.GetIp6Filter().AddUnsecurePort(mNetif.GetCoapSecure().GetPort());
-
-        messageInfo.GetPeerAddr().mFields.m16[0] = HostSwap16(0xfe80);
-        messageInfo.GetPeerAddr().SetIid(mJoinerRouter);
-        messageInfo.mPeerPort = mJoinerUdpPort;
-        messageInfo.mInterfaceId = OT_NETIF_INTERFACE_ID_THREAD;
-
-        mNetif.GetCoapSecure().Connect(messageInfo, Joiner::HandleSecureCoapClientConnect, this);
-        mState = kStateConnect;
+        joinerRouter.mJoinerUdpPort = aResult->mJoinerUdpPort;
+        joinerRouter.mPanId         = aResult->mPanId;
+        joinerRouter.mChannel       = aResult->mChannel;
+        joinerRouter.mExtAddr       = static_cast<Mac::ExtAddress &>(aResult->mExtAddress);
+        AddJoinerRouter(joinerRouter);
     }
     else
     {
-        otLogDebgMeshCoP(GetInstance(), "No joinable network found");
-        Complete(OT_ERROR_NOT_FOUND);
+        otError error = TryNextJoin();
+
+        if (error != OT_ERROR_NONE)
+        {
+            Complete(error);
+        }
     }
 
 exit:
-    otLogFuncExit();
+    return;
+}
+
+void Joiner::AddJoinerRouter(JoinerRouter &aJoinerRouter)
+{
+    JoinerRouter *joinerRouter = &mJoinerRouters[0];
+
+    // Find the lowest priority
+    for (size_t i = 1; i < OPENTHREAD_CONFIG_MAX_JOINER_ROUTER_ENTRIES; i++)
+    {
+        if (mJoinerRouters[i].mPriority < joinerRouter->mPriority)
+        {
+            joinerRouter = &mJoinerRouters[i];
+        }
+
+        if (joinerRouter->mPriority == 0)
+        {
+            break;
+        }
+    }
+
+    if (aJoinerRouter.mPriority > joinerRouter->mPriority)
+    {
+        memcpy(joinerRouter, &aJoinerRouter, sizeof(aJoinerRouter));
+    }
+}
+
+otError Joiner::TryNextJoin()
+{
+    ThreadNetif & netif        = GetNetif();
+    otError       error        = OT_ERROR_NOT_FOUND;
+    JoinerRouter *joinerRouter = &mJoinerRouters[0];
+
+    for (size_t i = 1; i < OPENTHREAD_CONFIG_MAX_JOINER_ROUTER_ENTRIES; i++)
+    {
+        if (mJoinerRouters[i].mPriority > joinerRouter->mPriority)
+        {
+            joinerRouter = &mJoinerRouters[i];
+        }
+    }
+
+    if (joinerRouter->mPriority > 0)
+    {
+        Ip6::SockAddr sockaddr;
+
+        joinerRouter->mPriority = 0;
+
+        netif.GetMac().SetPanId(joinerRouter->mPanId);
+        netif.GetMac().SetPanChannel(joinerRouter->mChannel);
+        netif.GetIp6Filter().AddUnsecurePort(OPENTHREAD_CONFIG_JOINER_UDP_PORT);
+
+        sockaddr.GetAddress().mFields.m16[0] = HostSwap16(0xfe80);
+        sockaddr.GetAddress().SetIid(joinerRouter->mExtAddr);
+        sockaddr.mPort    = joinerRouter->mJoinerUdpPort;
+        sockaddr.mScopeId = OT_NETIF_INTERFACE_ID_THREAD;
+
+        netif.GetCoapSecure().Connect(sockaddr, Joiner::HandleSecureCoapClientConnect, this);
+        mState = OT_JOINER_STATE_CONNECT;
+        error  = OT_ERROR_NONE;
+    }
+    else
+    {
+        otLogDebgMeshCoP("No joinable networks remaining to try");
+    }
+
+    return error;
 }
 
 void Joiner::HandleSecureCoapClientConnect(bool aConnected, void *aContext)
@@ -251,10 +318,10 @@ void Joiner::HandleSecureCoapClientConnect(bool aConnected)
 {
     switch (mState)
     {
-    case kStateConnect:
+    case OT_JOINER_STATE_CONNECT:
         if (aConnected)
         {
-            mState = kStateConnected;
+            mState = OT_JOINER_STATE_CONNECTED;
             SendJoinerFinalize();
             mTimer.Start(kTimeout);
         }
@@ -272,22 +339,21 @@ void Joiner::HandleSecureCoapClientConnect(bool aConnected)
 
 void Joiner::SendJoinerFinalize(void)
 {
-    Coap::Header header;
-    otError error = OT_ERROR_NONE;
-    Message *message = NULL;
-    StateTlv stateTlv;
-    VendorNameTlv vendorNameTlv;
-    VendorModelTlv vendorModelTlv;
-    VendorSwVersionTlv vendorSwVersionTlv;
+    ThreadNetif &         netif = GetNetif();
+    Coap::Header          header;
+    otError               error   = OT_ERROR_NONE;
+    Message *             message = NULL;
+    StateTlv              stateTlv;
+    VendorNameTlv         vendorNameTlv;
+    VendorModelTlv        vendorModelTlv;
+    VendorSwVersionTlv    vendorSwVersionTlv;
     VendorStackVersionTlv vendorStackVersionTlv;
 
-    otLogFuncEntry();
-
-    header.Init(kCoapTypeConfirmable, kCoapRequestPost);
+    header.Init(OT_COAP_TYPE_CONFIRMABLE, OT_COAP_CODE_POST);
     header.AppendUriPathOptions(OT_URI_PATH_JOINER_FINALIZE);
     header.SetPayloadMarker();
 
-    VerifyOrExit((message = NewMeshCoPMessage(mNetif.GetCoapSecure(), header)) != NULL, error = OT_ERROR_NO_BUFS);
+    VerifyOrExit((message = NewMeshCoPMessage(netif.GetCoapSecure(), header)) != NULL, error = OT_ERROR_NO_BUFS);
 
     stateTlv.Init();
     stateTlv.SetState(MeshCoP::StateTlv::kAccept);
@@ -320,23 +386,22 @@ void Joiner::SendJoinerFinalize(void)
         SuccessOrExit(error = message->Append(&vendorDataTlv, vendorDataTlv.GetSize()));
     }
 
-    if (mNetif.GetCoapSecure().GetDtls().mProvisioningUrl.GetLength() > 0)
+    if (netif.GetCoapSecure().GetDtls().mProvisioningUrl.GetLength() > 0)
     {
-        SuccessOrExit(error = message->Append(&mNetif.GetCoapSecure().GetDtls().mProvisioningUrl,
-                                              mNetif.GetCoapSecure().GetDtls().mProvisioningUrl.GetSize()));
+        SuccessOrExit(error = message->Append(&netif.GetCoapSecure().GetDtls().mProvisioningUrl,
+                                              netif.GetCoapSecure().GetDtls().mProvisioningUrl.GetSize()));
     }
 
 #if OPENTHREAD_ENABLE_CERT_LOG
     uint8_t buf[OPENTHREAD_CONFIG_MESSAGE_BUFFER_SIZE];
     VerifyOrExit(message->GetLength() <= sizeof(buf));
     message->Read(header.GetLength(), message->GetLength() - header.GetLength(), buf);
-    otDumpCertMeshCoP(GetInstance(), "[THCI] direction=send | type=JOIN_FIN.req |", buf,
-                      message->GetLength() - header.GetLength());
+    otDumpCertMeshCoP("[THCI] direction=send | type=JOIN_FIN.req |", buf, message->GetLength() - header.GetLength());
 #endif
 
-    SuccessOrExit(error = mNetif.GetCoapSecure().SendMessage(*message, Joiner::HandleJoinerFinalizeResponse, this));
+    SuccessOrExit(error = netif.GetCoapSecure().SendMessage(*message, Joiner::HandleJoinerFinalizeResponse, this));
 
-    otLogInfoMeshCoP(GetInstance(), "Sent joiner finalize");
+    otLogInfoMeshCoP("Sent joiner finalize");
 
 exit:
 
@@ -344,78 +409,75 @@ exit:
     {
         message->Free();
     }
-
-    otLogFuncExit();
 }
 
-void Joiner::HandleJoinerFinalizeResponse(void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-                                          const otMessageInfo *aMessageInfo, otError aResult)
+void Joiner::HandleJoinerFinalizeResponse(void *               aContext,
+                                          otCoapHeader *       aHeader,
+                                          otMessage *          aMessage,
+                                          const otMessageInfo *aMessageInfo,
+                                          otError              aResult)
 {
     static_cast<Joiner *>(aContext)->HandleJoinerFinalizeResponse(
         static_cast<Coap::Header *>(aHeader), static_cast<Message *>(aMessage),
         static_cast<const Ip6::MessageInfo *>(aMessageInfo), aResult);
 }
 
-void Joiner::HandleJoinerFinalizeResponse(Coap::Header *aHeader, Message *aMessage,
-                                          const Ip6::MessageInfo *aMessageInfo, otError aResult)
+void Joiner::HandleJoinerFinalizeResponse(Coap::Header *          aHeader,
+                                          Message *               aMessage,
+                                          const Ip6::MessageInfo *aMessageInfo,
+                                          otError                 aResult)
 {
-    (void) aMessageInfo;
+    (void)aMessageInfo;
     StateTlv state;
 
-    otLogFuncEntry();
-
-    VerifyOrExit(mState == kStateConnected &&
-                 aResult == OT_ERROR_NONE &&
-                 aHeader->GetType() == kCoapTypeAcknowledgment &&
-                 aHeader->GetCode() == kCoapResponseChanged);
+    VerifyOrExit(mState == OT_JOINER_STATE_CONNECTED && aResult == OT_ERROR_NONE &&
+                 aHeader->GetType() == OT_COAP_TYPE_ACKNOWLEDGMENT && aHeader->GetCode() == OT_COAP_CODE_CHANGED);
 
     SuccessOrExit(Tlv::GetTlv(*aMessage, Tlv::kState, sizeof(state), state));
     VerifyOrExit(state.IsValid());
 
-    mState = kStateEntrust;
+    mState = OT_JOINER_STATE_ENTRUST;
     mTimer.Start(kTimeout);
 
-    otLogInfoMeshCoP(GetInstance(), "received joiner finalize response %d", static_cast<uint8_t>(state.GetState()));
+    otLogInfoMeshCoP("received joiner finalize response %d", static_cast<uint8_t>(state.GetState()));
 #if OPENTHREAD_ENABLE_CERT_LOG
     uint8_t buf[OPENTHREAD_CONFIG_MESSAGE_BUFFER_SIZE];
     VerifyOrExit(aMessage->GetLength() <= sizeof(buf));
     aMessage->Read(aHeader->GetLength(), aMessage->GetLength() - aHeader->GetLength(), buf);
-    otDumpCertMeshCoP(GetInstance(), "[THCI] direction=recv | type=JOIN_FIN.rsp |", buf,
-                      aMessage->GetLength() - aHeader->GetLength());
+    otDumpCertMeshCoP("[THCI] direction=recv | type=JOIN_FIN.rsp |", buf, aMessage->GetLength() - aHeader->GetLength());
 #endif
 
 exit:
     Close();
-    otLogFuncExit();
 }
 
-void Joiner::HandleJoinerEntrust(void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
+void Joiner::HandleJoinerEntrust(void *               aContext,
+                                 otCoapHeader *       aHeader,
+                                 otMessage *          aMessage,
                                  const otMessageInfo *aMessageInfo)
 {
-    static_cast<Joiner *>(aContext)->HandleJoinerEntrust(
-        *static_cast<Coap::Header *>(aHeader), *static_cast<Message *>(aMessage),
-        *static_cast<const Ip6::MessageInfo *>(aMessageInfo));
+    static_cast<Joiner *>(aContext)->HandleJoinerEntrust(*static_cast<Coap::Header *>(aHeader),
+                                                         *static_cast<Message *>(aMessage),
+                                                         *static_cast<const Ip6::MessageInfo *>(aMessageInfo));
 }
 
 void Joiner::HandleJoinerEntrust(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
-    otError error;
-
-    NetworkMasterKeyTlv masterKey;
-    MeshLocalPrefixTlv meshLocalPrefix;
-    ExtendedPanIdTlv extendedPanId;
-    NetworkNameTlv networkName;
-    ActiveTimestampTlv activeTimestamp;
+    ThreadNetif &         netif = GetNetif();
+    otError               error;
+    NetworkMasterKeyTlv   masterKey;
+    MeshLocalPrefixTlv    meshLocalPrefix;
+    ExtendedPanIdTlv      extendedPanId;
+    NetworkNameTlv        networkName;
+    ActiveTimestampTlv    activeTimestamp;
     NetworkKeySequenceTlv networkKeySeq;
 
-    otLogFuncEntry();
+    VerifyOrExit(mState == OT_JOINER_STATE_ENTRUST && aHeader.GetType() == OT_COAP_TYPE_CONFIRMABLE &&
+                     aHeader.GetCode() == OT_COAP_CODE_POST,
+                 error = OT_ERROR_DROP);
 
-    VerifyOrExit(mState == kStateEntrust &&
-                 aHeader.GetType() == kCoapTypeConfirmable &&
-                 aHeader.GetCode() == kCoapRequestPost, error = OT_ERROR_DROP);
-
-    otLogInfoMeshCoP(GetInstance(), "Received joiner entrust");
-    otLogCertMeshCoP(GetInstance(), "[THCI] direction=recv | type=JOIN_ENT.ntf");
+    otLogInfoMeshCoP("Received joiner entrust");
+    otLogCertMeshCoP("[THCI] direction=recv | type=JOIN_ENT.ntf");
 
     SuccessOrExit(error = Tlv::GetTlv(aMessage, Tlv::kNetworkMasterKey, sizeof(masterKey), masterKey));
     VerifyOrExit(masterKey.IsValid(), error = OT_ERROR_PARSE);
@@ -435,13 +497,19 @@ void Joiner::HandleJoinerEntrust(Coap::Header &aHeader, Message &aMessage, const
     SuccessOrExit(error = Tlv::GetTlv(aMessage, Tlv::kNetworkKeySequence, sizeof(networkKeySeq), networkKeySeq));
     VerifyOrExit(networkKeySeq.IsValid(), error = OT_ERROR_PARSE);
 
-    mNetif.GetKeyManager().SetMasterKey(masterKey.GetNetworkMasterKey());
-    mNetif.GetKeyManager().SetCurrentKeySequence(networkKeySeq.GetNetworkKeySequence());
-    mNetif.GetMle().SetMeshLocalPrefix(meshLocalPrefix.GetMeshLocalPrefix());
-    mNetif.GetMac().SetExtendedPanId(extendedPanId.GetExtendedPanId());
-    mNetif.GetMac().SetNetworkName(networkName.GetNetworkName());
+    netif.GetKeyManager().SetMasterKey(masterKey.GetNetworkMasterKey());
+    netif.GetKeyManager().SetCurrentKeySequence(networkKeySeq.GetNetworkKeySequence());
+    netif.GetMle().SetMeshLocalPrefix(meshLocalPrefix.GetMeshLocalPrefix());
+    netif.GetMac().SetExtendedPanId(extendedPanId.GetExtendedPanId());
 
-    otLogInfoMeshCoP(GetInstance(), "join success!");
+    {
+        otNetworkName name;
+        memcpy(name.m8, networkName.GetNetworkName(), networkName.GetLength());
+        name.m8[networkName.GetLength()] = '\0';
+        netif.GetMac().SetNetworkName(name.m8);
+    }
+
+    otLogInfoMeshCoP("join success!");
 
     // Send dummy response.
     SendJoinerEntrustResponse(aHeader, aMessageInfo);
@@ -450,33 +518,35 @@ void Joiner::HandleJoinerEntrust(Coap::Header &aHeader, Message &aMessage, const
     mTimer.Start(kConfigExtAddressDelay);
 
 exit:
-    otLogFuncExit();
+
+    if (error != OT_ERROR_NONE)
+    {
+        otLogWarnMeshCoP("Error while processing joiner entrust: %s", otThreadErrorToString(error));
+    }
 }
 
-void Joiner::SendJoinerEntrustResponse(const Coap::Header &aRequestHeader,
-                                       const Ip6::MessageInfo &aRequestInfo)
+void Joiner::SendJoinerEntrustResponse(const Coap::Header &aRequestHeader, const Ip6::MessageInfo &aRequestInfo)
 {
-    otError error = OT_ERROR_NONE;
-    Message *message;
-    Coap::Header responseHeader;
+    ThreadNetif &    netif = GetNetif();
+    otError          error = OT_ERROR_NONE;
+    Message *        message;
+    Coap::Header     responseHeader;
     Ip6::MessageInfo responseInfo(aRequestInfo);
-
-    otLogFuncEntry();
 
     responseHeader.SetDefaultResponseHeader(aRequestHeader);
 
-    VerifyOrExit((message = NewMeshCoPMessage(mNetif.GetCoap(), responseHeader)) != NULL, error = OT_ERROR_NO_BUFS);
+    VerifyOrExit((message = NewMeshCoPMessage(netif.GetCoap(), responseHeader)) != NULL, error = OT_ERROR_NO_BUFS);
     message->SetSubType(Message::kSubTypeJoinerEntrust);
 
     memset(&responseInfo.mSockAddr, 0, sizeof(responseInfo.mSockAddr));
-    SuccessOrExit(error = mNetif.GetCoap().SendMessage(*message, responseInfo));
+    SuccessOrExit(error = netif.GetCoap().SendMessage(*message, responseInfo));
 
-    mState = kStateJoined;
+    mState = OT_JOINER_STATE_JOINED;
 
-    otLogInfoArp(GetInstance(), "Sent Joiner Entrust response");
+    otLogInfoArp("Sent Joiner Entrust response");
 
-    otLogInfoMeshCoP(GetInstance(), "Sent joiner entrust response length = %d", message->GetLength());
-    otLogCertMeshCoP(GetInstance(), "[THCI] direction=send | type=JOIN_ENT.rsp");
+    otLogInfoMeshCoP("Sent joiner entrust response length = %d", message->GetLength());
+    otLogCertMeshCoP("[THCI] direction=send | type=JOIN_ENT.rsp");
 
 exit:
 
@@ -484,48 +554,46 @@ exit:
     {
         message->Free();
     }
-
-    otLogFuncExit();
 }
 
-void Joiner::HandleTimer(void *aContext)
+void Joiner::HandleTimer(Timer &aTimer)
 {
-    static_cast<Joiner *>(aContext)->HandleTimer();
+    aTimer.GetOwner<Joiner>().HandleTimer();
 }
 
 void Joiner::HandleTimer(void)
 {
-    otError error = OT_ERROR_NONE;
+    ThreadNetif &netif = GetNetif();
+    otError      error = OT_ERROR_NONE;
 
     switch (mState)
     {
-    case kStateIdle:
-    case kStateDiscover:
-    case kStateConnect:
+    case OT_JOINER_STATE_IDLE:
+    case OT_JOINER_STATE_DISCOVER:
+    case OT_JOINER_STATE_CONNECT:
         assert(false);
         break;
 
-    case kStateConnected:
-    case kStateEntrust:
+    case OT_JOINER_STATE_CONNECTED:
+    case OT_JOINER_STATE_ENTRUST:
         error = OT_ERROR_RESPONSE_TIMEOUT;
         break;
 
-    case kStateJoined:
+    case OT_JOINER_STATE_JOINED:
         Mac::ExtAddress extAddress;
 
-        mNetif.GetMac().GenerateExtAddress(&extAddress);
-        mNetif.GetMac().SetExtAddress(extAddress);
-        mNetif.GetMle().UpdateLinkLocalAddress();
+        extAddress.GenerateRandom();
+        netif.GetMac().SetExtAddress(extAddress);
+        netif.GetMle().UpdateLinkLocalAddress();
 
         error = OT_ERROR_NONE;
         break;
-
     }
 
     Complete(error);
 }
 
-}  // namespace MeshCoP
-}  // namespace ot
+} // namespace MeshCoP
+} // namespace ot
 
 #endif // OPENTHREAD_ENABLE_JOINER

@@ -33,19 +33,22 @@
 
 #define WPP_NAME "logging.tmh"
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "logging.hpp"
 
-#include <openthread/openthread.h>
+#include "common/instance.hpp"
+
+/*
+ * Verify debug uart dependency.
+ *
+ * It is reasonable to only enable the debug uart and not enable logs to the DEBUG uart.
+ */
+#if (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_DEBUG_UART) && (!OPENTHREAD_CONFIG_ENABLE_DEBUG_UART)
+#error OPENTHREAD_CONFIG_ENABLE_DEBUG_UART_LOG requires OPENTHREAD_CONFIG_ENABLE_DEBUG_UART
+#endif
 
 #ifndef WINDOWS_LOGGING
-#define otLogDump(aFormat, ...)                                             \
-    _otDynamicLog(aInstance, aLogLevel, aLogRegion, aFormat OPENTHREAD_CONFIG_LOG_SUFFIX, ## __VA_ARGS__)
+#define otLogDump(aFormat, ...) \
+    _otDynamicLog(aLogLevel, aLogRegion, aFormat OPENTHREAD_CONFIG_LOG_SUFFIX, ##__VA_ARGS__)
 #endif
 
 #ifdef __cplusplus
@@ -62,10 +65,9 @@ extern "C" {
  * @param[in]  aLength     Number of bytes in the buffer.
  *
  */
-static void DumpLine(otInstance *aInstance, otLogLevel aLogLevel, otLogRegion aLogRegion, const void *aBuf,
-                     const size_t aLength)
+static void DumpLine(otLogLevel aLogLevel, otLogRegion aLogRegion, const void *aBuf, const size_t aLength)
 {
-    char buf[80];
+    char  buf[80];
     char *cur = buf;
 
     snprintf(cur, sizeof(buf) - static_cast<size_t>(cur - buf), "|");
@@ -111,17 +113,14 @@ static void DumpLine(otInstance *aInstance, otLogLevel aLogLevel, otLogRegion aL
     }
 
     otLogDump("%s", buf);
-
-    (void)aInstance;
 }
 
-void otDump(otInstance *aInstance, otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aId, const void *aBuf,
-            const size_t aLength)
+void otDump(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aId, const void *aBuf, const size_t aLength)
 {
-    size_t idlen = strlen(aId);
+    size_t       idlen = strlen(aId);
     const size_t width = 72;
-    char buf[80];
-    char *cur = buf;
+    char         buf[80];
+    char *       cur = buf;
 
     for (size_t i = 0; i < (width - idlen) / 2 - 5; i++)
     {
@@ -142,7 +141,7 @@ void otDump(otInstance *aInstance, otLogLevel aLogLevel, otLogRegion aLogRegion,
 
     for (size_t i = 0; i < aLength; i += 16)
     {
-        DumpLine(aInstance, aLogLevel, aLogRegion, (uint8_t *)(aBuf) + i, (aLength - i) < 16 ? (aLength - i) : 16);
+        DumpLine(aLogLevel, aLogRegion, (uint8_t *)(aBuf) + i, (aLength - i) < 16 ? (aLength - i) : 16);
     }
 
     cur = buf;
@@ -155,113 +154,11 @@ void otDump(otInstance *aInstance, otLogLevel aLogLevel, otLogRegion aLogRegion,
 
     otLogDump("%s", buf);
 }
-#else // OPENTHREAD_CONFIG_LOG_PKT_DUMP
-void otDump(otInstance *, otLogLevel, otLogRegion, const char *, const void *, const size_t) {}
+#else  // OPENTHREAD_CONFIG_LOG_PKT_DUMP
+void otDump(otLogLevel, otLogRegion, const char *, const void *, const size_t)
+{
+}
 #endif // OPENTHREAD_CONFIG_LOG_PKT_DUMP
-
-#ifdef OPENTHREAD_CONFIG_LOG_PREPEND_LEVEL
-const char *otLogLevelToString(otLogLevel aLevel)
-{
-    const char *retval;
-
-    switch (aLevel)
-    {
-    case OT_LOG_LEVEL_NONE:
-        retval = "NONE";
-        break;
-
-    case OT_LOG_LEVEL_CRIT:
-        retval = "CRIT";
-        break;
-
-    case OT_LOG_LEVEL_WARN:
-        retval = "WARN";
-        break;
-
-    case OT_LOG_LEVEL_INFO:
-        retval = "INFO";
-        break;
-
-    case OT_LOG_LEVEL_DEBG:
-        retval = "DEBG";
-        break;
-
-    default:
-        retval = "----";
-        break;
-    }
-
-    return retval;
-}
-#endif // OPENTHREAD_CONFIG_LOG_PREPEND_REGION
-
-#ifdef OPENTHREAD_CONFIG_LOG_PREPEND_REGION
-const char *otLogRegionToString(otLogRegion aRegion)
-{
-    const char *retval;
-
-    switch (aRegion)
-    {
-    case OT_LOG_REGION_API:
-        retval = "-API-----";
-        break;
-
-    case OT_LOG_REGION_MLE:
-        retval = "-MLE-----";
-        break;
-
-    case OT_LOG_REGION_COAP:
-        retval = "-COAP----";
-        break;
-
-    case OT_LOG_REGION_ARP:
-        retval = "-ARP-----";
-        break;
-
-    case OT_LOG_REGION_NET_DATA:
-        retval = "-N-DATA--";
-        break;
-
-    case OT_LOG_REGION_ICMP:
-        retval = "-ICMP----";
-        break;
-
-    case OT_LOG_REGION_IP6:
-        retval = "-IP6-----";
-        break;
-
-    case OT_LOG_REGION_MAC:
-        retval = "-MAC-----";
-        break;
-
-    case OT_LOG_REGION_MEM:
-        retval = "-MEM-----";
-        break;
-
-    case OT_LOG_REGION_NCP:
-        retval = "-NCP-----";
-        break;
-
-    case OT_LOG_REGION_MESH_COP:
-        retval = "-MESH-CP-";
-        break;
-
-    case OT_LOG_REGION_NET_DIAG:
-        retval = "-DIAG----";
-        break;
-
-    case OT_LOG_REGION_PLATFORM:
-        retval = "-PLAT----";
-        break;
-
-    default:
-        retval = "---------";
-        break;
-    }
-
-    return retval;
-}
-#endif // OPENTHREAD_CONFIG_LOG_PREPEND_REGION
 
 const char *otThreadErrorToString(otError aError)
 {
@@ -270,7 +167,7 @@ const char *otThreadErrorToString(otError aError)
     switch (aError)
     {
     case OT_ERROR_NONE:
-        retval = "None";
+        retval = "OK";
         break;
 
     case OT_ERROR_FAILED:
@@ -353,8 +250,8 @@ const char *otThreadErrorToString(otError aError)
         retval = "InvalidSourceAddress";
         break;
 
-    case OT_ERROR_WHITELIST_FILTERED:
-        retval = "WhitelistFiltered";
+    case OT_ERROR_ADDRESS_FILTERED:
+        retval = "AddressFiltered";
         break;
 
     case OT_ERROR_DESTINATION_ADDRESS_FILTERED:
@@ -367,10 +264,6 @@ const char *otThreadErrorToString(otError aError)
 
     case OT_ERROR_ALREADY:
         retval = "Already";
-        break;
-
-    case OT_ERROR_BLACKLIST_FILTERED:
-        retval = "BlacklistFiltered";
         break;
 
     case OT_ERROR_IP6_ADDRESS_CREATION_FAILURE:
@@ -409,6 +302,10 @@ const char *otThreadErrorToString(otError aError)
         retval = "GenericError";
         break;
 
+    case OT_ERROR_LINK_MARGIN_LOW:
+        retval = "LinkMarginLow";
+        break;
+
     default:
         retval = "UnknownErrorType";
         break;
@@ -416,6 +313,50 @@ const char *otThreadErrorToString(otError aError)
 
     return retval;
 }
+
+const char *otLogLevelToPrefixString(otLogLevel aLogLevel)
+{
+    const char *retval = "";
+
+    switch (aLogLevel)
+    {
+    case OT_LOG_LEVEL_NONE:
+        retval = _OT_LEVEL_NONE_PREFIX;
+        break;
+
+    case OT_LOG_LEVEL_CRIT:
+        retval = _OT_LEVEL_CRIT_PREFIX;
+        break;
+
+    case OT_LOG_LEVEL_WARN:
+        retval = _OT_LEVEL_WARN_PREFIX;
+        break;
+
+    case OT_LOG_LEVEL_NOTE:
+        retval = _OT_LEVEL_NOTE_PREFIX;
+        break;
+
+    case OT_LOG_LEVEL_INFO:
+        retval = _OT_LEVEL_INFO_PREFIX;
+        break;
+
+    case OT_LOG_LEVEL_DEBG:
+        retval = _OT_LEVEL_DEBG_PREFIX;
+        break;
+    }
+
+    return retval;
+}
+
+#if OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_NONE
+/* this provides a stub, incase something uses the function */
+void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
+{
+    OT_UNUSED_VARIABLE(aLogLevel);
+    OT_UNUSED_VARIABLE(aLogRegion);
+    OT_UNUSED_VARIABLE(aFormat);
+}
+#endif
 
 #ifdef __cplusplus
 };

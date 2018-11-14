@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="openthread.configuration.props" />
   <PropertyGroup Label="Globals">
@@ -49,6 +49,8 @@
         ..\..\include;
         ..\..\src;
         ..\..\src\core;
+        ..\..\third_party\mbedtls;
+        ..\..\third_party\mbedtls\repo\include;
       </AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
@@ -59,6 +61,8 @@
     <ClCompile Include="..\..\src\cli\cli_dataset.cpp" />
     <ClCompile Include="..\..\src\cli\cli_instance.cpp" />
     <ClCompile Include="..\..\src\cli\cli_uart.cpp" />
+    <ClCompile Include="..\..\src\core\utils\missing_strnlen.c" />
+    <ClCompile Include="..\..\src\core\utils\parse_cmdline.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

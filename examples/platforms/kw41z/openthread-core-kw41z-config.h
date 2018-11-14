@@ -36,6 +36,23 @@
 #define OPENTHREAD_CORE_KW41Z_CONFIG_H_
 
 /**
+ * @def OPENTHREAD_CONFIG_LOG_OUTPUT
+ *
+ * The emsk platform provides an otPlatLog() function.
+ */
+#ifndef OPENTHREAD_CONFIG_LOG_OUTPUT /* allow command line override */
+#define OPENTHREAD_CONFIG_LOG_OUTPUT  OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_PLATFORM_INFO
+ *
+ * The platform-specific string to insert into the OpenThread version string.
+ *
+ */
+#define OPENTHREAD_CONFIG_PLATFORM_INFO                         "KW41Z"
+
+/**
  * @def SETTINGS_CONFIG_BASE_ADDRESS
  *
  * The base address of settings.
@@ -76,11 +93,11 @@
 #define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT            1
 
 /**
-  * @def OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE
-  *
-  * Define to 1 if you want use legacy transmit done.
-  *
-  */
-#define OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE 1
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+ *
+ * Define to 1 if you want to enable software CSMA-CA backoff logic.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF          1
 
 #endif  // OPENTHREAD_CORE_KW41Z_CONFIG_H_

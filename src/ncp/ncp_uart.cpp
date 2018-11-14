@@ -30,44 +30,45 @@
  *   This file contains definitions for a UART based NCP interface to the OpenThread stack.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "ncp_uart.hpp"
 
 #include <stdio.h>
 
 #include <openthread/ncp.h>
 #include <openthread/platform/logging.h>
-#include <openthread/platform/uart.h>
 #include <openthread/platform/misc.h>
+#include <openthread/platform/uart.h>
 
 #include "openthread-core-config.h"
-#include "openthread-instance.h"
 #include "common/code_utils.hpp"
-#include "common/new.hpp"
 #include "common/debug.hpp"
+#include "common/instance.hpp"
+#include "common/new.hpp"
 #include "net/ip6.hpp"
 
 #if OPENTHREAD_ENABLE_NCP_UART
 
 namespace ot {
+namespace Ncp {
+
+#if OPENTHREAD_ENABLE_NCP_VENDOR_HOOK == 0
 
 static otDEFINE_ALIGNED_VAR(sNcpRaw, sizeof(NcpUart), uint64_t);
 
 extern "C" void otNcpInit(otInstance *aInstance)
 {
-    NcpUart *ncpUart = NULL;
-    ncpUart = new(&sNcpRaw) NcpUart(aInstance);
+    NcpUart * ncpUart  = NULL;
+    Instance *instance = static_cast<Instance *>(aInstance);
+
+    ncpUart = new (&sNcpRaw) NcpUart(instance);
 
     if (ncpUart == NULL || ncpUart != NcpBase::GetNcpInstance())
     {
         assert(false);
     }
 }
+
+#endif // OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT == 0
 
 NcpUart::UartTxBuffer::UartTxBuffer(void)
     : Hdlc::Encoder::BufferWriteIterator()
@@ -77,7 +78,7 @@ NcpUart::UartTxBuffer::UartTxBuffer(void)
 
 void NcpUart::UartTxBuffer::Clear(void)
 {
-    mWritePointer = mBuffer;
+    mWritePointer    = mBuffer;
     mRemainingLength = sizeof(mBuffer);
 }
 
@@ -96,24 +97,31 @@ const uint8_t *NcpUart::UartTxBuffer::GetBuffer(void) const
     return mBuffer;
 }
 
-NcpUart::NcpUart(otInstance *aInstance):
-    NcpBase(aInstance),
-    mFrameDecoder(mRxBuffer, sizeof(mRxBuffer), &NcpUart::HandleFrame, &NcpUart::HandleError, this),
-    mUartBuffer(),
-    mState(kStartingFrame),
-    mByte(0),
-    mUartSendTask(aInstance->mIp6.mTaskletScheduler, EncodeAndSendToUart, this)
+NcpUart::NcpUart(Instance *aInstance)
+    : NcpBase(aInstance)
+    , mFrameDecoder(mRxBuffer, sizeof(mRxBuffer), &NcpUart::HandleFrame, &NcpUart::HandleError, this)
+    , mUartBuffer()
+    , mState(kStartingFrame)
+    , mByte(0)
+    , mUartSendImmediate(false)
+    , mUartSendTask(*aInstance, EncodeAndSendToUart, this)
+#if OPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER
+    , mTxFrameBufferEncrypterReader(mTxFrameBuffer)
+#endif // OPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER
 {
     mTxFrameBuffer.SetFrameAddedCallback(HandleFrameAddedToNcpBuffer, this);
 
     otPlatUartEnable();
 }
 
-void NcpUart::HandleFrameAddedToNcpBuffer(void *aContext, NcpFrameBuffer::FrameTag aTag,
-                                          NcpFrameBuffer *aNcpFrameBuffer)
+void NcpUart::HandleFrameAddedToNcpBuffer(void *                   aContext,
+                                          NcpFrameBuffer::FrameTag aTag,
+                                          NcpFrameBuffer::Priority aPriority,
+                                          NcpFrameBuffer *         aNcpFrameBuffer)
 {
-    (void)aNcpFrameBuffer;
-    (void)aTag;
+    OT_UNUSED_VARIABLE(aNcpFrameBuffer);
+    OT_UNUSED_VARIABLE(aTag);
+    OT_UNUSED_VARIABLE(aPriority);
 
     static_cast<NcpUart *>(aContext)->HandleFrameAddedToNcpBuffer();
 }
@@ -126,11 +134,10 @@ void NcpUart::HandleFrameAddedToNcpBuffer(void)
     }
 }
 
-void NcpUart::EncodeAndSendToUart(void *aContext)
+void NcpUart::EncodeAndSendToUart(Tasklet &aTasklet)
 {
-    NcpUart *obj = static_cast<NcpUart *>(aContext);
-
-    obj->EncodeAndSendToUart();
+    OT_UNUSED_VARIABLE(aTasklet);
+    static_cast<NcpUart *>(GetNcpInstance())->EncodeAndSendToUart();
 }
 
 // This method encodes a frame from the tx frame buffer (mTxFrameBuffer) into the uart buffer and sends it over uart.
@@ -139,8 +146,14 @@ void NcpUart::EncodeAndSendToUart(void *aContext)
 void NcpUart::EncodeAndSendToUart(void)
 {
     uint16_t len;
+    bool     prevHostPowerState;
+#if OPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER
+    NcpFrameBufferEncrypterReader &txFrameBuffer = mTxFrameBufferEncrypterReader;
+#else
+    NcpFrameBuffer &txFrameBuffer = mTxFrameBuffer;
+#endif // OPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER
 
-    while (!mTxFrameBuffer.IsEmpty())
+    while (!txFrameBuffer.IsEmpty() || (mState == kFinalizingFrame))
     {
         switch (mState)
         {
@@ -154,20 +167,34 @@ void NcpUart::EncodeAndSendToUart(void)
             VerifyOrExit(super_t::ShouldDeferHostSend() == false);
             SuccessOrExit(mFrameEncoder.Init(mUartBuffer));
 
-            mTxFrameBuffer.OutFrameBegin();
+            txFrameBuffer.OutFrameBegin();
 
             mState = kEncodingFrame;
 
-            while (!mTxFrameBuffer.OutFrameHasEnded())
+            while (!txFrameBuffer.OutFrameHasEnded())
             {
-                mByte = mTxFrameBuffer.OutFrameReadByte();
+                mByte = txFrameBuffer.OutFrameReadByte();
 
             case kEncodingFrame:
 
                 SuccessOrExit(mFrameEncoder.Encode(mByte, mUartBuffer));
             }
 
-            mTxFrameBuffer.OutFrameRemove();
+            // track the change of mHostPowerStateInProgress by the
+            // call to OutFrameRemove.
+            prevHostPowerState = mHostPowerStateInProgress;
+
+            txFrameBuffer.OutFrameRemove();
+
+            if (prevHostPowerState && !mHostPowerStateInProgress)
+            {
+                // If mHostPowerStateInProgress transitioned from true -> false
+                // in the call to OutFrameRemove, then the frame should be sent
+                // out the UART without attempting to push any new frames into
+                // the mUartBuffer. This is necessary to avoid prematurely calling
+                // otPlatWakeHost.
+                mUartSendImmediate = true;
+            }
 
             mState = kFinalizingFrame;
 
@@ -178,6 +205,13 @@ void NcpUart::EncodeAndSendToUart(void)
             SuccessOrExit(mFrameEncoder.Finalize(mUartBuffer));
 
             mState = kStartingFrame;
+
+            if (mUartSendImmediate)
+            {
+                // clear state and break;
+                mUartSendImmediate = false;
+                break;
+            }
         }
     }
 
@@ -232,7 +266,15 @@ void NcpUart::HandleFrame(void *aContext, uint8_t *aBuf, uint16_t aBufLength)
 
 void NcpUart::HandleFrame(uint8_t *aBuf, uint16_t aBufLength)
 {
+#if OPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER
+    size_t dataLen = aBufLength;
+    if (SpinelEncrypter::DecryptInbound(aBuf, sizeof(mRxBuffer), &dataLen))
+    {
+        super_t::HandleReceive(aBuf, dataLen);
+    }
+#else
     super_t::HandleReceive(aBuf, aBufLength);
+#endif // OPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER
 }
 
 void NcpUart::HandleError(void *aContext, otError aError, uint8_t *aBuf, uint16_t aBufLength)
@@ -242,7 +284,7 @@ void NcpUart::HandleError(void *aContext, otError aError, uint8_t *aBuf, uint16_
 
 void NcpUart::HandleError(otError aError, uint8_t *aBuf, uint16_t aBufLength)
 {
-    char hexbuf[128];
+    char     hexbuf[128];
     uint16_t i = 0;
 
     super_t::IncrementFrameErrorCounter();
@@ -273,38 +315,74 @@ void NcpUart::HandleError(otError aError, uint8_t *aBuf, uint16_t aBufLength)
     otNcpStreamWrite(0, reinterpret_cast<uint8_t *>(hexbuf + 1), static_cast<int>(strlen(hexbuf) - 1));
 }
 
-#if OPENTHREAD_ENABLE_DEFAULT_LOGGING
-#ifdef __cplusplus
-extern "C" {
-#endif
-void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
+#if OPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER
+
+NcpUart::NcpFrameBufferEncrypterReader::NcpFrameBufferEncrypterReader(NcpFrameBuffer &aTxFrameBuffer)
+    : mTxFrameBuffer(aTxFrameBuffer)
+    , mDataBufferReadIndex(0)
+    , mOutputDataLength(0)
 {
-    char logString[128];
-    int charsWritten;
-    va_list args;
+}
 
-    va_start(args, aFormat);
+bool NcpUart::NcpFrameBufferEncrypterReader::IsEmpty(void) const
+{
+    return mTxFrameBuffer.IsEmpty() && !mOutputDataLength;
+}
 
-    if ((charsWritten = vsnprintf(logString, sizeof(logString), aFormat, args)) > 0)
+otError NcpUart::NcpFrameBufferEncrypterReader::OutFrameBegin(void)
+{
+    otError status = OT_ERROR_FAILED;
+
+    Reset();
+
+    if ((status = mTxFrameBuffer.OutFrameBegin()) == OT_ERROR_NONE)
     {
-        if (charsWritten > static_cast<int>(sizeof(logString) - 1))
-        {
-            charsWritten = static_cast<int>(sizeof(logString) - 1);
-        }
+        mOutputDataLength = mTxFrameBuffer.OutFrameGetLength();
 
-        otNcpStreamWrite(0, reinterpret_cast<uint8_t *>(logString), charsWritten);
+        if (mOutputDataLength > 0)
+        {
+            assert(mOutputDataLength <= sizeof(mDataBuffer));
+            mTxFrameBuffer.OutFrameRead(mOutputDataLength, mDataBuffer);
+
+            if (!SpinelEncrypter::EncryptOutbound(mDataBuffer, sizeof(mDataBuffer), &mOutputDataLength))
+            {
+                mOutputDataLength = 0;
+                status            = OT_ERROR_FAILED;
+            }
+        }
+        else
+        {
+            status = OT_ERROR_FAILED;
+        }
     }
 
-    va_end(args);
-
-    (void)aLogLevel;
-    (void)aLogRegion;
+    return status;
 }
-#ifdef __cplusplus
-}  // extern "C"
-#endif
-#endif // OPENTHREAD_ENABLE_CLI_LOGGING
 
-}  // namespace ot
+bool NcpUart::NcpFrameBufferEncrypterReader::OutFrameHasEnded(void)
+{
+    return (mDataBufferReadIndex >= mOutputDataLength);
+}
+
+uint8_t NcpUart::NcpFrameBufferEncrypterReader::OutFrameReadByte(void)
+{
+    return mDataBuffer[mDataBufferReadIndex++];
+}
+
+otError NcpUart::NcpFrameBufferEncrypterReader::OutFrameRemove(void)
+{
+    return mTxFrameBuffer.OutFrameRemove();
+}
+
+void NcpUart::NcpFrameBufferEncrypterReader::Reset(void)
+{
+    mOutputDataLength    = 0;
+    mDataBufferReadIndex = 0;
+}
+
+#endif // OPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER
+
+} // namespace Ncp
+} // namespace ot
 
 #endif // OPENTHREAD_ENABLE_NCP_UART

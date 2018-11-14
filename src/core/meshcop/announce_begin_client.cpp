@@ -33,12 +33,6 @@
 
 #define WPP_NAME "announce_begin_client.tmh"
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "announce_begin_client.hpp"
 
 #include <openthread/platform/random.h>
@@ -46,6 +40,7 @@
 #include "coap/coap_header.hpp"
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
+#include "common/instance.hpp"
 #include "common/logging.hpp"
 #include "meshcop/meshcop.hpp"
 #include "meshcop/meshcop_tlvs.hpp"
@@ -56,45 +51,42 @@
 
 namespace ot {
 
-AnnounceBeginClient::AnnounceBeginClient(ThreadNetif &aThreadNetif) :
-    mNetif(aThreadNetif)
+AnnounceBeginClient::AnnounceBeginClient(Instance &aInstance)
+    : InstanceLocator(aInstance)
 {
 }
 
-otInstance *AnnounceBeginClient::GetInstance(void)
-{
-    return mNetif.GetInstance();
-}
-
-otError AnnounceBeginClient::SendRequest(uint32_t aChannelMask, uint8_t aCount, uint16_t aPeriod,
+otError AnnounceBeginClient::SendRequest(uint32_t            aChannelMask,
+                                         uint8_t             aCount,
+                                         uint16_t            aPeriod,
                                          const Ip6::Address &aAddress)
 {
-    otError error = OT_ERROR_NONE;
-    Coap::Header header;
+    otError                           error = OT_ERROR_NONE;
+    Coap::Header                      header;
     MeshCoP::CommissionerSessionIdTlv sessionId;
-    MeshCoP::ChannelMask0Tlv channelMask;
-    MeshCoP::CountTlv count;
-    MeshCoP::PeriodTlv period;
+    MeshCoP::ChannelMaskTlv           channelMask;
+    MeshCoP::CountTlv                 count;
+    MeshCoP::PeriodTlv                period;
 
     Ip6::MessageInfo messageInfo;
-    Message *message = NULL;
+    Message *        message = NULL;
 
-    VerifyOrExit(mNetif.GetCommissioner().IsActive(), error = OT_ERROR_INVALID_STATE);
+    VerifyOrExit(GetNetif().GetCommissioner().IsActive(), error = OT_ERROR_INVALID_STATE);
 
-    header.Init(aAddress.IsMulticast() ? kCoapTypeNonConfirmable : kCoapTypeConfirmable,
-                kCoapRequestPost);
+    header.Init(aAddress.IsMulticast() ? OT_COAP_TYPE_NON_CONFIRMABLE : OT_COAP_TYPE_CONFIRMABLE, OT_COAP_CODE_POST);
     header.SetToken(Coap::Header::kDefaultTokenLength);
     header.AppendUriPathOptions(OT_URI_PATH_ANNOUNCE_BEGIN);
     header.SetPayloadMarker();
 
-    VerifyOrExit((message = MeshCoP::NewMeshCoPMessage(mNetif.GetCoap(), header)) != NULL,
+    VerifyOrExit((message = MeshCoP::NewMeshCoPMessage(GetNetif().GetCoap(), header)) != NULL,
                  error = OT_ERROR_NO_BUFS);
 
     sessionId.Init();
-    sessionId.SetCommissionerSessionId(mNetif.GetCommissioner().GetSessionId());
+    sessionId.SetCommissionerSessionId(GetNetif().GetCommissioner().GetSessionId());
     SuccessOrExit(error = message->Append(&sessionId, sizeof(sessionId)));
 
     channelMask.Init();
+    channelMask.SetChannelPage(OT_RADIO_CHANNEL_PAGE);
     channelMask.SetMask(aChannelMask);
     SuccessOrExit(error = message->Append(&channelMask, sizeof(channelMask)));
 
@@ -106,14 +98,14 @@ otError AnnounceBeginClient::SendRequest(uint32_t aChannelMask, uint8_t aCount, 
     period.SetPeriod(aPeriod);
     SuccessOrExit(error = message->Append(&period, sizeof(period)));
 
-    messageInfo.SetSockAddr(mNetif.GetMle().GetMeshLocal16());
+    messageInfo.SetSockAddr(GetNetif().GetMle().GetMeshLocal16());
     messageInfo.SetPeerAddr(aAddress);
     messageInfo.SetPeerPort(kCoapUdpPort);
-    messageInfo.SetInterfaceId(mNetif.GetInterfaceId());
+    messageInfo.SetInterfaceId(GetNetif().GetInterfaceId());
 
-    SuccessOrExit(error = mNetif.GetCoap().SendMessage(*message, messageInfo));
+    SuccessOrExit(error = GetNetif().GetCoap().SendMessage(*message, messageInfo));
 
-    otLogInfoMeshCoP(GetInstance(), "sent announce begin query");
+    otLogInfoMeshCoP("sent announce begin query");
 
 exit:
 
@@ -125,7 +117,6 @@ exit:
     return error;
 }
 
-}  // namespace ot
+} // namespace ot
 
 #endif // OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
-

@@ -35,28 +35,35 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <openthread-config.h>
-#include <openthread/platform/alarm.h>
+#include <openthread/config.h>
+#include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/diag.h>
-#include <openthread/platform/platform.h>
 
 #include "utils/code_utils.h"
 
+#include "em_core.h"
 #include "rail.h"
 
-static uint32_t sTimerHi = 0;
-static uint32_t sTimerLo = 0;
-static uint32_t sAlarmT0 = 0;
-static uint32_t sAlarmDt = 0;
-static bool sIsRunning   = false;
+#define XTAL_ACCURACY 200
+#define US_IN_MS 1000
+
+static uint32_t sTimerHi   = 0;
+static uint32_t sTimerLo   = 0;
+static uint32_t sAlarmT0   = 0;
+static uint32_t sAlarmDt   = 0;
+static bool     sIsRunning = false;
 
 void efr32AlarmInit(void)
 {
 }
 
-uint32_t otPlatAlarmGetNow(void)
+uint64_t otPlatTimeGet(void)
 {
     uint32_t timer_lo;
+    uint64_t timer_us;
+
+    CORE_DECLARE_IRQ_STATE;
+    CORE_ENTER_CRITICAL();
 
     timer_lo = RAIL_GetTime();
 
@@ -67,18 +74,32 @@ uint32_t otPlatAlarmGetNow(void)
 
     sTimerLo = timer_lo;
 
-    return (((uint64_t)sTimerHi << 32) | sTimerLo) / 1000;
+    timer_us = (((uint64_t)sTimerHi << 32) | sTimerLo);
+
+    CORE_EXIT_CRITICAL();
+
+    return timer_us;
 }
 
-void otPlatAlarmStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
+uint32_t otPlatAlarmMilliGetNow(void)
+{
+    return otPlatTimeGet() / US_IN_MS;
+}
+
+uint32_t otPlatTimeGetXtalAccuracy(void)
+{
+    return XTAL_ACCURACY;
+}
+
+void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
 {
     (void)aInstance;
-    sAlarmT0 = t0;
-    sAlarmDt = dt;
+    sAlarmT0   = t0;
+    sAlarmDt   = dt;
     sIsRunning = true;
 }
 
-void otPlatAlarmStop(otInstance *aInstance)
+void otPlatAlarmMilliStop(otInstance *aInstance)
 {
     (void)aInstance;
     sIsRunning = false;
@@ -86,9 +107,9 @@ void otPlatAlarmStop(otInstance *aInstance)
 
 void efr32AlarmProcess(otInstance *aInstance)
 {
-    uint32_t now = otPlatAlarmGetNow();
+    uint32_t now = otPlatAlarmMilliGetNow();
     uint32_t expires;
-    bool fire = false;
+    bool     fire = false;
 
     otEXPECT(sIsRunning);
 
@@ -116,7 +137,7 @@ void efr32AlarmProcess(otInstance *aInstance)
         else
 #endif
         {
-            otPlatAlarmFired(aInstance);
+            otPlatAlarmMilliFired(aInstance);
         }
     }
 

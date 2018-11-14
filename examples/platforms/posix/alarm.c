@@ -28,73 +28,127 @@
 
 #include "platform-posix.h"
 
+#if OPENTHREAD_POSIX_VIRTUAL_TIME == 0
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <openthread/platform/alarm.h>
+#include <openthread/platform/alarm-micro.h>
+#include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/diag.h>
 
-static bool s_is_running = false;
-static uint32_t s_alarm = 0;
-static struct timeval s_start;
+#define MS_PER_S 1000
+#define US_PER_MS 1000
+#define US_PER_S 1000000
 
-void platformAlarmInit(void)
+#define DEFAULT_TIMEOUT 10 // seconds
+
+static bool     sIsMsRunning = false;
+static uint32_t sMsAlarm     = 0;
+
+static bool     sIsUsRunning = false;
+static uint32_t sUsAlarm     = 0;
+
+static uint32_t sSpeedUpFactor = 1;
+
+static struct timeval sStart;
+
+void platformAlarmInit(uint32_t aSpeedUpFactor)
 {
-    gettimeofday(&s_start, NULL);
+    sSpeedUpFactor = aSpeedUpFactor;
+    gettimeofday(&sStart, NULL);
 }
 
-uint32_t otPlatAlarmGetNow(void)
+uint64_t platformGetNow(void)
 {
     struct timeval tv;
 
     gettimeofday(&tv, NULL);
-    timersub(&tv, &s_start, &tv);
+    timersub(&tv, &sStart, &tv);
 
-    return (uint32_t)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+    return (uint64_t)tv.tv_sec * sSpeedUpFactor * US_PER_S + (uint64_t)tv.tv_usec * sSpeedUpFactor;
 }
 
-void otPlatAlarmStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
+uint32_t otPlatAlarmMilliGetNow(void)
 {
-    (void)aInstance;
-    s_alarm = t0 + dt;
-    s_is_running = true;
+    return (uint32_t)(platformGetNow() / US_PER_MS);
 }
 
-void otPlatAlarmStop(otInstance *aInstance)
+void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
 {
     (void)aInstance;
-    s_is_running = false;
+    sMsAlarm     = aT0 + aDt;
+    sIsMsRunning = true;
+}
+
+void otPlatAlarmMilliStop(otInstance *aInstance)
+{
+    (void)aInstance;
+    sIsMsRunning = false;
+}
+
+uint32_t otPlatAlarmMicroGetNow(void)
+{
+    return (uint32_t)platformGetNow();
+}
+
+void otPlatAlarmMicroStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
+{
+    (void)aInstance;
+    sUsAlarm     = aT0 + aDt;
+    sIsUsRunning = true;
+}
+
+void otPlatAlarmMicroStop(otInstance *aInstance)
+{
+    (void)aInstance;
+    sIsUsRunning = false;
 }
 
 void platformAlarmUpdateTimeout(struct timeval *aTimeout)
 {
-    int32_t remaining;
+    int32_t usRemaining = DEFAULT_TIMEOUT * US_PER_S;
+    int32_t msRemaining = DEFAULT_TIMEOUT * MS_PER_S;
 
     if (aTimeout == NULL)
     {
         return;
     }
 
-    if (s_is_running)
+    if (sIsUsRunning)
     {
-        remaining = (int32_t)(s_alarm - otPlatAlarmGetNow());
+        usRemaining = (int32_t)(sUsAlarm - otPlatAlarmMicroGetNow());
+    }
 
-        if (remaining > 0)
-        {
-            aTimeout->tv_sec = remaining / 1000;
-            aTimeout->tv_usec = (remaining % 1000) * 1000;
-        }
-        else
-        {
-            aTimeout->tv_sec = 0;
-            aTimeout->tv_usec = 0;
-        }
+    if (sIsMsRunning)
+    {
+        msRemaining = (int32_t)(sMsAlarm - otPlatAlarmMilliGetNow());
+    }
+
+    if (usRemaining <= 0 || msRemaining <= 0)
+    {
+        aTimeout->tv_sec  = 0;
+        aTimeout->tv_usec = 0;
     }
     else
     {
-        aTimeout->tv_sec = 10;
-        aTimeout->tv_usec = 0;
+        int64_t remaining = ((int64_t)msRemaining) * US_PER_MS;
+
+        if (usRemaining < remaining)
+        {
+            remaining = usRemaining;
+        }
+
+        remaining /= sSpeedUpFactor;
+
+        if (remaining == 0)
+        {
+            remaining = 1;
+        }
+
+        aTimeout->tv_sec  = (time_t)remaining / US_PER_S;
+        aTimeout->tv_usec = remaining % US_PER_S;
     }
 }
 
@@ -102,13 +156,13 @@ void platformAlarmProcess(otInstance *aInstance)
 {
     int32_t remaining;
 
-    if (s_is_running)
+    if (sIsMsRunning)
     {
-        remaining = (int32_t)(s_alarm - otPlatAlarmGetNow());
+        remaining = (int32_t)(sMsAlarm - otPlatAlarmMilliGetNow());
 
         if (remaining <= 0)
         {
-            s_is_running = false;
+            sIsMsRunning = false;
 
 #if OPENTHREAD_ENABLE_DIAG
 
@@ -119,8 +173,38 @@ void platformAlarmProcess(otInstance *aInstance)
             else
 #endif
             {
-                otPlatAlarmFired(aInstance);
+                otPlatAlarmMilliFired(aInstance);
             }
         }
     }
+
+#if OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
+
+    if (sIsUsRunning)
+    {
+        remaining = (int32_t)(sUsAlarm - otPlatAlarmMicroGetNow());
+
+        if (remaining <= 0)
+        {
+            sIsUsRunning = false;
+
+            otPlatAlarmMicroFired(aInstance);
+        }
+    }
+
+#endif // OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
 }
+
+#if OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+uint64_t otPlatTimeGet(void)
+{
+    return platformGetNow();
+}
+
+uint16_t otPlatTimeGetXtalAccuracy(void)
+{
+    return 0;
+}
+#endif // OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+
+#endif // OPENTHREAD_POSIX_VIRTUAL_TIME == 0

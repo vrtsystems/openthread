@@ -44,8 +44,7 @@ EXTRA_DIST                                                         = \
     Cert_5_1_11_REEDAttachLinkQuality.py                             \
     Cert_5_1_12_NewRouterNeighborSync.py                             \
     Cert_5_1_13_RouterReset.py                                       \
-    Cert_5_2_01_BecomeActiveRouter.py                                \
-    Cert_5_2_02_LeaderReject1Hop.py                                  \
+    Cert_5_2_01_REEDAttach.py                                        \
     Cert_5_2_03_LeaderReject2Hops.py                                 \
     Cert_5_2_04_REEDUpgrade.py                                       \
     Cert_5_2_05_AddressQuery.py                                      \
@@ -62,7 +61,8 @@ EXTRA_DIST                                                         = \
     Cert_5_3_08_ChildAddressSet.py                                   \
     Cert_5_3_09_AddressQuery.py                                      \
     Cert_5_3_10_AddressQuery.py                                      \
-    Cert_5_5_01_LeaderReset.py                                       \
+    Cert_5_3_11_AddressQueryTimeoutIntervals.py                      \
+    Cert_5_5_01_LeaderReboot.py                                      \
     Cert_5_5_02_LeaderReboot.py                                      \
     Cert_5_5_03_SplitMergeChildren.py                                \
     Cert_5_5_04_SplitMergeRouters.py                                 \
@@ -121,6 +121,7 @@ EXTRA_DIST                                                         = \
     Cert_9_2_17_Orphan.py                                            \
     Cert_9_2_18_RollBackActiveTimestamp.py                           \
     coap.py                                                          \
+    command.py                                                       \
     common.py                                                        \
     config.py                                                        \
     ipv6.py                                                          \
@@ -133,15 +134,20 @@ EXTRA_DIST                                                         = \
     network_layer.py                                                 \
     node.py                                                          \
     node_cli.py                                                      \
+    pcap.py                                                          \
+    simulator.py                                                     \
     sniffer.py                                                       \
     sniffer_transport.py                                             \
     test_coap.py                                                     \
+    test_coaps.py                                                    \
     test_common.py                                                   \
     test_crypto.py                                                   \
+    test_diag.py                                                     \
     test_ipv6.py                                                     \
     test_lowpan.py                                                   \
     test_mac802154.py                                                \
     test_mle.py                                                      \
+    test_service.py                                                  \
     test_network_data.py                                             \
     test_network_layer.py                                            \
     $(NULL)
@@ -151,12 +157,14 @@ check_PROGRAMS                                                     = \
 
 check_SCRIPTS                                                      = \
     test_coap.py                                                     \
+    test_coaps.py                                                    \
     test_common.py                                                   \
     test_crypto.py                                                   \
     test_ipv6.py                                                     \
     test_lowpan.py                                                   \
     test_mac802154.py                                                \
     test_mle.py                                                      \
+    test_service.py                                                  \
     test_network_data.py                                             \
     test_network_layer.py                                            \
     Cert_5_1_01_RouterAttach.py                                      \
@@ -172,13 +180,11 @@ check_SCRIPTS                                                      = \
     Cert_5_1_11_REEDAttachLinkQuality.py                             \
     Cert_5_1_12_NewRouterNeighborSync.py                             \
     Cert_5_1_13_RouterReset.py                                       \
-    Cert_5_2_01_BecomeActiveRouter.py                                \
-    Cert_5_2_02_LeaderReject1Hop.py                                  \
-    Cert_5_2_03_LeaderReject2Hops.py                                 \
-    Cert_5_2_04_REEDUpgrade.py                                       \
+    Cert_5_2_01_REEDAttach.py                                        \
     Cert_5_2_05_AddressQuery.py                                      \
     Cert_5_2_06_RouterDowngrade.py                                   \
     Cert_5_2_07_REEDSynchronization.py                               \
+    Cert_5_2_04_REEDUpgrade.py                                       \
     Cert_5_3_01_LinkLocal.py                                         \
     Cert_5_3_02_RealmLocal.py                                        \
     Cert_5_3_03_AddressQuery.py                                      \
@@ -190,7 +196,8 @@ check_SCRIPTS                                                      = \
     Cert_5_3_08_ChildAddressSet.py                                   \
     Cert_5_3_09_AddressQuery.py                                      \
     Cert_5_3_10_AddressQuery.py                                      \
-    Cert_5_5_01_LeaderReset.py                                       \
+    Cert_5_3_11_AddressQueryTimeoutIntervals.py                      \
+    Cert_5_5_01_LeaderReboot.py                                      \
     Cert_5_5_02_LeaderReboot.py                                      \
     Cert_5_5_03_SplitMergeChildren.py                                \
     Cert_5_5_04_SplitMergeRouters.py                                 \
@@ -226,6 +233,7 @@ check_SCRIPTS                                                      = \
     Cert_6_5_02_ChildResetReattach.py                                \
     Cert_6_6_01_KeyIncrement.py                                      \
     Cert_6_6_02_KeyIncrementRollOver.py                              \
+    Cert_5_2_03_LeaderReject2Hops.py                                 \
     Cert_7_1_01_BorderRouterAsLeader.py                              \
     Cert_7_1_02_BorderRouterAsRouter.py                              \
     Cert_7_1_03_BorderRouterAsLeader.py                              \
@@ -250,6 +258,12 @@ check_SCRIPTS                                                      = \
     Cert_9_2_18_RollBackActiveTimestamp.py                           \
     $(NULL)
 
+if OPENTHREAD_ENABLE_DIAG
+check_SCRIPTS                                                     += \
+    test_diag.py                                                     \
+    $(NULL)
+endif
+
 TESTS_ENVIRONMENT                                                  = \
     export                                                           \
     top_builddir='$(top_builddir)'                                   \
@@ -262,7 +276,10 @@ TESTS                                                              = \
     $(NULL)
 
 XFAIL_NCP_TESTS                                                    = \
-    Cert_5_3_09_AddressQuery.py                                      \
+    test_coaps.py                                                    \
+    test_diag.py                                                     \
+    test_service.py                                                  \
+    Cert_5_3_10_AddressQuery.py                                      \
     Cert_8_1_01_Commissioning.py                                     \
     Cert_8_1_02_Commissioning.py                                     \
     Cert_8_2_01_JoinerRouter.py                                      \

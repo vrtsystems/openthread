@@ -25,11 +25,7 @@
  *    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
+#include <openthread/config.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,10 +33,10 @@
 
 int main(int argc, char **argv)
 {
-    char string_a[8] = "foo";
-    char string_b[] = "barbarbar";
-    size_t ret = 0;
-    int errors = 0;
+    char   string_a[8] = "foo";
+    char   string_b[]  = "barbarbar";
+    size_t ret         = 0;
+    int    errors      = 0;
 
     (void)argc;
     (void)argv;

@@ -32,23 +32,30 @@ AM_MAKEFLAGS                        = --no-print-directory
 
 AM_DISTCHECK_CONFIGURE_FLAGS        = \
     --enable-address-sanitizer        \
-    --enable-cli-app=all              \
-    --enable-ncp-app=all              \
-    --with-ncp-bus=uart               \
-    --enable-diag                     \
-    --with-examples=posix             \
+    --enable-application-coap         \
+    --enable-application-coap-secure  \
+    --enable-border-router            \
+    --enable-cli                      \
     --enable-commissioner             \
-    --enable-joiner                   \
     --enable-dhcp6-client             \
     --enable-dhcp6-server             \
+    --enable-diag                     \
     --enable-dns-client               \
-    --enable-application-coap         \
+    --enable-ftd                      \
+    --enable-joiner                   \
+    --enable-mac-filter               \
+    --enable-mtd                      \
+    --enable-ncp                      \
+    --with-ncp-bus=uart               \
+    --enable-radio-only               \
+    --enable-service                  \
+    --with-examples=posix             \
     $(NULL)
 
 SUBDIRS                             = \
     include                           \
-    src                               \
     third_party                       \
+    src                               \
     examples                          \
     tests                             \
     tools                             \
@@ -56,8 +63,6 @@ SUBDIRS                             = \
     $(NULL)
 
 EXTRA_DIST                          = \
-    .astyle/astyle-opts               \
-    .astyle/astyle-wrap.sh            \
     .default-version                  \
     bootstrap                         \
     etc                               \

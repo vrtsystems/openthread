@@ -33,10 +33,12 @@
 #include <string>
 #include <vector>
 
+#include <stdint.h>
+
 void otTestHexToVector(std::string &aHex, std::vector<uint8_t> &aOutBytes)
 {
     std::istringstream ss(aHex);
-    std::string word;
+    std::string        word;
 
     while (ss >> word)
     {
@@ -53,9 +55,15 @@ void otTestPrintHex(uint8_t *aBuffer, int aLength)
     {
         printf("%02x ", aBuffer[i]);
 
-        if (i % 16 == 7) { printf(" "); }
+        if (i % 16 == 7)
+        {
+            printf(" ");
+        }
 
-        if (i % 16 == 15 && aLength != i + 1) { printf("\n"); }
+        if (i % 16 == 15 && aLength != i + 1)
+        {
+            printf("\n");
+        }
     }
 
     printf("\n");

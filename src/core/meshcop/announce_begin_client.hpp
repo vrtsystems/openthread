@@ -35,56 +35,45 @@
 #define ANNOUNCE_BEGIN_CLIENT_HPP_
 
 #include "openthread-core-config.h"
+
 #include "coap/coap.hpp"
+#include "common/locator.hpp"
 #include "net/ip6_address.hpp"
 #include "net/udp6.hpp"
 
 namespace ot {
 
-class ThreadNetif;
-
 /**
  * This class implements handling Announce Begin Requests.
  *
  */
-class AnnounceBeginClient
+class AnnounceBeginClient : public InstanceLocator
 {
 public:
     /**
      * This constructor initializes the object.
      *
      */
-    AnnounceBeginClient(ThreadNetif &aThreadNetif);
-
-    /**
-     * This method returns the pointer to the parent otInstance structure.
-     *
-     * @returns The pointer to the parent otInstance structure.
-     *
-     */
-    otInstance *GetInstance(void);
+    explicit AnnounceBeginClient(Instance &aInstance);
 
     /**
      * This method sends a Announce Begin message.
      *
      * @param[in]  aChannelMask   The channel mask value.
-     * @param[in]  aCount         The number of energy measurements per channel.
-     * @param[in]  aPeriod        The time between energy measurements (milliseconds).
+     * @param[in]  aCount         The number of Announce messages sent per channel.
+     * @param[in]  aPeriod        The time between two successive MLE Announce transmissions (in milliseconds).
      *
      * @retval OT_ERROR_NONE     Successfully enqueued the Announce Begin message.
      * @retval OT_ERROR_NO_BUFS  Insufficient buffers to generate a Announce Begin message.
      *
      */
     otError SendRequest(uint32_t aChannelMask, uint8_t aCount, uint16_t mPeriod, const Ip6::Address &aAddress);
-
-private:
-    ThreadNetif &mNetif;
 };
 
 /**
  * @}
  */
 
-}  // namespace ot
+} // namespace ot
 
-#endif  // ANNOUNCE_BEGIN_CLIENT_HPP_
+#endif // ANNOUNCE_BEGIN_CLIENT_HPP_

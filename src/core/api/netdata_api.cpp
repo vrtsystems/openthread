@@ -31,144 +31,65 @@
  *   This file implements the OpenThread Network Data API.
  */
 
+#include "openthread-core-config.h"
+
 #include <openthread/netdata.h>
 
-#include "openthread-instance.h"
+#include "common/instance.hpp"
 
 using namespace ot;
 
-otError otNetDataGetLeader(otInstance *aInstance, bool aStable, uint8_t *aData, uint8_t *aDataLength)
+otError otNetDataGet(otInstance *aInstance, bool aStable, uint8_t *aData, uint8_t *aDataLength)
 {
-    otError error = OT_ERROR_NONE;
+    otError   error    = OT_ERROR_NONE;
+    Instance &instance = *static_cast<Instance *>(aInstance);
 
     VerifyOrExit(aData != NULL && aDataLength != NULL, error = OT_ERROR_INVALID_ARGS);
 
-    aInstance->mThreadNetif.GetNetworkDataLeader().GetNetworkData(aStable, aData, *aDataLength);
+    error = instance.GetThreadNetif().GetNetworkDataLeader().GetNetworkData(aStable, aData, *aDataLength);
 
 exit:
     return error;
 }
 
-otError otNetDataGetLocal(otInstance *aInstance, bool aStable, uint8_t *aData, uint8_t *aDataLength)
+otError otNetDataGetNextOnMeshPrefix(otInstance *           aInstance,
+                                     otNetworkDataIterator *aIterator,
+                                     otBorderRouterConfig * aConfig)
 {
-    otError error = OT_ERROR_NONE;
-
-    VerifyOrExit(aData != NULL && aDataLength != NULL, error = OT_ERROR_INVALID_ARGS);
-
-    aInstance->mThreadNetif.GetNetworkDataLocal().GetNetworkData(aStable, aData, *aDataLength);
-
-exit:
-    return error;
-}
-
-otError otNetDataAddPrefixInfo(otInstance *aInstance, const otBorderRouterConfig *aConfig)
-{
-    uint8_t flags = 0;
-
-    if (aConfig->mPreferred)
-    {
-        flags |= NetworkData::BorderRouterEntry::kPreferredFlag;
-    }
-
-    if (aConfig->mSlaac)
-    {
-        flags |= NetworkData::BorderRouterEntry::kSlaacFlag;
-    }
-
-    if (aConfig->mDhcp)
-    {
-        flags |= NetworkData::BorderRouterEntry::kDhcpFlag;
-    }
-
-    if (aConfig->mConfigure)
-    {
-        flags |= NetworkData::BorderRouterEntry::kConfigureFlag;
-    }
-
-    if (aConfig->mDefaultRoute)
-    {
-        flags |= NetworkData::BorderRouterEntry::kDefaultRouteFlag;
-    }
-
-    if (aConfig->mOnMesh)
-    {
-        flags |= NetworkData::BorderRouterEntry::kOnMeshFlag;
-    }
-
-    return aInstance->mThreadNetif.GetNetworkDataLocal().AddOnMeshPrefix(aConfig->mPrefix.mPrefix.mFields.m8,
-                                                                         aConfig->mPrefix.mLength,
-                                                                         aConfig->mPreference, flags, aConfig->mStable);
-}
-
-otError otNetDataRemovePrefixInfo(otInstance *aInstance, const otIp6Prefix *aPrefix)
-{
-    return aInstance->mThreadNetif.GetNetworkDataLocal().RemoveOnMeshPrefix(aPrefix->mPrefix.mFields.m8, aPrefix->mLength);
-}
-
-otError otNetDataGetNextPrefixInfo(otInstance *aInstance, bool aLocal, otNetworkDataIterator *aIterator,
-                                   otBorderRouterConfig *aConfig)
-{
-    otError error = OT_ERROR_NONE;
+    otError   error    = OT_ERROR_NONE;
+    Instance &instance = *static_cast<Instance *>(aInstance);
 
     VerifyOrExit(aIterator && aConfig, error = OT_ERROR_INVALID_ARGS);
 
-    if (aLocal)
-    {
-        error = aInstance->mThreadNetif.GetNetworkDataLocal().GetNextOnMeshPrefix(aIterator, aConfig);
-    }
-    else
-    {
-        error = aInstance->mThreadNetif.GetNetworkDataLeader().GetNextOnMeshPrefix(aIterator, aConfig);
-    }
+    error = instance.GetThreadNetif().GetNetworkDataLeader().GetNextOnMeshPrefix(aIterator, aConfig);
 
 exit:
     return error;
 }
 
-otError otNetDataAddRoute(otInstance *aInstance, const otExternalRouteConfig *aConfig)
+otError otNetDataGetNextRoute(otInstance *aInstance, otNetworkDataIterator *aIterator, otExternalRouteConfig *aConfig)
 {
-    return aInstance->mThreadNetif.GetNetworkDataLocal().AddHasRoutePrefix(aConfig->mPrefix.mPrefix.mFields.m8,
-                                                                           aConfig->mPrefix.mLength,
-                                                                           aConfig->mPreference, aConfig->mStable);
-}
-
-otError otNetDataRemoveRoute(otInstance *aInstance, const otIp6Prefix *aPrefix)
-{
-    return aInstance->mThreadNetif.GetNetworkDataLocal().RemoveHasRoutePrefix(aPrefix->mPrefix.mFields.m8,
-                                                                              aPrefix->mLength);
-}
-
-otError otNetDataGetNextRoute(otInstance *aInstance, bool aLocal, otNetworkDataIterator *aIterator,
-                              otExternalRouteConfig *aConfig)
-{
-    otError error = OT_ERROR_NONE;
+    otError   error    = OT_ERROR_NONE;
+    Instance &instance = *static_cast<Instance *>(aInstance);
 
     VerifyOrExit(aIterator && aConfig, error = OT_ERROR_INVALID_ARGS);
 
-    if (aLocal)
-    {
-        error = aInstance->mThreadNetif.GetNetworkDataLocal().GetNextExternalRoute(aIterator, aConfig);
-    }
-    else
-    {
-        error = aInstance->mThreadNetif.GetNetworkDataLeader().GetNextExternalRoute(aIterator, aConfig);
-    }
+    error = instance.GetThreadNetif().GetNetworkDataLeader().GetNextExternalRoute(aIterator, aConfig);
 
 exit:
     return error;
-}
-
-otError otNetDataRegister(otInstance *aInstance)
-{
-    return aInstance->mThreadNetif.GetNetworkDataLocal().SendServerDataNotification();
 }
 
 uint8_t otNetDataGetVersion(otInstance *aInstance)
 {
-    return aInstance->mThreadNetif.GetMle().GetLeaderDataTlv().GetDataVersion();
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    return instance.GetThreadNetif().GetMle().GetLeaderDataTlv().GetDataVersion();
 }
 
 uint8_t otNetDataGetStableVersion(otInstance *aInstance)
 {
-    return aInstance->mThreadNetif.GetMle().GetLeaderDataTlv().GetStableDataVersion();
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    return instance.GetThreadNetif().GetMle().GetLeaderDataTlv().GetStableDataVersion();
 }

@@ -32,15 +32,13 @@
  *
  */
 
-#include <stdint.h>
-#include "fsl_device_registers.h"
 #include "fsl_clock.h"
+#include "fsl_device_registers.h"
 #include "fsl_pit.h"
+#include <stdint.h>
 
-#include "openthread/openthread.h"
-#include "openthread/platform/platform.h"
-#include "openthread/platform/alarm.h"
-#include "openthread/platform/diag.h"
+#include <openthread/platform/alarm-milli.h>
+#include <openthread/platform/diag.h>
 
 static volatile uint32_t sTime      = 0;
 static uint32_t          sAlarmTime = 0;
@@ -48,7 +46,7 @@ static uint32_t          sAlarmTime = 0;
 void kw41zAlarmInit(void)
 {
     pit_config_t config;
-    uint32_t count = (CLOCK_GetBusClkFreq() / 1000) - 1;
+    uint32_t     count = (CLOCK_GetBusClkFreq() / 1000) - 1;
 
     PIT_GetDefaultConfig(&config);
     PIT_Init(PIT, &config);
@@ -74,24 +72,24 @@ void kw41zAlarmProcess(otInstance *aInstance)
         else
 #endif
         {
-            otPlatAlarmFired(aInstance);
+            otPlatAlarmMilliFired(aInstance);
         }
     }
 }
 
-void otPlatAlarmStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
+void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
 {
     (void)aInstance;
     sAlarmTime = aT0 + aDt;
 }
 
-void otPlatAlarmStop(otInstance *aInstance)
+void otPlatAlarmMilliStop(otInstance *aInstance)
 {
     (void)aInstance;
     sAlarmTime = 0;
 }
 
-uint32_t otPlatAlarmGetNow(void)
+uint32_t otPlatAlarmMilliGetNow(void)
 {
     return sTime;
 }

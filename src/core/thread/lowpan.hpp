@@ -34,16 +34,15 @@
 #ifndef LOWPAN_HPP_
 #define LOWPAN_HPP_
 
+#include "openthread-core-config.h"
+
+#include "common/locator.hpp"
 #include "common/message.hpp"
 #include "mac/mac_frame.hpp"
 #include "net/ip6.hpp"
 #include "net/ip6_address.hpp"
 
 namespace ot {
-
-class ThreadNetif;
-
-namespace NetworkData { class Leader; }
 
 /**
  * @addtogroup core-6lowpan
@@ -69,26 +68,26 @@ namespace Lowpan {
  */
 struct Context
 {
-    const uint8_t *mPrefix;        ///< A pointer to the prefix.
-    uint8_t        mPrefixLength;  ///< The prefix length.
-    uint8_t        mContextId;     ///< The Context ID.
-    bool           mCompressFlag;  ///< The Context compression flag.
+    const uint8_t *mPrefix;       ///< A pointer to the prefix.
+    uint8_t        mPrefixLength; ///< The prefix length.
+    uint8_t        mContextId;    ///< The Context ID.
+    bool           mCompressFlag; ///< The Context compression flag.
 };
 
 /**
  * This class implements LOWPAN_IPHC header compression.
  *
  */
-class Lowpan
+class Lowpan : public InstanceLocator
 {
 public:
     /**
      * This constructor initializes the object.
      *
-     * @param[in]  aThreadNetif  A reference to the Thread network interface.
+     * @param[in]  aInstance     A reference to the OpenThread instance.
      *
      */
-    explicit Lowpan(ThreadNetif &aThreadNetif);
+    explicit Lowpan(Instance &aInstance);
 
     /**
      * This method indicates whether or not the header is a LOWPAN_IPHC header.
@@ -98,7 +97,8 @@ public:
      * @retval TRUE   If the header matches the LOWPAN_IPHC dispatch value.
      * @retval FALSE  If the header does not match the LOWPAN_IPHC dispatch value.
      */
-    static bool IsLowpanHc(uint8_t *aHeader) {
+    static bool IsLowpanHc(const uint8_t *aHeader)
+    {
         return (aHeader[0] & (Lowpan::kHcDispatchMask >> 8)) == (Lowpan::kHcDispatch >> 8);
     }
 
@@ -128,29 +128,50 @@ public:
      * @returns The size of the compressed header in bytes.
      *
      */
-    int Decompress(Message &aMessage, const Mac::Address &aMacSource, const Mac::Address &aMacDest,
-                   const uint8_t *aBuf, uint16_t aBufLen, uint16_t aDatagramLen);
+    int Decompress(Message &           aMessage,
+                   const Mac::Address &aMacSource,
+                   const Mac::Address &aMacDest,
+                   const uint8_t *     aBuf,
+                   uint16_t            aBufLen,
+                   uint16_t            aDatagramLen);
 
     /**
      * This method decompresses a LOWPAN_IPHC header.
      *
-     * @param[out]  aHeader       A reference where the IPv6 header will be placed.
-     * @param[in]   aMacSource    The MAC source address.
-     * @param[in]   aMacDest      The MAC destination address.
-     * @param[in]   aBuf          A pointer to the LOWPAN_IPHC header.
-     * @param[in]   aBufLength    The number of bytes in @p aBuf.
+     * @param[out]  aHeader                 A reference where the IPv6 header will be placed.
+     * @param[out]  aCommpressedNextHeader  A boolean reference to output whether next header is compressed or not.
+     * @param[in]   aMacSource              The MAC source address.
+     * @param[in]   aMacDest                The MAC destination address.
+     * @param[in]   aBuf                    A pointer to the LOWPAN_IPHC header.
+     * @param[in]   aBufLength              The number of bytes in @p aBuf.
      *
-     * @returns The size of the compressed header in bytes.
+     * @returns The size of the compressed header in bytes or -1 if decompression fails.
      *
      */
-    int DecompressBaseHeader(Ip6::Header &aHeader, const Mac::Address &aMacSource, const Mac::Address &aMacDest,
-                             const uint8_t *aBuf, uint16_t aBufLength);
+    int DecompressBaseHeader(Ip6::Header &       aHeader,
+                             bool &              aCompressedNextHeader,
+                             const Mac::Address &aMacSource,
+                             const Mac::Address &aMacDest,
+                             const uint8_t *     aBuf,
+                             uint16_t            aBufLength);
+
+    /**
+     * This method decompresses a LOWPAN_NHC UDP header.
+     *
+     * @param[out]  aUdpHeader    A reference where the UDP header will be placed.
+     * @param[in]   aBuf          A pointer to the LOWPAN_NHC header.
+     * @param[in]   aBufLength    The number of bytes in @p aBuf.
+     *
+     * @returns The size of the compressed header in bytes or -1 if decompression fails.
+     *
+     */
+    int DecompressUdpHeader(Ip6::UdpHeader &aUdpHeader, const uint8_t *aBuf, uint16_t aBufLength);
 
 private:
     enum
     {
-        kHcDispatch        = 3 << 13,
-        kHcDispatchMask    = 7 << 13,
+        kHcDispatch     = 3 << 13,
+        kHcDispatchMask = 7 << 13,
 
         kHcTrafficClass    = 1 << 11,
         kHcFlowLabel       = 2 << 11,
@@ -179,38 +200,42 @@ private:
         kExtHdrDispatch     = 0xe0,
         kExtHdrDispatchMask = 0xf0,
 
-        kExtHdrEidHbh       = 0x00,
-        kExtHdrEidRouting   = 0x02,
-        kExtHdrEidFragment  = 0x04,
-        kExtHdrEidDst       = 0x06,
-        kExtHdrEidMobility  = 0x08,
-        kExtHdrEidIp6       = 0x0e,
-        kExtHdrEidMask      = 0x0e,
+        kExtHdrEidHbh      = 0x00,
+        kExtHdrEidRouting  = 0x02,
+        kExtHdrEidFragment = 0x04,
+        kExtHdrEidDst      = 0x06,
+        kExtHdrEidMobility = 0x08,
+        kExtHdrEidIp6      = 0x0e,
+        kExtHdrEidMask     = 0x0e,
 
-        kExtHdrNextHeader   = 0x01,
+        kExtHdrNextHeader = 0x01,
 
-        kUdpDispatch        = 0xf0,
-        kUdpDispatchMask    = 0xf8,
-        kUdpChecksum        = 1 << 2,
-        kUdpPortMask        = 3 << 0,
+        kUdpDispatch     = 0xf0,
+        kUdpDispatchMask = 0xf8,
+        kUdpChecksum     = 1 << 2,
+        kUdpPortMask     = 3 << 0,
     };
 
-    int CompressExtensionHeader(Message &message, uint8_t *aBuf, uint8_t &nextHeader);
-    int CompressSourceIid(const Mac::Address &macaddr, const Ip6::Address &ipaddr, const Context &aContext,
-                          uint16_t &hcCtl, uint8_t *aBuf);
-    int CompressDestinationIid(const Mac::Address &macaddr, const Ip6::Address &ipaddr, const Context &aContext,
-                               uint16_t &hcCtl, uint8_t *aBuf);
-    int CompressMulticast(const Ip6::Address &ipaddr, uint16_t &hcCtl, uint8_t *aBuf);
-    int CompressUdp(Message &message, uint8_t *aBuf);
+    int CompressExtensionHeader(Message &aMessage, uint8_t *aBuf, uint8_t &aNextHeader);
+    int CompressSourceIid(const Mac::Address &aMacAddr,
+                          const Ip6::Address &aIpAddr,
+                          const Context &     aContext,
+                          uint16_t &          aHcCtl,
+                          uint8_t *           aBuf);
+    int CompressDestinationIid(const Mac::Address &aMacAddr,
+                               const Ip6::Address &aIpAddr,
+                               const Context &     aContext,
+                               uint16_t &          aHcCtl,
+                               uint8_t *           aBuf);
+    int CompressMulticast(const Ip6::Address &aIpAddr, uint16_t &aHcCtl, uint8_t *aBuf);
+    int CompressUdp(Message &aMessage, uint8_t *aBuf);
 
-    int DecompressExtensionHeader(Message &message, const uint8_t *aBuf, uint16_t aBufLength);
-    int DecompressUdpHeader(Message &message, const uint8_t *aBuf, uint16_t aBufLength, uint16_t datagramLength);
-    otError DispatchToNextHeader(uint8_t dispatch, Ip6::IpProto &nextHeader);
+    int     DecompressExtensionHeader(Message &aMessage, const uint8_t *aBuf, uint16_t aBufLength);
+    int     DecompressUdpHeader(Message &aMessage, const uint8_t *aBuf, uint16_t aBufLength, uint16_t aDatagramLength);
+    otError DispatchToNextHeader(uint8_t aDispatch, Ip6::IpProto &aNextHeader);
 
     static otError CopyContext(const Context &aContext, Ip6::Address &aAddress);
     static otError ComputeIid(const Mac::Address &aMacAddr, const Context &aContext, Ip6::Address &aIpAddress);
-
-    NetworkData::Leader &mNetworkData;
 };
 
 /**
@@ -223,7 +248,7 @@ class MeshHeader
 public:
     enum
     {
-        kAdditionalHopsLeft = 1    ///< The additional value that is added to predicted value of the route cost.
+        kAdditionalHopsLeft = 1 ///< The additional value that is added to predicted value of the route cost.
     };
 
     /**
@@ -268,7 +293,7 @@ public:
      * @retval FALSE  If the header does not match the Mesh Header dispatch value.
      *
      */
-    bool IsMeshHeader(void) { return (mDispatchHopsLeft & kDispatchMask) == kDispatch; }
+    bool IsMeshHeader(void) const { return (mDispatchHopsLeft & kDispatchMask) == kDispatch; }
 
     /**
      * This method indicates whether or not the Mesh Header appears to be well-formed.
@@ -277,7 +302,7 @@ public:
      * @retval FALSE  If the header does not appear to be well-formed.
      *
      */
-    bool IsValid(void) { return (mDispatchHopsLeft & kSourceShort) && (mDispatchHopsLeft & kDestinationShort); }
+    bool IsValid(void) const { return (mDispatchHopsLeft & kSourceShort) && (mDispatchHopsLeft & kDestinationShort); }
 
     /**
      * This method indicates whether or not the header contains Deep Hops Left field.
@@ -286,7 +311,7 @@ public:
      * @retval FALSE  If the header does not contain Deep Hops Left field.
      *
      */
-    bool IsDeepHopsLeftField(void) { return (mDispatchHopsLeft & kHopsLeftMask) == kDeepHopsLeft; }
+    bool IsDeepHopsLeftField(void) const { return (mDispatchHopsLeft & kHopsLeftMask) == kDeepHopsLeft; }
 
     /**
      * This static method returns the size of the Mesh Header in bytes.
@@ -294,7 +319,7 @@ public:
      * @returns The size of the Mesh Header in bytes.
      *
      */
-    uint8_t GetHeaderLength(void) { return sizeof(*this) - (IsDeepHopsLeftField() ? 0 : sizeof(mDeepHopsLeft)) ; }
+    uint8_t GetHeaderLength(void) const { return sizeof(*this) - (IsDeepHopsLeftField() ? 0 : sizeof(mDeepHopsLeft)); }
 
     /**
      * This method returns the Hops Left value.
@@ -302,7 +327,10 @@ public:
      * @returns The Hops Left value.
      *
      */
-    uint8_t GetHopsLeft(void) { return IsDeepHopsLeftField() ? mDeepHopsLeft : mDispatchHopsLeft & kHopsLeftMask; }
+    uint8_t GetHopsLeft(void) const
+    {
+        return IsDeepHopsLeftField() ? mDeepHopsLeft : mDispatchHopsLeft & kHopsLeftMask;
+    }
 
     /**
      * This method sets the Hops Left value.
@@ -310,13 +338,16 @@ public:
      * @param[in]  aHops  The Hops Left value.
      *
      */
-    void SetHopsLeft(uint8_t aHops) {
-        if (aHops < kDeepHopsLeft && !IsDeepHopsLeftField()) {
+    void SetHopsLeft(uint8_t aHops)
+    {
+        if (aHops < kDeepHopsLeft && !IsDeepHopsLeftField())
+        {
             mDispatchHopsLeft = (mDispatchHopsLeft & ~kHopsLeftMask) | aHops;
         }
-        else {
+        else
+        {
             mDispatchHopsLeft = (mDispatchHopsLeft & ~kHopsLeftMask) | kDeepHopsLeft;
-            mDeepHopsLeft = aHops;
+            mDeepHopsLeft     = aHops;
         }
     }
 
@@ -326,7 +357,7 @@ public:
      * @returns The Mesh Source address.
      *
      */
-    uint16_t GetSource(void) { return HostSwap16(mAddress.mSource); }
+    uint16_t GetSource(void) const { return HostSwap16(mAddress.mSource); }
 
     /**
      * This method sets the Mesh Source address.
@@ -342,7 +373,7 @@ public:
      * @returns The Mesh Destination address.
      *
      */
-    uint16_t GetDestination(void) { return HostSwap16(mAddress.mDestination); }
+    uint16_t GetDestination(void) const { return HostSwap16(mAddress.mDestination); }
 
     /**
      * This method sets the Mesh Destination address.
@@ -358,10 +389,12 @@ public:
      * @param[in]  aFrame  The pointer to the frame.
      *
      */
-    void AppendTo(uint8_t *aFrame) {
+    void AppendTo(uint8_t *aFrame) const
+    {
         *aFrame++ = mDispatchHopsLeft;
 
-        if (IsDeepHopsLeftField()) {
+        if (IsDeepHopsLeftField())
+        {
             *aFrame++ = mDeepHopsLeft;
         }
 
@@ -379,13 +412,13 @@ private:
         kDeepHopsLeft     = 0x0f
     };
 
-    uint8_t  mDispatchHopsLeft;
-    uint8_t  mDeepHopsLeft;
-    struct
+    uint8_t mDispatchHopsLeft;
+    uint8_t mDeepHopsLeft;
+    struct OT_TOOL_PACKED_FIELD
     {
         uint16_t mSource;
         uint16_t mDestination;
-    } mAddress OT_TOOL_PACKED_FIELD;
+    } mAddress;
 } OT_TOOL_PACKED_END;
 
 /**
@@ -397,10 +430,45 @@ class FragmentHeader
 {
 public:
     /**
+     * This constructor initializes the Fragment Header.
+     *
+     */
+    FragmentHeader(void)
+    {
+        mDispatchSize = HostSwap16(kDispatch);
+        mTag          = 0;
+        mOffset       = 0;
+    }
+
+    /**
      * This method initializes the Fragment Header.
      *
      */
     void Init(void) { mDispatchSize = HostSwap16(kDispatch); }
+
+    /**
+     * This method initializes the fragment header from a frame @p aFrame.
+     *
+     * @param[in]  aFrame        The pointer to the frame.
+     * @param[in]  aFrameLength  The length of the frame.
+     *
+     * @retval OT_ERROR_NONE     Fragment Header initialized successfully.
+     * @retval OT_ERROR_PARSE    Fragment header could not be initialized from @p aFrame (e.g., frame not long enough).
+     *
+     */
+    otError Init(const uint8_t *aFrame, uint8_t aFrameLength);
+
+    /**
+     * This method initializes the fragment header from a message @p aMessage.
+     *
+     * @param[in]  aMessage      The message object.
+     * @param[in]  aOffset       An offset into the message to read the header.
+     *
+     * @retval OT_ERROR_NONE     Fragment Header initialized successfully.
+     * @retval OT_ERROR_PARSE    Fragment header could not be initialized (e.g., no frag header or message too short).
+     *
+     */
+    otError Init(const Message &aMessage, uint16_t aOffset);
 
     /**
      * This method indicates whether or not the header is a Fragment Header.
@@ -409,7 +477,7 @@ public:
      * @retval FALSE  If the header does not match the Fragment Header dispatch value.
      *
      */
-    bool IsFragmentHeader(void) { return (HostSwap16(mDispatchSize) & kDispatchMask) == kDispatch; }
+    bool IsFragmentHeader(void) const { return (HostSwap16(mDispatchSize) & kDispatchMask) == kDispatch; }
 
     /**
      * This method returns the Fragment Header length.
@@ -417,9 +485,15 @@ public:
      * @returns The Fragment Header length in bytes.
      *
      */
-    uint8_t GetHeaderLength(void) {
-        return (HostSwap16(mDispatchSize) & kOffset) ? sizeof(*this) : sizeof(*this) - sizeof(mOffset);
-    }
+    uint8_t GetHeaderLength(void) const { return IsOffsetPresent() ? sizeof(*this) : sizeof(*this) - sizeof(mOffset); }
+
+    /**
+     * This method indicates whether or not the Offset field is present.
+     *
+     * @returns TRUE if the Offset field is present, FALSE otherwise.
+     *
+     */
+    bool IsOffsetPresent(void) const { return (HostSwap16(mDispatchSize) & kOffset) != 0; }
 
     /**
      * This method returns the Datagram Size value.
@@ -427,7 +501,7 @@ public:
      * @returns The Datagram Size value.
      *
      */
-    uint16_t GetDatagramSize(void) { return HostSwap16(mDispatchSize) & kSizeMask; }
+    uint16_t GetDatagramSize(void) const { return HostSwap16(mDispatchSize) & kSizeMask; }
 
     /**
      * This method sets the Datagram Size value.
@@ -435,7 +509,8 @@ public:
      * @param[in]  aSize  The Datagram Size value.
      *
      */
-    void SetDatagramSize(uint16_t aSize) {
+    void SetDatagramSize(uint16_t aSize)
+    {
         mDispatchSize = HostSwap16((HostSwap16(mDispatchSize) & ~kSizeMask) | (aSize & kSizeMask));
     }
 
@@ -445,7 +520,7 @@ public:
      * @returns The Datagram Tag value.
      *
      */
-    uint16_t GetDatagramTag(void) { return HostSwap16(mTag); }
+    uint16_t GetDatagramTag(void) const { return HostSwap16(mTag); }
 
     /**
      * This method sets the Datagram Tag value.
@@ -461,7 +536,7 @@ public:
      * @returns The Datagram Offset value.
      *
      */
-    uint16_t GetDatagramOffset(void) { return (HostSwap16(mDispatchSize) & kOffset) ? static_cast<uint16_t>(mOffset) * 8 : 0; }
+    uint16_t GetDatagramOffset(void) const { return IsOffsetPresent() ? static_cast<uint16_t>(mOffset) * 8 : 0; }
 
     /**
      * This method sets the Datagram Offset value.
@@ -469,13 +544,16 @@ public:
      * @param[in]  aOffset  The Datagram Offset value.
      *
      */
-    void SetDatagramOffset(uint16_t aOffset) {
-        if (aOffset == 0) {
+    void SetDatagramOffset(uint16_t aOffset)
+    {
+        if (aOffset == 0)
+        {
             mDispatchSize = HostSwap16(HostSwap16(mDispatchSize) & ~kOffset);
         }
-        else {
+        else
+        {
             mDispatchSize = HostSwap16(HostSwap16(mDispatchSize) | kOffset);
-            mOffset = (aOffset >> 3) & kOffsetMask;
+            mOffset       = (aOffset >> 3) & kOffsetMask;
         }
     }
 
@@ -484,7 +562,7 @@ private:
     {
         kDispatch     = 3 << 14,
         kOffset       = 1 << 13,
-        kDispatchMask = 0xd800,  ///< Accept FRAG1 and FRAGN only.
+        kDispatchMask = 0xd800, ///< Accept FRAG1 and FRAGN only.
         kSizeMask     = 0x7ff,
         kOffsetMask   = 0xff,
     };
@@ -498,7 +576,7 @@ private:
  * @}
  */
 
-}  // namespace Lowpan
-}  // namespace ot
+} // namespace Lowpan
+} // namespace ot
 
-#endif  // LOWPAN_HPP_
+#endif // LOWPAN_HPP_

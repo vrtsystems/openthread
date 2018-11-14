@@ -82,7 +82,7 @@ otPlatReset(
     NT_ASSERT(otCtxToFilter(pFilter->otCtx) == pFilter);
 
     // Disable Icmp (ping) handling
-    otIcmp6SetEchoEnabled(pFilter->otCtx, FALSE);
+    otIcmp6SetEchoMode(pFilter->otCtx, OT_ICMP6_ECHO_HANDLER_DISABLED);
 
     // Register callbacks with OpenThread
     otSetStateChangedCallback(pFilter->otCtx, otLwfStateChangedCallback, pFilter);
@@ -210,7 +210,7 @@ void otPlatRadioSetPanId(_In_ otInstance *otCtx, uint16_t panid)
     }
 }
 
-void otPlatRadioSetExtendedAddress(_In_ otInstance *otCtx, uint8_t *address)
+void otPlatRadioSetExtendedAddress(_In_ otInstance *otCtx, const otExtAddress *address)
 {
     NT_ASSERT(otCtx);
     PMS_FILTER pFilter = otCtxToFilter(otCtx);
@@ -223,7 +223,7 @@ void otPlatRadioSetExtendedAddress(_In_ otInstance *otCtx, uint8_t *address)
 
     for (size_t i = 0; i < OT_EXT_ADDRESS_SIZE; i++)
     {
-        extAddr.bytes[i] = address[7 - i];
+        extAddr.bytes[i] = address->m8[7 - i];
     }
 
     // Indicate to the miniport
@@ -633,7 +633,7 @@ void otPlatRadioEnableSrcMatch(_In_ otInstance *otCtx, bool aEnable)
     }
 }
 
-otError otPlatRadioAddSrcMatchShortEntry(_In_ otInstance *otCtx, const uint16_t aShortAddress)
+otError otPlatRadioAddSrcMatchShortEntry(_In_ otInstance *otCtx, otShortAddress aShortAddress)
 {
     NT_ASSERT(otCtx);
     PMS_FILTER pFilter = otCtxToFilter(otCtx);
@@ -654,7 +654,7 @@ otError otPlatRadioAddSrcMatchShortEntry(_In_ otInstance *otCtx, const uint16_t 
     return NT_SUCCESS(status) ? OT_ERROR_NONE : OT_ERROR_FAILED;
 }
 
-otError otPlatRadioAddSrcMatchExtEntry(_In_ otInstance *otCtx, const uint8_t *aExtAddress)
+otError otPlatRadioAddSrcMatchExtEntry(_In_ otInstance *otCtx, const otExtAddress *aExtAddress)
 {
     NT_ASSERT(otCtx);
     PMS_FILTER pFilter = otCtxToFilter(otCtx);
@@ -675,7 +675,7 @@ otError otPlatRadioAddSrcMatchExtEntry(_In_ otInstance *otCtx, const uint8_t *aE
     return NT_SUCCESS(status) ? OT_ERROR_NONE : OT_ERROR_FAILED;
 }
 
-otError otPlatRadioClearSrcMatchShortEntry(_In_ otInstance *otCtx, const uint16_t aShortAddress)
+otError otPlatRadioClearSrcMatchShortEntry(_In_ otInstance *otCtx, otShortAddress aShortAddress)
 {
     NT_ASSERT(otCtx);
     PMS_FILTER pFilter = otCtxToFilter(otCtx);
@@ -696,7 +696,7 @@ otError otPlatRadioClearSrcMatchShortEntry(_In_ otInstance *otCtx, const uint16_
     return NT_SUCCESS(status) ? OT_ERROR_NONE : OT_ERROR_FAILED;
 }
 
-otError otPlatRadioClearSrcMatchExtEntry(_In_ otInstance *otCtx, const uint8_t *aExtAddress)
+otError otPlatRadioClearSrcMatchExtEntry(_In_ otInstance *otCtx, const otExtAddress *aExtAddress)
 {
     NT_ASSERT(otCtx);
     PMS_FILTER pFilter = otCtxToFilter(otCtx);
@@ -802,7 +802,30 @@ error:
     return NT_SUCCESS(status) ? OT_ERROR_NONE : OT_ERROR_FAILED;
 }
 
-void otPlatRadioSetDefaultTxPower(_In_ otInstance *otCtx, int8_t aPower)
+otError otPlatRadioGetTransmitPower(_In_ otInstance *otCtx, int8_t *aPower)
+{
+    NT_ASSERT(otCtx);
+    PMS_FILTER pFilter = otCtxToFilter(otCtx);
+    NTSTATUS status;
+
+    status =
+        otLwfCmdGetProp(
+            pFilter,
+            NULL,
+            SPINEL_PROP_PHY_TX_POWER,
+            SPINEL_DATATYPE_INT8_S,
+            aPower
+        );
+
+    if (!NT_SUCCESS(status))
+    {
+        LogError(DRIVER_DEFAULT, "Get SPINEL_PROP_PHY_TX_POWER, failed, %!STATUS!", status);
+    }
+
+    return NT_SUCCESS(status) ? OT_ERROR_NONE : OT_ERROR_FAILED;
+}
+
+otError otPlatRadioSetTransmitPower(_In_ otInstance *otCtx, int8_t aPower)
 {
     NT_ASSERT(otCtx);
     PMS_FILTER pFilter = otCtxToFilter(otCtx);
@@ -816,10 +839,13 @@ void otPlatRadioSetDefaultTxPower(_In_ otInstance *otCtx, int8_t aPower)
             SPINEL_DATATYPE_INT8_S,
             aPower
         );
+
     if (!NT_SUCCESS(status))
     {
         LogError(DRIVER_DEFAULT, "Set SPINEL_PROP_PHY_TX_POWER failed, %!STATUS!", status);
     }
+
+    return NT_SUCCESS(status) ? OT_ERROR_NONE : OT_ERROR_FAILED;
 }
 
 int8_t otPlatRadioGetReceiveSensitivity(_In_ otInstance *otCtx)

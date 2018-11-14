@@ -35,6 +35,31 @@
 #ifndef OPENTHREAD_CORE_NRF52840_CONFIG_H_
 #define OPENTHREAD_CORE_NRF52840_CONFIG_H_
 
+/*
+ * The GNU Autoconf system defines a PACKAGE macro which is the name
+ * of the software package. This name collides with PACKAGE field in
+ * the nRF52 Factory Information Configuration Registers (FICR)
+ * structure.
+ */
+#undef PACKAGE
+
+/**
+ * @def OPENTHREAD_CONFIG_LOG_OUTPUT
+ *
+ * The nrf52840 platform provides an otPlatLog() function.
+ */
+#ifndef OPENTHREAD_CONFIG_LOG_OUTPUT /* allow command line override */
+#define OPENTHREAD_CONFIG_LOG_OUTPUT  OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_PLATFORM_INFO
+ *
+ * The platform-specific string to insert into the OpenThread version string.
+ *
+ */
+#define OPENTHREAD_CONFIG_PLATFORM_INFO                         "NRF52840"
+
 /**
  * @def OPENTHREAD_CONFIG_NUM_MESSAGE_BUFFERS
  *
@@ -65,7 +90,9 @@
  * Define to prepend the log level to all log messages
  *
  */
+#ifndef OPENTHREAD_CONFIG_LOG_PREPEND_LEVEL
 #define OPENTHREAD_CONFIG_LOG_PREPEND_LEVEL                     0
+#endif
 
  /**
   * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
@@ -73,7 +100,7 @@
   * Define to 1 if you want to enable software ACK timeout logic.
   *
   */
-#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT           1
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT           0
 
  /**
   * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
@@ -84,12 +111,20 @@
 #define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT            1
 
 /**
- * @def OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_BACKOFF_TIMER
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
  *
- * Define to 1 if you want to enable microsecond backoff timer implemented in platform.
+ * Define to 1 if you want to enable software CSMA-CA backoff logic.
  *
  */
-#define OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_BACKOFF_TIMER     1
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF          0
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
+ *
+ * Define to 1 if you want to support microsecond timer in platform.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER     1
 
 /**
  * @def SETTINGS_CONFIG_BASE_ADDRESS
@@ -116,27 +151,65 @@
 #define SETTINGS_CONFIG_PAGE_NUM                                4
 
 /**
- * @def OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE
+ * @def OPENTHREAD_CONFIG_HEAP_SIZE
  *
- * The size of mbedTLS heap buffer when DTLS is enabled.
- *
- */
-#define OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE                     (4096 * sizeof(void *))
-
-/**
- * @def OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE_NO_DTLS
- *
- * The size of mbedTLS heap buffer when DTLS is disabled.
+ * The size of heap buffer when DTLS is enabled.
  *
  */
-#define OPENTHREAD_CONFIG_MBEDTLS_HEAP_SIZE_NO_DTLS             2048
+#define OPENTHREAD_CONFIG_HEAP_SIZE                             (4096 * sizeof(void *))
 
 /**
-  * @def OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE
-  *
-  * Define to 1 if you want use legacy transmit done.
-  *
-  */
-#define OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE 1
+ * @def OPENTHREAD_CONFIG_HEAP_SIZE_NO_DTLS
+ *
+ * The size of heap buffer when DTLS is disabled.
+ *
+ */
+#define OPENTHREAD_CONFIG_HEAP_SIZE_NO_DTLS                     2048
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+ *
+ * Define as 1 to enable the time synchronization service feature.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_TIME_SYNC                      0
+
+/**
+ * @def OPENTHREAD_CONFIG_HEADER_IE_SUPPORT
+ *
+ * Define as 1 to support IEEE 802.15.4-2015 Header IE (Information Element) generation and parsing, it must be set
+ * to support following features:
+ *    1. Time synchronization service feature (i.e., OPENTHREAD_CONFIG_ENABLE_TIME_SYNC is set).
+ *
+ * @note If it's enabled, plaforms must support interrupt context and concurrent access AES.
+ *
+ */
+#if OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+#define OPENTHREAD_CONFIG_HEADER_IE_SUPPORT                     1
+#endif
+
+/**
+ * @def NRF_MBEDTLS_AES_ALT_INTERRUPT_CONTEXT
+ *
+ * Define as 1 to enable AES usage in interrupt context and AES-256, by introducing a software AES under platform layer.
+ *
+ * @note This feature must be enabled to support AES-256 used by Commissioner and Joiner, and AES usage in interrupt context
+ *       used by Header IE related features.
+ *
+ */
+#if OPENTHREAD_ENABLE_COMMISSIONER || OPENTHREAD_ENABLE_JOINER || OPENTHREAD_CONFIG_HEADER_IE_SUPPORT
+#define NRF_MBEDTLS_AES_ALT_INTERRUPT_CONTEXT                   1
+#else
+#define NRF_MBEDTLS_AES_ALT_INTERRUPT_CONTEXT                   0
+#endif
+
+/*
+ * Suppress the ARMCC warning on unreachable statement,
+ * e.g. break after assert(false) or ExitNow() macro.
+ */
+#if defined(__CC_ARM)
+    _Pragma("diag_suppress=111")
+    _Pragma("diag_suppress=128")
+#endif
 
 #endif  // OPENTHREAD_CORE_NRF52840_CONFIG_H_

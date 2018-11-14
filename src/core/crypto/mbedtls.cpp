@@ -31,21 +31,33 @@
  *   This file implements the use of mbedTLS.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "mbedtls.hpp"
+
+#include <mbedtls/platform.h>
+
+#include "common/instance.hpp"
+
+#if !OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
 
 namespace ot {
 namespace Crypto {
 
-MbedTls::MbedTls(void)
+static void *CAlloc(size_t aCount, size_t aSize)
 {
-    mbedtls_memory_buffer_alloc_init(mMemory, sizeof(mMemory));
+    return Instance::Get().GetHeap().CAlloc(aCount, aSize);
 }
 
-}  // namespace Crypto
-}  // namespace ot
+static void Free(void *aPointer)
+{
+    Instance::Get().GetHeap().Free(aPointer);
+}
+
+MbedTls::MbedTls(void)
+{
+    mbedtls_platform_set_calloc_free(CAlloc, Free);
+}
+
+} // namespace Crypto
+} // namespace ot
+
+#endif // #if !OPENTHREAD_ENABLE_MULTIPLE_INSTANCES

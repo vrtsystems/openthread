@@ -33,12 +33,6 @@
 
 #define WPP_NAME "announce_begin_server.tmh"
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "announce_begin_server.hpp"
 
 #include <openthread/platform/radio.h>
@@ -46,7 +40,9 @@
 #include "coap/coap_header.hpp"
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
+#include "common/instance.hpp"
 #include "common/logging.hpp"
+#include "common/owner-locator.hpp"
 #include "meshcop/meshcop_tlvs.hpp"
 #include "thread/thread_netif.hpp"
 #include "thread/thread_uri_paths.hpp"
@@ -55,21 +51,11 @@ using ot::Encoding::BigEndian::HostSwap32;
 
 namespace ot {
 
-AnnounceBeginServer::AnnounceBeginServer(ThreadNetif &aThreadNetif) :
-    mChannelMask(0),
-    mPeriod(0),
-    mCount(0),
-    mChannel(0),
-    mTimer(aThreadNetif.GetIp6().mTimerScheduler, &AnnounceBeginServer::HandleTimer, this),
-    mAnnounceBegin(OT_URI_PATH_ANNOUNCE_BEGIN, &AnnounceBeginServer::HandleRequest, this),
-    mNetif(aThreadNetif)
+AnnounceBeginServer::AnnounceBeginServer(Instance &aInstance)
+    : AnnounceSenderBase(aInstance, &AnnounceBeginServer::HandleTimer)
+    , mAnnounceBegin(OT_URI_PATH_ANNOUNCE_BEGIN, &AnnounceBeginServer::HandleRequest, this)
 {
-    mNetif.GetCoap().AddResource(mAnnounceBegin);
-}
-
-otInstance *AnnounceBeginServer::GetInstance(void)
-{
-    return mNetif.GetInstance();
+    GetNetif().GetCoap().AddResource(mAnnounceBegin);
 }
 
 otError AnnounceBeginServer::SendAnnounce(uint32_t aChannelMask)
@@ -79,43 +65,30 @@ otError AnnounceBeginServer::SendAnnounce(uint32_t aChannelMask)
 
 otError AnnounceBeginServer::SendAnnounce(uint32_t aChannelMask, uint8_t aCount, uint16_t aPeriod)
 {
-    otError error = OT_ERROR_NONE;
-
-    mChannelMask = aChannelMask;
-    mCount = aCount;
-    mPeriod = aPeriod;
-    mChannel = OT_RADIO_CHANNEL_MIN;
-
-    while ((mChannelMask & (1 << mChannel)) == 0)
-    {
-        mChannel++;
-        VerifyOrExit(mChannel <= OT_RADIO_CHANNEL_MAX, error = OT_ERROR_INVALID_ARGS);
-    }
-
-    mTimer.Start(mPeriod);
-
-exit:
-    return error;
+    return AnnounceSenderBase::SendAnnounce(Mac::ChannelMask(aChannelMask), aCount, aPeriod, kDefaultJitter);
 }
 
-void AnnounceBeginServer::HandleRequest(void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
+void AnnounceBeginServer::HandleRequest(void *               aContext,
+                                        otCoapHeader *       aHeader,
+                                        otMessage *          aMessage,
                                         const otMessageInfo *aMessageInfo)
 {
-    static_cast<AnnounceBeginServer *>(aContext)->HandleRequest(
-        *static_cast<Coap::Header *>(aHeader), *static_cast<Message *>(aMessage),
-        *static_cast<const Ip6::MessageInfo *>(aMessageInfo));
+    static_cast<AnnounceBeginServer *>(aContext)->HandleRequest(*static_cast<Coap::Header *>(aHeader),
+                                                                *static_cast<Message *>(aMessage),
+                                                                *static_cast<const Ip6::MessageInfo *>(aMessageInfo));
 }
+
 void AnnounceBeginServer::HandleRequest(Coap::Header &aHeader, Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
-    MeshCoP::ChannelMask0Tlv channelMask;
-    MeshCoP::CountTlv count;
-    MeshCoP::PeriodTlv period;
-    Ip6::MessageInfo responseInfo(aMessageInfo);
+    MeshCoP::ChannelMaskTlv channelMask;
+    MeshCoP::CountTlv       count;
+    MeshCoP::PeriodTlv      period;
+    Ip6::MessageInfo        responseInfo(aMessageInfo);
 
-    VerifyOrExit(aHeader.GetCode() == kCoapRequestPost);
+    VerifyOrExit(aHeader.GetCode() == OT_COAP_CODE_POST);
 
     SuccessOrExit(MeshCoP::Tlv::GetTlv(aMessage, MeshCoP::Tlv::kChannelMask, sizeof(channelMask), channelMask));
-    VerifyOrExit(channelMask.IsValid());
+    VerifyOrExit(channelMask.IsValid() && (channelMask.GetChannelPage() == OT_RADIO_CHANNEL_PAGE));
 
     SuccessOrExit(MeshCoP::Tlv::GetTlv(aMessage, MeshCoP::Tlv::kCount, sizeof(count), count));
     VerifyOrExit(count.IsValid());
@@ -127,39 +100,17 @@ void AnnounceBeginServer::HandleRequest(Coap::Header &aHeader, Message &aMessage
 
     if (aHeader.IsConfirmable() && !aMessageInfo.GetSockAddr().IsMulticast())
     {
-        SuccessOrExit(mNetif.GetCoap().SendEmptyAck(aHeader, responseInfo));
-        otLogInfoMeshCoP(GetInstance(), "sent announce begin response");
+        SuccessOrExit(GetNetif().GetCoap().SendEmptyAck(aHeader, responseInfo));
+        otLogInfoMeshCoP("sent announce begin response");
     }
 
 exit:
     return;
 }
 
-void AnnounceBeginServer::HandleTimer(void *aContext)
+void AnnounceBeginServer::HandleTimer(Timer &aTimer)
 {
-    static_cast<AnnounceBeginServer *>(aContext)->HandleTimer();
+    aTimer.GetOwner<AnnounceBeginServer>().AnnounceSenderBase::HandleTimer();
 }
 
-void AnnounceBeginServer::HandleTimer(void)
-{
-    mNetif.GetMle().SendAnnounce(mChannel++, false);
-
-    while (mCount > 0)
-    {
-        if (mChannelMask & (1 << mChannel))
-        {
-            mTimer.Start(mPeriod);
-            break;
-        }
-
-        mChannel++;
-
-        if (mChannel > OT_RADIO_CHANNEL_MAX)
-        {
-            mChannel = OT_RADIO_CHANNEL_MIN;
-            mCount--;
-        }
-    }
-}
-
-}  // namespace ot
+} // namespace ot

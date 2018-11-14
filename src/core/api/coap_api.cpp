@@ -31,10 +31,12 @@
  *   This file implements the OpenThread CoAP API.
  */
 
+#include "openthread-core-config.h"
+
 #include <openthread/coap.h>
 
-#include "openthread-instance.h"
 #include "coap/coap_header.hpp"
+#include "common/instance.hpp"
 
 #if OPENTHREAD_ENABLE_APPLICATION_COAP
 
@@ -54,6 +56,11 @@ void otCoapHeaderSetToken(otCoapHeader *aHeader, const uint8_t *aToken, uint8_t 
 void otCoapHeaderGenerateToken(otCoapHeader *aHeader, uint8_t aTokenLength)
 {
     static_cast<Coap::Header *>(aHeader)->SetToken(aTokenLength);
+}
+
+otError otCoapHeaderAppendContentFormatOption(otCoapHeader *aHeader, otCoapOptionContentFormat aContentFormat)
+{
+    return static_cast<Coap::Header *>(aHeader)->AppendContentFormatOption(aContentFormat);
 }
 
 otError otCoapHeaderAppendOption(otCoapHeader *aHeader, const otCoapOption *aOption)
@@ -76,6 +83,11 @@ otError otCoapHeaderAppendUriPathOptions(otCoapHeader *aHeader, const char *aUri
     return static_cast<Coap::Header *>(aHeader)->AppendUriPathOptions(aUriPath);
 }
 
+otError otCoapHeaderAppendProxyUriOption(otCoapHeader *aHeader, const char *aUriPath)
+{
+    return static_cast<Coap::Header *>(aHeader)->AppendProxyUriOption(aUriPath);
+}
+
 otError otCoapHeaderAppendMaxAgeOption(otCoapHeader *aHeader, uint32_t aMaxAge)
 {
     return static_cast<Coap::Header *>(aHeader)->AppendMaxAgeOption(aMaxAge);
@@ -86,9 +98,9 @@ otError otCoapHeaderAppendUriQueryOption(otCoapHeader *aHeader, const char *aUri
     return static_cast<Coap::Header *>(aHeader)->AppendUriQueryOption(aUriQuery);
 }
 
-void otCoapHeaderSetPayloadMarker(otCoapHeader *aHeader)
+otError otCoapHeaderSetPayloadMarker(otCoapHeader *aHeader)
 {
-    static_cast<Coap::Header *>(aHeader)->SetPayloadMarker();
+    return static_cast<Coap::Header *>(aHeader)->SetPayloadMarker();
 }
 
 void otCoapHeaderSetMessageId(otCoapHeader *aHeader, uint16_t aMessageId)
@@ -104,6 +116,11 @@ otCoapType otCoapHeaderGetType(const otCoapHeader *aHeader)
 otCoapCode otCoapHeaderGetCode(const otCoapHeader *aHeader)
 {
     return static_cast<const Coap::Header *>(aHeader)->GetCode();
+}
+
+const char *otCoapHeaderCodeToString(const otCoapHeader *aHeader)
+{
+    return static_cast<const Coap::Header *>(aHeader)->CodeToString();
 }
 
 uint16_t otCoapHeaderGetMessageId(const otCoapHeader *aHeader)
@@ -131,53 +148,77 @@ const otCoapOption *otCoapHeaderGetNextOption(otCoapHeader *aHeader)
     return static_cast<const otCoapOption *>(static_cast<Coap::Header *>(aHeader)->GetNextOption());
 }
 
-otMessage *otCoapNewMessage(otInstance *aInstance, const otCoapHeader *aHeader)
+otMessage *otCoapNewMessage(otInstance *aInstance, const otCoapHeader *aHeader, const otMessageSettings *aSettings)
 {
-    Message *message;
+    Message * message;
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
     VerifyOrExit(aHeader != NULL, message = NULL);
-    message = aInstance->mApplicationCoap.NewMessage(*(static_cast<const Coap::Header *>(aHeader)));
+
+    if (aSettings != NULL)
+    {
+        VerifyOrExit(aSettings->mPriority <= OT_MESSAGE_PRIORITY_HIGH, message = NULL);
+    }
+
+    message = instance.GetApplicationCoap().NewMessage(*(static_cast<const Coap::Header *>(aHeader)), aSettings);
+
 exit:
     return message;
 }
 
-otError otCoapSendRequest(otInstance *aInstance, otMessage *aMessage, const otMessageInfo *aMessageInfo,
-                          otCoapResponseHandler aHandler, void *aContext)
+otError otCoapSendRequest(otInstance *          aInstance,
+                          otMessage *           aMessage,
+                          const otMessageInfo * aMessageInfo,
+                          otCoapResponseHandler aHandler,
+                          void *                aContext)
 {
-    return aInstance->mApplicationCoap.SendMessage(
-               *static_cast<Message *>(aMessage),
-               *static_cast<const Ip6::MessageInfo *>(aMessageInfo),
-               aHandler, aContext);
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    return instance.GetApplicationCoap().SendMessage(
+        *static_cast<Message *>(aMessage), *static_cast<const Ip6::MessageInfo *>(aMessageInfo), aHandler, aContext);
 }
 
 otError otCoapStart(otInstance *aInstance, uint16_t aPort)
 {
-    return aInstance->mApplicationCoap.Start(aPort);
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    return instance.GetApplicationCoap().Start(aPort);
 }
 
 otError otCoapStop(otInstance *aInstance)
 {
-    return aInstance->mApplicationCoap.Stop();
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    return instance.GetApplicationCoap().Stop();
 }
 
 otError otCoapAddResource(otInstance *aInstance, otCoapResource *aResource)
 {
-    return aInstance->mApplicationCoap.AddResource(*static_cast<Coap::Resource *>(aResource));
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    return instance.GetApplicationCoap().AddResource(*static_cast<Coap::Resource *>(aResource));
 }
 
 void otCoapRemoveResource(otInstance *aInstance, otCoapResource *aResource)
 {
-    aInstance->mApplicationCoap.RemoveResource(*static_cast<Coap::Resource *>(aResource));
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    instance.GetApplicationCoap().RemoveResource(*static_cast<Coap::Resource *>(aResource));
 }
 
 void otCoapSetDefaultHandler(otInstance *aInstance, otCoapRequestHandler aHandler, void *aContext)
 {
-    aInstance->mApplicationCoap.SetDefaultHandler(aHandler, aContext);
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    instance.GetApplicationCoap().SetDefaultHandler(aHandler, aContext);
 }
 
 otError otCoapSendResponse(otInstance *aInstance, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
-    return aInstance->mApplicationCoap.SendMessage(
-               *static_cast<Message *>(aMessage), *static_cast<const Ip6::MessageInfo *>(aMessageInfo));
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    return instance.GetApplicationCoap().SendMessage(*static_cast<Message *>(aMessage),
+                                                     *static_cast<const Ip6::MessageInfo *>(aMessageInfo));
 }
 
 #endif // OPENTHREAD_ENABLE_APPLICATION_COAP

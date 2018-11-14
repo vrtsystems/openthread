@@ -31,11 +31,10 @@
  *   This file implements the OpenThread platform abstraction for miscellaneous behaviors.
  */
 
-#include <openthread/types.h>
 #include <openthread/platform/misc.h>
 
-#include "platform-efr32.h"
 #include "em_rmu.h"
+#include "platform-efr32.h"
 
 static uint32_t sResetCause;
 
@@ -79,10 +78,8 @@ otPlatResetReason otPlatGetResetReason(otInstance *aInstance)
     {
         reason = OT_PLAT_RESET_REASON_FAULT;
     }
-    else if ((sResetCause & RMU_RSTCAUSE_AVDDBOD) ||
-             (sResetCause & RMU_RSTCAUSE_DECBOD)  ||
-             (sResetCause & RMU_RSTCAUSE_DVDDBOD) ||
-             (sResetCause & RMU_RSTCAUSE_EM4RST))
+    else if ((sResetCause & RMU_RSTCAUSE_AVDDBOD) || (sResetCause & RMU_RSTCAUSE_DECBOD) ||
+             (sResetCause & RMU_RSTCAUSE_DVDDBOD) || (sResetCause & RMU_RSTCAUSE_EM4RST))
     {
         reason = OT_PLAT_RESET_REASON_ASSERT;
     }

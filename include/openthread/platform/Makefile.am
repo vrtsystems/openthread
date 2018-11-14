@@ -28,22 +28,27 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
-ot_platform_headers                      =\
-    alarm.h                               \
+ot_platform_headers                     = \
+    alarm-micro.h                         \
+    alarm-milli.h                         \
+    ble.h                                 \
     diag.h                                \
     memory.h                              \
     misc.h                                \
     logging.h                             \
-    platform.h                            \
     radio.h                               \
     random.h                              \
+    time.h                                \
     uart.h                                \
+    udp.h                                 \
     spi-slave.h                           \
     settings.h                            \
     messagepool.h                         \
     toolchain.h                           \
-    usec-alarm.h                          \
     $(NULL)
+
+noinst_HEADERS                          = \
+    debug_uart.h
 
 ot_platformdir = $(includedir)/openthread/platform
 dist_ot_platform_HEADERS = $(ot_platform_headers)

@@ -707,14 +707,14 @@ void OTCALL otNodeStateChangedCallback(uint32_t aFlags, void *aContext)
     otLogFuncEntry();
     otNode* aNode = (otNode*)aContext;
 
-    if ((aFlags & OT_NET_ROLE) != 0)
+    if ((aFlags & OT_CHANGED_THREAD_ROLE) != 0)
     {
         auto Role = otThreadGetDeviceRole(aNode->mInstance);
         printf("%d: new role: %s\r\n", aNode->mId, otDeviceRoleToString(Role));
     }
 
-    if ((aFlags & OT_IP6_ADDRESS_ADDED) != 0 || (aFlags & OT_IP6_ADDRESS_REMOVED) != 0 ||
-        (aFlags & OT_IP6_RLOC_ADDED) != 0 || (aFlags & OT_IP6_RLOC_REMOVED) != 0)
+    if ((aFlags & OT_CHANGED_IP6_ADDRESS_ADDED) != 0 || (aFlags & OT_CHANGED_IP6_ADDRESS_REMOVED) != 0 ||
+        (aFlags & OT_CHANGED_THREAD_RLOC_ADDED) != 0 || (aFlags & OT_CHANGED_THREAD_RLOC_REMOVED) != 0)
     {
         HandleAddressChanges(aNode);
     }
@@ -1069,7 +1069,7 @@ OTNODEAPI int32_t OTCALL otNodeClearWhitelist(otNode* aNode)
     otLogFuncEntryMsg("[%d]", aNode->mId);
     printf("%d: whitelist clear\r\n", aNode->mId);
 
-    otLinkClearWhitelist(aNode->mInstance);
+    otLinkFilterClearAddresses(aNode->mInstance);
     otLogFuncExit();
     return 0;
 }
@@ -1079,9 +1079,9 @@ OTNODEAPI int32_t OTCALL otNodeEnableWhitelist(otNode* aNode)
     otLogFuncEntryMsg("[%d]", aNode->mId);
     printf("%d: whitelist enable\r\n", aNode->mId);
 
-    otLinkSetWhitelistEnabled(aNode->mInstance, true);
+    otError error = otLinkFilterSetAddressMode(aNode->mInstance, OT_MAC_FILTER_ADDRESS_MODE_WHITELIST);
     otLogFuncExit();
-    return 0;
+    return error;
 }
 
 OTNODEAPI int32_t OTCALL otNodeDisableWhitelist(otNode* aNode)
@@ -1089,31 +1089,36 @@ OTNODEAPI int32_t OTCALL otNodeDisableWhitelist(otNode* aNode)
     otLogFuncEntryMsg("[%d]", aNode->mId);
     printf("%d: whitelist disable\r\n", aNode->mId);
 
-    otLinkSetWhitelistEnabled(aNode->mInstance, false);
+    otError error = otLinkFilterSetAddressMode(aNode->mInstance, OT_MAC_FILTER_ADDRESS_MODE_DISABLED);
     otLogFuncExit();
-    return 0;
+    return error;
 }
 
-OTNODEAPI int32_t OTCALL otNodeAddWhitelist(otNode* aNode, const char *aExtAddr, int8_t aRssi)
+OTNODEAPI int32_t OTCALL otNodeAddWhitelist(otNode* aNode,
+        const char *aExtAddr, int8_t aRssi = OT_MAC_FILTER_FIXED_RSS_DISABLED)
 {
     otLogFuncEntryMsg("[%d]", aNode->mId);
-    if (aRssi == 0)
-        printf("%d: whitelist add %s\r\n", aNode->mId, aExtAddr);
-    else printf("%d: whitelist add %s %d\r\n", aNode->mId, aExtAddr, aRssi);
+    otError error = OT_ERROR_NONE;
 
-    uint8_t extAddr[8];
-    if (Hex2Bin(aExtAddr, extAddr, sizeof(extAddr)) != sizeof(extAddr))
+    otExtAddress extAddress;
+    if (Hex2Bin(aExtAddr, extAddress.m8, OT_EXT_ADDRESS_SIZE) != OT_EXT_ADDRESS_SIZE)
         return OT_ERROR_PARSE;
 
-    otError error;
-    if (aRssi == 0)
+    printf("%d: whitelist add %s", aNode->mId, aExtAddr);
+
+    error = otLinkFilterAddAddress(aNode->mInstance, &extAddress);
+
+    if (error == OT_ERROR_NONE || error == OT_ERROR_ALREADY)
     {
-        error = otLinkAddWhitelist(aNode->mInstance, extAddr);
+        if (aRssi != OT_MAC_FILTER_FIXED_RSS_DISABLED)
+        {
+            error = otLinkFilterAddRssIn(aNode->mInstance, &extAddress, aRssi);
+            printf(" %d", aRssi);
+        }
     }
-    else
-    {
-        error = otLinkAddWhitelistRssi(aNode->mInstance, extAddr, aRssi);
-    }
+
+    printf("\r\n");
+
     otLogFuncExit();
     return error;
 }
@@ -1123,13 +1128,13 @@ OTNODEAPI int32_t OTCALL otNodeRemoveWhitelist(otNode* aNode, const char *aExtAd
     otLogFuncEntryMsg("[%d]", aNode->mId);
     printf("%d: whitelist remove %s\r\n", aNode->mId, aExtAddr);
 
-    uint8_t extAddr[8];
-    if (Hex2Bin(aExtAddr, extAddr, sizeof(extAddr)) != sizeof(extAddr))
-        return OT_ERROR_INVALID_ARGS;
+    otExtAddress extAddress;
+    if (Hex2Bin(aExtAddr, extAddress.m8, OT_EXT_ADDRESS_SIZE) != OT_EXT_ADDRESS_SIZE)
+        return OT_ERROR_PARSE;
 
-    otLinkRemoveWhitelist(aNode->mInstance, extAddr);
+    otError error = otLinkFilterRemoveAddress(aNode->mInstance, &extAddress);
     otLogFuncExit();
-    return 0;
+    return error;
 }
 
 OTNODEAPI uint16_t OTCALL otNodeGetAddr16(otNode* aNode)
@@ -1141,23 +1146,6 @@ OTNODEAPI uint16_t OTCALL otNodeGetAddr16(otNode* aNode)
     return result;
 }
 
-OTNODEAPI const char* OTCALL otNodeGetHashMacAddress(otNode* aNode)
-{
-    otLogFuncEntryMsg("[%d]", aNode->mId);
-    otExtAddress aHashMacAddress = {};
-    otLinkGetJoinerId(aNode->mInstance, &aHashMacAddress);
-    char* str = (char*)malloc(18);
-    if (str != nullptr)
-    {
-        aNode->mMemoryToFree.push_back(str);
-        for (int i = 0; i < 8; i++)
-            sprintf_s(str + i * 2, 18 - (2 * i), "%02x", aHashMacAddress.m8[i]);
-        printf("%d: hashmacaddr\r\n%s\r\n", aNode->mId, str);
-    }
-    otLogFuncExit();
-    return str;
-}
-
 OTNODEAPI const char* OTCALL otNodeGetAddr64(otNode* aNode)
 {
     otLogFuncEntryMsg("[%d]", aNode->mId);
@@ -1167,10 +1155,44 @@ OTNODEAPI const char* OTCALL otNodeGetAddr64(otNode* aNode)
     {
         aNode->mMemoryToFree.push_back(str);
         for (int i = 0; i < 8; i++)
-            sprintf_s(str + i * 2, 18 - (2 * i), "%02x", extAddr[i]);
+            sprintf_s(str + i * 2, 18 - (2 * i), "%02x", extAddr->m8[i]);
         printf("%d: extaddr\r\n%s\r\n", aNode->mId, str);
     }
     otFreeMemory(extAddr);
+    otLogFuncExit();
+    return str;
+}
+
+OTNODEAPI const char* OTCALL otNodeGetEui64(otNode* aNode)
+{
+    otLogFuncEntryMsg("[%d]", aNode->mId);
+    otExtAddress aEui64 = {};
+    otLinkGetFactoryAssignedIeeeEui64(aNode->mInstance, &aEui64);
+    char* str = (char*)malloc(18);
+    if (str != nullptr)
+    {
+        aNode->mMemoryToFree.push_back(str);
+        for (int i = 0; i < 8; i++)
+            sprintf_s(str + i * 2, 18 - (2 * i), "%02x", aEui64.m8[i]);
+        printf("%d: eui64\r\n%s\r\n", aNode->mId, str);
+    }
+    otLogFuncExit();
+    return str;
+}
+
+OTNODEAPI const char* OTCALL otNodeGetJoinerId(otNode* aNode)
+{
+    otLogFuncEntryMsg("[%d]", aNode->mId);
+    otExtAddress aJoinerId = {};
+    otJoinerGetId(aNode->mInstance, &aJoinerId);
+    char* str = (char*)malloc(18);
+    if (str != nullptr)
+    {
+        aNode->mMemoryToFree.push_back(str);
+        for (int i = 0; i < 8; i++)
+            sprintf_s(str + i * 2, 18 - (2 * i), "%02x", aJoinerId.m8[i]);
+        printf("%d: joinerid\r\n%s\r\n", aNode->mId, str);
+    }
     otLogFuncExit();
     return str;
 }
@@ -1610,7 +1632,7 @@ OTNODEAPI int32_t OTCALL otNodeAddPrefix(otNode* aNode, const char *aPrefix, con
         return OT_ERROR_INVALID_ARGS;
     }
 
-    auto result = otNetDataAddPrefixInfo(aNode->mInstance, &config);
+    auto result = otBorderRouterAddOnMeshPrefix(aNode->mInstance, &config);
     otLogFuncExit();
     return result;
 }
@@ -1623,7 +1645,7 @@ OTNODEAPI int32_t OTCALL otNodeRemovePrefix(otNode* aNode, const char *aPrefix)
     auto error = otNodeParsePrefix(aPrefix, &prefix);
     if (error != OT_ERROR_NONE) return error;
 
-    auto result = otNetDataRemovePrefixInfo(aNode->mInstance, &prefix);
+    auto result = otBorderRouterRemoveOnMeshPrefix(aNode->mInstance, &prefix);
     otLogFuncExit();
     return result;
 }
@@ -1653,7 +1675,7 @@ OTNODEAPI int32_t OTCALL otNodeAddRoute(otNode* aNode, const char *aPrefix, cons
         return OT_ERROR_INVALID_ARGS;
     }
 
-    auto result = otNetDataAddRoute(aNode->mInstance, &config);
+    auto result = otBorderRouterAddRoute(aNode->mInstance, &config);
     otLogFuncExit();
     return result;
 }
@@ -1666,7 +1688,7 @@ OTNODEAPI int32_t OTCALL otNodeRemoveRoute(otNode* aNode, const char *aPrefix)
     auto error = otNodeParsePrefix(aPrefix, &prefix);
     if (error != OT_ERROR_NONE) return error;
 
-    auto result = otNetDataRemoveRoute(aNode->mInstance, &prefix);
+    auto result = otBorderRouterRemoveRoute(aNode->mInstance, &prefix);
     otLogFuncExit();
     return result;
 }
@@ -1675,7 +1697,7 @@ OTNODEAPI int32_t OTCALL otNodeRegisterNetdata(otNode* aNode)
 {
     otLogFuncEntryMsg("[%d]", aNode->mId);
     printf("%d: registernetdata\r\n", aNode->mId);
-    auto result = otNetDataRegister(aNode->mInstance);
+    auto result = otBorderRouterRegister(aNode->mInstance);
     otLogFuncExit();
     return result;
 }
@@ -1954,24 +1976,24 @@ OTNODEAPI int32_t OTCALL otNodeSetActiveDataset(otNode* aNode, uint64_t aTimesta
     otOperationalDataset aDataset = {};
 
     aDataset.mActiveTimestamp = aTimestamp;
-    aDataset.mIsActiveTimestampSet = true;
+    aDataset.mComponents.mIsActiveTimestampPresent = true;
 
     if (aPanId != 0)
     {
         aDataset.mPanId = aPanId;
-        aDataset.mIsPanIdSet = true;
+        aDataset.mComponents.mIsPanIdPresent = true;
     }
 
     if (aChannel != 0)
     {
         aDataset.mChannel = aChannel;
-        aDataset.mIsChannelSet = true;
+        aDataset.mComponents.mIsChannelPresent = true;
     }
 
     if (aChannelMask != 0)
     {
         aDataset.mChannelMaskPage0 = aChannelMask;
-        aDataset.mIsChannelMaskPage0Set = true;
+        aDataset.mComponents.mIsChannelMaskPage0Present = true;
     }
 
     if (aMasterKey != NULL && strlen(aMasterKey) != 0)
@@ -1982,7 +2004,7 @@ OTNODEAPI int32_t OTCALL otNodeSetActiveDataset(otNode* aNode, uint64_t aTimesta
             printf("invalid length key %d\r\n", keyLength);
             return OT_ERROR_PARSE;
         }
-        aDataset.mIsMasterKeySet = true;
+        aDataset.mComponents.mIsMasterKeyPresent = true;
     }
 
     auto result = otDatasetSetActive(aNode->mInstance, &aDataset);
@@ -2000,25 +2022,25 @@ OTNODEAPI int32_t OTCALL otNodeSetPendingDataset(otNode* aNode, uint64_t aActive
     if (aActiveTimestamp != 0)
     {
         aDataset.mActiveTimestamp = aActiveTimestamp;
-        aDataset.mIsActiveTimestampSet = true;
+        aDataset.mComponents.mIsActiveTimestampPresent = true;
     }
 
     if (aPendingTimestamp != 0)
     {
         aDataset.mPendingTimestamp = aPendingTimestamp;
-        aDataset.mIsPendingTimestampSet = true;
+        aDataset.mComponents.mIsPendingTimestampPresent = true;
     }
 
     if (aPanId != 0)
     {
         aDataset.mPanId = aPanId;
-        aDataset.mIsPanIdSet = true;
+        aDataset.mComponents.mIsPanIdPresent = true;
     }
 
     if (aChannel != 0)
     {
         aDataset.mChannel = aChannel;
-        aDataset.mIsChannelSet = true;
+        aDataset.mComponents.mIsChannelPresent = true;
     }
 
     auto result = otDatasetSetPending(aNode->mInstance, &aDataset);
@@ -2036,31 +2058,31 @@ OTNODEAPI int32_t OTCALL otNodeSendPendingSet(otNode* aNode, uint64_t aActiveTim
     if (aActiveTimestamp != 0)
     {
         aDataset.mActiveTimestamp = aActiveTimestamp;
-        aDataset.mIsActiveTimestampSet = true;
+        aDataset.mComponents.mIsActiveTimestampPresent = true;
     }
 
     if (aPendingTimestamp != 0)
     {
         aDataset.mPendingTimestamp = aPendingTimestamp;
-        aDataset.mIsPendingTimestampSet = true;
+        aDataset.mComponents.mIsPendingTimestampPresent = true;
     }
 
     if (aDelayTimer != 0)
     {
         aDataset.mDelay = aDelayTimer;
-        aDataset.mIsDelaySet = true;
+        aDataset.mComponents.mIsDelayPresent = true;
     }
 
     if (aPanId != 0)
     {
         aDataset.mPanId = aPanId;
-        aDataset.mIsPanIdSet = true;
+        aDataset.mComponents.mIsPanIdPresent = true;
     }
 
     if (aChannel != 0)
     {
         aDataset.mChannel = aChannel;
-        aDataset.mIsChannelSet = true;
+        aDataset.mComponents.mIsChannelPresent = true;
     }
 
     if (aMasterKey != NULL && strlen(aMasterKey) != 0)
@@ -2071,7 +2093,7 @@ OTNODEAPI int32_t OTCALL otNodeSendPendingSet(otNode* aNode, uint64_t aActiveTim
             printf("invalid length key %d\r\n", keyLength);
             return OT_ERROR_PARSE;
         }
-        aDataset.mIsMasterKeySet = true;
+        aDataset.mComponents.mIsMasterKeyPresent = true;
     }
 
     if (aMeshLocal != NULL && strlen(aMeshLocal) != 0)
@@ -2080,13 +2102,13 @@ OTNODEAPI int32_t OTCALL otNodeSendPendingSet(otNode* aNode, uint64_t aActiveTim
         auto error = otIp6AddressFromString(aMeshLocal, &prefix);
         if (error != OT_ERROR_NONE) return error;
         memcpy(aDataset.mMeshLocalPrefix.m8, prefix.mFields.m8, sizeof(aDataset.mMeshLocalPrefix.m8));
-        aDataset.mIsMeshLocalPrefixSet = true;
+        aDataset.mComponents.mIsMeshLocalPrefixPresent = true;
     }
 
     if (aNetworkName != NULL && strlen(aNetworkName) != 0)
     {
         strcpy_s(aDataset.mNetworkName.m8, sizeof(aDataset.mNetworkName.m8), aNetworkName);
-        aDataset.mIsNetworkNameSet = true;
+        aDataset.mComponents.mIsNetworkNamePresent = true;
     }
 
     auto result = otDatasetSendMgmtPendingSet(aNode->mInstance, &aDataset, nullptr, 0);
@@ -2106,24 +2128,24 @@ OTNODEAPI int32_t OTCALL otNodeSendActiveSet(otNode* aNode, uint64_t aActiveTime
     if (aActiveTimestamp != 0)
     {
         aDataset.mActiveTimestamp = aActiveTimestamp;
-        aDataset.mIsActiveTimestampSet = true;
+        aDataset.mComponents.mIsActiveTimestampPresent = true;
     }
     if (aPanId != 0)
     {
         aDataset.mPanId = aPanId;
-        aDataset.mIsPanIdSet = true;
+        aDataset.mComponents.mIsPanIdPresent = true;
     }
 
     if (aChannel != 0)
     {
         aDataset.mChannel = aChannel;
-        aDataset.mIsChannelSet = true;
+        aDataset.mComponents.mIsChannelPresent = true;
     }
 
     if (aChannelMask != 0)
     {
         aDataset.mChannelMaskPage0 = aChannelMask;
-        aDataset.mIsChannelMaskPage0Set = true;
+        aDataset.mComponents.mIsChannelMaskPage0Present = true;
     }
 
     if (aExtPanId != NULL && strlen(aExtPanId) != 0)
@@ -2134,7 +2156,7 @@ OTNODEAPI int32_t OTCALL otNodeSendActiveSet(otNode* aNode, uint64_t aActiveTime
             printf("invalid length ext pan id %d\r\n", keyLength);
             return OT_ERROR_PARSE;
         }
-        aDataset.mIsExtendedPanIdSet = true;
+        aDataset.mComponents.mIsExtendedPanIdPresent = true;
     }
 
     if (aMasterKey != NULL && strlen(aMasterKey) != 0)
@@ -2145,7 +2167,7 @@ OTNODEAPI int32_t OTCALL otNodeSendActiveSet(otNode* aNode, uint64_t aActiveTime
             printf("invalid length key %d\r\n", keyLength);
             return OT_ERROR_PARSE;
         }
-        aDataset.mIsMasterKeySet = true;
+        aDataset.mComponents.mIsMasterKeyPresent = true;
     }
 
     if (aMeshLocal != NULL && strlen(aMeshLocal) != 0)
@@ -2154,13 +2176,13 @@ OTNODEAPI int32_t OTCALL otNodeSendActiveSet(otNode* aNode, uint64_t aActiveTime
         auto error = otIp6AddressFromString(aMeshLocal, &prefix);
         if (error != OT_ERROR_NONE) return error;
         memcpy(aDataset.mMeshLocalPrefix.m8, prefix.mFields.m8, sizeof(aDataset.mMeshLocalPrefix.m8));
-        aDataset.mIsMeshLocalPrefixSet = true;
+        aDataset.mComponents.mIsMeshLocalPrefixPresent = true;
     }
 
     if (aNetworkName != NULL && strlen(aNetworkName) != 0)
     {
         strcpy_s(aDataset.mNetworkName.m8, sizeof(aDataset.mNetworkName.m8), aNetworkName);
-        aDataset.mIsNetworkNameSet = true;
+        aDataset.mComponents.mIsNetworkNamePresent = true;
     }
 
     if (aBinary != NULL && strlen(aBinary) != 0)

@@ -31,12 +31,6 @@
  *   This file implements HMAC SHA-256.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "hmac_sha256.hpp"
 
 namespace ot {
@@ -70,5 +64,5 @@ void HmacSha256::Finish(uint8_t aHash[kHashSize])
     mbedtls_md_hmac_finish(&mContext, aHash);
 }
 
-}  // namespace Crypto
-}  // namespace ot
+} // namespace Crypto
+} // namespace ot

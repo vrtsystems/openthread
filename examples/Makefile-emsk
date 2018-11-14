@@ -42,33 +42,15 @@ OBJCOPY                         = arc-elf32-objcopy
 BuildJobs                      ?= 10
 
 configure_OPTIONS               = \
-    --enable-cli-app=all          \
-    --enable-ncp-app=all          \
+    --enable-cli                  \
+    --enable-ftd                  \
+    --enable-mtd                  \
+    --enable-ncp                  \
     --with-ncp-bus=uart           \
-    --enable-default-logging      \
+    --enable-radio-only           \
+    --enable-linker-map           \
     --with-examples=emsk          \
-    --with-platform-info=EMSK     \
     $(NULL)
-
-ifeq ($(CERT_LOG),1)
-configure_OPTIONS              += --enable-cert-log
-endif
-
-ifeq ($(COMMISSIONER),1)
-configure_OPTIONS              += --enable-commissioner
-endif
-
-ifeq ($(JOINER),1)
-configure_OPTIONS              += --enable-joiner
-endif
-
-ifeq ($(DHCP6_SERVER),1)
-configure_OPTIONS              += --enable-dhcp6-server
-endif
-
-ifeq ($(DHCP6_CLIENT),1)
-configure_OPTIONS              += --enable-dhcp6-client
-endif
 
 TopSourceDir                    := $(dir $(shell readlink $(firstword $(MAKEFILE_LIST))))..
 AbsTopSourceDir                 := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))..
@@ -84,6 +66,8 @@ COMMONCFLAGS                   := \
     -D$(CONFIG_FILE)              \
     -I$(CONFIG_FILE_PATH)         \
     $(NULL)
+
+include $(dir $(abspath $(lastword $(MAKEFILE_LIST))))/common-switches.mk
 
 CPPFLAGS                       += \
     $(COMMONCFLAGS)               \
@@ -113,7 +97,6 @@ LDFLAGS                        += \
     -nostartfiles                 \
     -specs=nano.specs             \
     -Wl,--gc-sections             \
-    -Wl,-Map=map.map              \
     -Wl,--defsym=_STACKSIZE=524288 \
     -Wl,--defsym=_HEAPSIZE=524288 \
     $(NULL)

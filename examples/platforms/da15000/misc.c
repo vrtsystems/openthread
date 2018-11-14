@@ -26,16 +26,17 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <openthread/types.h>
-
 #include <openthread/platform/misc.h>
 
+#include "platform-da15000.h"
+
+#include "hw_cpm.h"
 #include "sdk_defs.h"
 
 void otPlatReset(otInstance *aInstance)
 {
     (void)aInstance;
-    WDOG->WATCHDOG_CTRL_REG |= (1 << (WDOG_WATCHDOG_CTRL_REG_NMI_RST_Pos));
+    hw_cpm_reboot_system();
 }
 
 otPlatResetReason otPlatGetResetReason(otInstance *aInstance)

@@ -35,45 +35,43 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <openthread-config.h>
-#include <openthread/openthread.h>
-#include <openthread/platform/alarm.h>
+#include <openthread/config.h>
+#include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/diag.h>
-#include <openthread/platform/platform.h>
 
 #include "platform-cc2538.h"
 
 enum
 {
-    kSystemClock = 32000000,  ///< MHz
-    kTicksPerSec = 1000,      ///< Ticks per second
+    kSystemClock = 32000000, ///< MHz
+    kTicksPerSec = 1000,     ///< Ticks per second
 };
 
-static uint32_t sCounter = 0;
-static uint32_t sAlarmT0 = 0;
-static uint32_t sAlarmDt = 0;
-static bool sIsRunning = false;
+static uint32_t sCounter   = 0;
+static uint32_t sAlarmT0   = 0;
+static uint32_t sAlarmDt   = 0;
+static bool     sIsRunning = false;
 
 void cc2538AlarmInit(void)
 {
     HWREG(NVIC_ST_RELOAD) = kSystemClock / kTicksPerSec;
-    HWREG(NVIC_ST_CTRL) = NVIC_ST_CTRL_CLK_SRC | NVIC_ST_CTRL_INTEN | NVIC_ST_CTRL_ENABLE;
+    HWREG(NVIC_ST_CTRL)   = NVIC_ST_CTRL_CLK_SRC | NVIC_ST_CTRL_INTEN | NVIC_ST_CTRL_ENABLE;
 }
 
-uint32_t otPlatAlarmGetNow(void)
+uint32_t otPlatAlarmMilliGetNow(void)
 {
     return sCounter;
 }
 
-void otPlatAlarmStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
+void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t t0, uint32_t dt)
 {
     (void)aInstance;
-    sAlarmT0 = t0;
-    sAlarmDt = dt;
+    sAlarmT0   = t0;
+    sAlarmDt   = dt;
     sIsRunning = true;
 }
 
-void otPlatAlarmStop(otInstance *aInstance)
+void otPlatAlarmMilliStop(otInstance *aInstance)
 {
     (void)aInstance;
     sIsRunning = false;
@@ -82,7 +80,7 @@ void otPlatAlarmStop(otInstance *aInstance)
 void cc2538AlarmProcess(otInstance *aInstance)
 {
     uint32_t expires;
-    bool fire = false;
+    bool     fire = false;
 
     if (sIsRunning)
     {
@@ -116,11 +114,10 @@ void cc2538AlarmProcess(otInstance *aInstance)
             else
 #endif
             {
-                otPlatAlarmFired(aInstance);
+                otPlatAlarmMilliFired(aInstance);
             }
         }
     }
-
 }
 
 void SysTick_Handler()

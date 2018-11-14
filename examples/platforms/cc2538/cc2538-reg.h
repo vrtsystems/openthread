@@ -37,6 +37,8 @@
 
 #include <stdint.h>
 
+// clang-format off
+
 #define HWREG(x)                                (*((volatile uint32_t *)(x)))
 
 #define NVIC_ST_CTRL                            0xE000E010  // SysTick Control and Status
@@ -81,6 +83,7 @@
 #define RFCORE_XREG_RXENABLE                    0x4008862C  // RX enabling
 #define RFCORE_XREG_FREQCTRL                    0x4008863C  // Controls the RF frequency
 #define RFCORE_XREG_TXPOWER                     0x40088640  // Controls the output power
+#define RFCORE_XREG_FSMSTAT0                    0x40088648  // Radio finite state machine status
 #define RFCORE_XREG_FSMSTAT1                    0x4008864C  // Radio status register
 #define RFCORE_XREG_FIFOPCTRL                   0x40088650  // FIFOP threshold
 #define RFCORE_XREG_CCACTRL0                    0x40088658  // CCA threshold
@@ -103,7 +106,50 @@
 
 #define RFCORE_XREG_RFRND_IRND                  0x00000001
 
+#define RFCORE_XREG_FSMSTAT0_STATE_MASK         0x0000003F
+#define RFCORE_XREG_FSMSTAT0_CAL_DONE           0x00000080
+#define RFCORE_XREG_FSMSTAT0_CAL_RUN            0x00000040
+
+#define RFCORE_XREG_FSMSTAT0_STATE_IDLE         0x00000000
+#define RFCORE_XREG_FSMSTAT0_STATE_RX_CAL       0x00000002
+#define RFCORE_XREG_FSMSTAT0_STATE_SFD_WAIT0    0x00000003
+#define RFCORE_XREG_FSMSTAT0_STATE_SFD_WAIT1    0x00000004
+#define RFCORE_XREG_FSMSTAT0_STATE_SFD_WAIT2    0x00000005
+#define RFCORE_XREG_FSMSTAT0_STATE_SFD_WAIT3    0x00000006
+#define RFCORE_XREG_FSMSTAT0_STATE_RX0          0x00000007
+#define RFCORE_XREG_FSMSTAT0_STATE_RX1          0x00000008
+#define RFCORE_XREG_FSMSTAT0_STATE_RX2          0x00000009
+#define RFCORE_XREG_FSMSTAT0_STATE_RX3          0x0000000A
+#define RFCORE_XREG_FSMSTAT0_STATE_RX4          0x0000000B
+#define RFCORE_XREG_FSMSTAT0_STATE_RX5          0x0000000C
+#define RFCORE_XREG_FSMSTAT0_STATE_RX6          0x0000000D
+#define RFCORE_XREG_FSMSTAT0_STATE_RX_WAIT      0x0000000E
+#define RFCORE_XREG_FSMSTAT0_STATE_RX_FRST      0x00000010
+#define RFCORE_XREG_FSMSTAT0_STATE_RX_OVER      0x00000011
+#define RFCORE_XREG_FSMSTAT0_STATE_TX_CAL       0x00000020
+#define RFCORE_XREG_FSMSTAT0_STATE_TX0          0x00000022
+#define RFCORE_XREG_FSMSTAT0_STATE_TX1          0x00000023
+#define RFCORE_XREG_FSMSTAT0_STATE_TX2          0x00000024
+#define RFCORE_XREG_FSMSTAT0_STATE_TX3          0x00000025
+#define RFCORE_XREG_FSMSTAT0_STATE_TX4          0x00000026
+#define RFCORE_XREG_FSMSTAT0_STATE_TX_FINAL     0x00000027
+#define RFCORE_XREG_FSMSTAT0_STATE_RXTX_TRANS   0x00000028
+#define RFCORE_XREG_FSMSTAT0_STATE_ACK_CAL      0x00000030
+#define RFCORE_XREG_FSMSTAT0_STATE_ACK0         0x00000031
+#define RFCORE_XREG_FSMSTAT0_STATE_ACK1         0x00000032
+#define RFCORE_XREG_FSMSTAT0_STATE_ACK2         0x00000033
+#define RFCORE_XREG_FSMSTAT0_STATE_ACK3         0x00000034
+#define RFCORE_XREG_FSMSTAT0_STATE_ACK4         0x00000035
+#define RFCORE_XREG_FSMSTAT0_STATE_ACK5         0x00000036
+#define RFCORE_XREG_FSMSTAT0_STATE_ACK_DELAY    0x00000037
+#define RFCORE_XREG_FSMSTAT0_STATE_TX_UNDER     0x00000038
+#define RFCORE_XREG_FSMSTAT0_STATE_TX_DOWN0     0x0000001A
+#define RFCORE_XREG_FSMSTAT0_STATE_TX_DOWN1     0x0000003A
+
+#define RFCORE_XREG_FSMSTAT1_RX_ACTIVE          0x00000001
 #define RFCORE_XREG_FSMSTAT1_TX_ACTIVE          0x00000002
+#define RFCORE_XREG_FSMSTAT1_LOCK_STATUS        0x00000004
+#define RFCORE_XREG_FSMSTAT1_SAMPLED_CCA        0x00000008
 #define RFCORE_XREG_FSMSTAT1_CCA                0x00000010  // Clear channel assessment
 #define RFCORE_XREG_FSMSTAT1_SFD                0x00000020
 #define RFCORE_XREG_FSMSTAT1_FIFOP              0x00000040
@@ -111,7 +157,13 @@
 
 #define RFCORE_XREG_RSSISTAT_RSSI_VALID         0x00000001  // RSSI value is valid.
 
+#define RFCORE_SFR_RFERRF_NLOCK                 0x00000001  // Failed to achieve PLL lock.
+#define RFCORE_SFR_RFERRF_RXABO                 0x00000002  // RX Aborted.
 #define RFCORE_SFR_RFERRF_RXOVERF               0x00000004  // RX FIFO overflowed.
+#define RFCORE_SFR_RFERRF_RXUNDERF              0x00000008  // RX FIFO underflowed.
+#define RFCORE_SFR_RFERRF_TXOVERF               0x00000010  // TX FIFO overflowed.
+#define RFCORE_SFR_RFERRF_TXUNDERF              0x00000020  // TX FIFO underflowed.
+#define RFCORE_SFR_RFERRF_STROBEERR             0x00000040  // Command Strobe Error.
 
 #define RFCORE_SFR_RFST_INSTR_RXON              0xE3        // Instruction set RX on
 #define RFCORE_SFR_RFST_INSTR_TXON              0xE9        // Instruction set TX on
@@ -148,19 +200,35 @@
 #define SYS_CTRL_SCGCUART_UART0                 0x00000001
 #define SYS_CTRL_DCGCUART_UART0                 0x00000001
 
+#define SYS_CTRL_RCGCUART_UART1                 0x00000002
+#define SYS_CTRL_SCGCUART_UART1                 0x00000002
+#define SYS_CTRL_DCGCUART_UART1                 0x00000002
+
 #define IOC_PA0_SEL                             0x400D4000  // Peripheral select control
 #define IOC_PA1_SEL                             0x400D4004  // Peripheral select control
+#define IOC_PA2_SEL                             0x400D4008
+#define IOC_PA3_SEL                             0x400D400C
 #define IOC_UARTRXD_UART0                       0x400D4100
+#define IOC_UARTRXD_UART1                       0x400D4108
 
 #define IOC_PA0_OVER                            0x400D4080
 #define IOC_PA1_OVER                            0x400D4084
+#define IOC_PA2_OVER                            0x400D4088
+#define IOC_PA3_OVER                            0x400D408C
 
 #define IOC_MUX_OUT_SEL_UART0_TXD               0x00000000
+#define IOC_MUX_OUT_SEL_UART1_TXD               0x00000002
 
 #define IOC_OVERRIDE_OE                         0x00000008  // PAD Config Override Output Enable
 #define IOC_OVERRIDE_DIS                        0x00000000  // PAD Config Override Disabled
 
+#define IOC_PAD_IN_SEL_PA0                      0x00000000  // PA0
+#define IOC_PAD_IN_SEL_PA1                      0x00000001  // PA1
+#define IOC_PAD_IN_SEL_PA2                      0x00000002  // PA2
+#define IOC_PAD_IN_SEL_PA3                      0x00000003  // PA3
+
 #define UART0_BASE                              0x4000C000
+#define UART1_BASE                              0x4000D000
 #define GPIO_A_BASE                             0x400D9000  // GPIO
 
 #define GPIO_O_DIR                              0x00000400
@@ -168,6 +236,8 @@
 
 #define GPIO_PIN_0                              0x00000001  // GPIO pin 0
 #define GPIO_PIN_1                              0x00000002  // GPIO pin 1
+#define GPIO_PIN_2                              0x00000004  // GPIO pin 2
+#define GPIO_PIN_3                              0x00000008  // GPIO pin 3
 
 #define UART_O_DR                               0x00000000  // UART data
 #define UART_O_FR                               0x00000018  // UART flag
@@ -202,8 +272,9 @@
 #define SOC_ADC_ADCCON1_RCTRL0                  0x00000004  // ADCCON1 RCTRL bit 0
 #define SOC_ADC_ADCCON1_RCTRL1                  0x00000008  // ADCCON1 RCTRL bit 1
 
-#define FLASH_BASE                              0x00200000  // Flash base address
 #define FLASH_CTRL_FCTL                         0x400D3008  // Flash control
 #define FLASH_CTRL_DIECFG0                      0x400D3014  // Flash information
+
+// clang-format on
 
 #endif

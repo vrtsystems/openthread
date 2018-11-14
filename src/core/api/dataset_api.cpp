@@ -31,9 +31,11 @@
  *   This file implements the OpenThread Operational Dataset API (for both FTD and MTD).
  */
 
+#include "openthread-core-config.h"
+
 #include <openthread/dataset.h>
 
-#include "openthread-instance.h"
+#include "common/instance.hpp"
 
 using namespace ot;
 
@@ -43,22 +45,19 @@ bool otDatasetIsCommissioned(otInstance *aInstance)
 
     otDatasetGetActive(aInstance, &dataset);
 
-    if ((dataset.mIsMasterKeySet) && (dataset.mIsNetworkNameSet) &&
-        (dataset.mIsExtendedPanIdSet) && (dataset.mIsPanIdSet) && (dataset.mIsChannelSet))
-    {
-        return true;
-    }
-
-    return false;
+    return ((dataset.mComponents.mIsMasterKeyPresent) && (dataset.mComponents.mIsNetworkNamePresent) &&
+            (dataset.mComponents.mIsExtendedPanIdPresent) && (dataset.mComponents.mIsPanIdPresent) &&
+            (dataset.mComponents.mIsChannelPresent));
 }
 
 otError otDatasetGetActive(otInstance *aInstance, otOperationalDataset *aDataset)
 {
-    otError error = OT_ERROR_NONE;
+    otError   error    = OT_ERROR_NONE;
+    Instance &instance = *static_cast<Instance *>(aInstance);
 
     VerifyOrExit(aDataset != NULL, error = OT_ERROR_INVALID_ARGS);
 
-    aInstance->mThreadNetif.GetActiveDataset().GetLocal().Get(*aDataset);
+    error = instance.GetThreadNetif().GetActiveDataset().Get(*aDataset);
 
 exit:
     return error;
@@ -66,11 +65,12 @@ exit:
 
 otError otDatasetGetPending(otInstance *aInstance, otOperationalDataset *aDataset)
 {
-    otError error = OT_ERROR_NONE;
+    otError   error    = OT_ERROR_NONE;
+    Instance &instance = *static_cast<Instance *>(aInstance);
 
     VerifyOrExit(aDataset != NULL, error = OT_ERROR_INVALID_ARGS);
 
-    aInstance->mThreadNetif.GetPendingDataset().GetLocal().Get(*aDataset);
+    error = instance.GetThreadNetif().GetPendingDataset().Get(*aDataset);
 
 exit:
     return error;

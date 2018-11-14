@@ -38,6 +38,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <openthread/error.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,7 +54,7 @@ extern "C" {
  *
  */
 
-#define OT_CRYPTO_HMAC_SHA_HASH_SIZE   32   ///< Length of HMAC SHA (in bytes).
+#define OT_CRYPTO_HMAC_SHA_HASH_SIZE 32 ///< Length of HMAC SHA (in bytes).
 
 /**
  * This function performs HMAC computation.
@@ -64,10 +66,11 @@ extern "C" {
  * @param[out]    aHash          A pointer to the output hash buffer.
  *
  */
-void otCryptoHmacSha256(
-    const uint8_t *aKey, uint16_t aKeyLength,
-    const uint8_t *aBuf, uint16_t aBufLength,
-    uint8_t *aHash);
+void otCryptoHmacSha256(const uint8_t *aKey,
+                        uint16_t       aKeyLength,
+                        const uint8_t *aBuf,
+                        uint16_t       aBufLength,
+                        uint8_t *      aHash);
 
 /**
  * This method performs AES CCM computation.
@@ -89,13 +92,40 @@ void otCryptoHmacSha256(
  * @param[out]    aTag           A pointer to the tag.
  *
  */
-void otCryptoAesCcm(
-    const uint8_t *aKey, uint16_t aKeyLength,
-    uint8_t aTagLength,
-    const void *aNonce, uint8_t aNonceLength,
-    const void *aHeader, uint32_t aHeaderLength,
-    void *aPlainText, void *aCipherText, uint32_t aLength, bool aEncrypt,
-    void *aTag);
+void otCryptoAesCcm(const uint8_t *aKey,
+                    uint16_t       aKeyLength,
+                    uint8_t        aTagLength,
+                    const void *   aNonce,
+                    uint8_t        aNonceLength,
+                    const void *   aHeader,
+                    uint32_t       aHeaderLength,
+                    void *         aPlainText,
+                    void *         aCipherText,
+                    uint32_t       aLength,
+                    bool           aEncrypt,
+                    void *         aTag);
+
+/**
+ * This method creates ECDSA sign.
+ *
+ * @param[out]    aOutput            An output buffer where ECDSA sign should be stored.
+ * @param[inout]  aOutputLength      The length of the @p aOutput buffer.
+ * @param[in]     aInputHash         An input hash.
+ * @param[in]     aInputHashLength   The length of the @p aClaims buffer.
+ * @param[in]     aPrivateKey        A private key in PEM format.
+ * @param[in]     aPrivateKeyLength  The length of the @p aPrivateKey buffer.
+ *
+ * @retval  OT_ERROR_NONE         ECDSA sign has been created successfully.
+ * @retval  OT_ERROR_NO_BUFS      Output buffer is too small.
+ * @retval  OT_ERROR_INVALID_ARGS Private key is not valid EC Private Key.
+ * @rerval  OT_ERROR_FAILED       Error during signing.
+ */
+otError otCryptoEcdsaSign(uint8_t *      aOutput,
+                          uint16_t *     aOutputLength,
+                          const uint8_t *aInputHash,
+                          uint16_t       aInputHashLength,
+                          const uint8_t *aPrivateKey,
+                          uint16_t       aPrivateKeyLength);
 
 /**
  * @}
@@ -103,7 +133,7 @@ void otCryptoAesCcm(
  */
 
 #ifdef __cplusplus
-}  // extern "C"
+} // extern "C"
 #endif
 
-#endif  // OPENTHREAD_CRYPTO_H_
+#endif // OPENTHREAD_CRYPTO_H_

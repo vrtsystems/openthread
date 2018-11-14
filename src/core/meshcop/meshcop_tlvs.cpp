@@ -36,6 +36,51 @@
 namespace ot {
 namespace MeshCoP {
 
+bool Tlv::IsValid(const Tlv &aTlv)
+{
+    bool rval = true;
+
+    switch (aTlv.GetType())
+    {
+    case Tlv::kChannel:
+        rval = static_cast<const ChannelTlv &>(aTlv).IsValid();
+        break;
+
+    case Tlv::kPanId:
+        rval = static_cast<const PanIdTlv &>(aTlv).IsValid();
+        break;
+
+    case Tlv::kExtendedPanId:
+        rval = static_cast<const ExtendedPanIdTlv &>(aTlv).IsValid();
+        break;
+
+    case Tlv::kNetworkName:
+        rval = static_cast<const NetworkNameTlv &>(aTlv).IsValid();
+        break;
+
+    case Tlv::kNetworkMasterKey:
+        rval = static_cast<const NetworkMasterKeyTlv &>(aTlv).IsValid();
+        break;
+
+    case Tlv::kPSKc:
+        rval = static_cast<const PSKcTlv &>(aTlv).IsValid();
+        break;
+
+    case Tlv::kMeshLocalPrefix:
+        rval = static_cast<const MeshLocalPrefixTlv &>(aTlv).IsValid();
+        break;
+
+    case Tlv::kSecurityPolicy:
+        rval = static_cast<const SecurityPolicyTlv &>(aTlv).IsValid();
+        break;
+
+    default:
+        break;
+    }
+
+    return rval;
+}
+
 bool SteeringDataTlv::IsCleared(void) const
 {
     bool rval = true;
@@ -52,14 +97,14 @@ bool SteeringDataTlv::IsCleared(void) const
     return rval;
 }
 
-void SteeringDataTlv::ComputeBloomFilter(otExtAddress *aExtAddress)
+void SteeringDataTlv::ComputeBloomFilter(const otExtAddress &aJoinerId)
 {
     Crc16 ccitt(Crc16::kCcitt);
     Crc16 ansi(Crc16::kAnsi);
 
     for (size_t j = 0; j < sizeof(otExtAddress); j++)
     {
-        uint8_t byte = aExtAddress->m8[j];
+        uint8_t byte = aJoinerId.m8[j];
         ccitt.Update(byte);
         ansi.Update(byte);
     }
@@ -68,5 +113,49 @@ void SteeringDataTlv::ComputeBloomFilter(otExtAddress *aExtAddress)
     SetBit(ansi.Get() % GetNumBits());
 }
 
-}  // namespace ot
-}  // namespace Thread
+const ChannelMaskEntryBase *ChannelMaskEntryBase::GetNext(const Tlv *aChannelMaskBaseTlv) const
+{
+    const uint8_t *entry = reinterpret_cast<const uint8_t *>(this) + GetSize();
+    const uint8_t *end   = aChannelMaskBaseTlv->GetValue() + aChannelMaskBaseTlv->GetSize();
+
+    return (entry < end) ? reinterpret_cast<const ChannelMaskEntryBase *>(entry) : NULL;
+}
+
+const ChannelMaskEntryBase *ChannelMaskBaseTlv::GetFirstEntry(void) const
+{
+    const ChannelMaskEntryBase *entry = NULL;
+
+    VerifyOrExit(GetLength() >= sizeof(ChannelMaskEntryBase));
+
+    entry = reinterpret_cast<const ChannelMaskEntryBase *>(GetValue());
+    VerifyOrExit(GetLength() >= entry->GetSize(), entry = NULL);
+
+exit:
+    return entry;
+}
+
+const ChannelMaskEntry *ChannelMaskBaseTlv::GetMaskEntry(uint8_t aChannelPage) const
+{
+    const ChannelMaskEntry *pageEntry = NULL;
+
+    for (const ChannelMaskEntryBase *entry = GetFirstEntry(); entry != NULL; entry = entry->GetNext(this))
+    {
+        if (entry->GetChannelPage() == aChannelPage)
+        {
+            pageEntry = static_cast<const ChannelMaskEntry *>(entry);
+
+            if (pageEntry->IsValid())
+            {
+                ExitNow();
+            }
+        }
+    }
+
+    pageEntry = NULL;
+
+exit:
+    return pageEntry;
+}
+
+} // namespace MeshCoP
+} // namespace ot

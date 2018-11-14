@@ -31,12 +31,6 @@
  *   This file implements AES-ECB.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "aes_ecb.hpp"
 
 namespace ot {
@@ -62,5 +56,5 @@ AesEcb::~AesEcb()
     mbedtls_aes_free(&mContext);
 }
 
-}  // namespace Crypto
-}  // namespace ot
+} // namespace Crypto
+} // namespace ot

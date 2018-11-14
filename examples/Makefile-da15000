@@ -42,18 +42,34 @@ OBJCOPY                         = arm-none-eabi-objcopy
 BuildJobs                      ?= 10
 
 configure_OPTIONS               = \
-    --enable-cli-app=all          \
-    --enable-ncp-app=all          \
+    --enable-cli                  \
+    --enable-ftd                  \
+    --enable-mtd                  \
+    --enable-ncp                  \
     --with-ncp-bus=uart           \
+    --enable-radio-only           \
+    --enable-linker-map           \
     --with-examples=da15000       \
-    --with-platform-info=DA15000  \
+    MBEDTLS_CPPFLAGS="$(DA15000_MBEDTLS_CPPFLAGS)" \
     $(NULL)
-
-DEFAULT_LOGGING ?= 1
-include $(dir $(abspath $(lastword $(MAKEFILE_LIST))))/common-switches.mk
 
 TopSourceDir                    := $(dir $(shell readlink $(firstword $(MAKEFILE_LIST))))..
 AbsTopSourceDir                 := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))..
+
+DA15000_MBEDTLS_CPPFLAGS  = -DMBEDTLS_CONFIG_FILE='\"mbedtls-config.h\"'
+DA15000_MBEDTLS_CPPFLAGS += -DMBEDTLS_USER_CONFIG_FILE='\"da15000-mbedtls-config.h\"'
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/examples/platforms/da15000/crypto
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/dialog/DialogSDK/bsp/include
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/dialog/DialogSDK/bsp/peripherals/include
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/dialog/DialogSDK/bsp/adapters/include
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/dialog/DialogSDK/bsp/memory/include
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/dialog/DialogSDK/interfaces/ftdf/include
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/dialog/DialogSDK/bsp/config
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/dialog/DialogSDK
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/dialog/DialogSDK/interfaces/ftdf/src
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/mbedtls/repo/include
+DA15000_MBEDTLS_CPPFLAGS += -I$(PWD)/third_party/mbedtls
+DA15000_MBEDTLS_CPPFLAGS += -include$(PWD)/examples/platforms/da15000/custom_config_qspi.h
 
 CONFIG_FILE                      = OPENTHREAD_PROJECT_CORE_CONFIG_FILE='\"openthread-core-da15000-config.h\"'
 CONFIG_FILE_PATH                 = $(AbsTopSourceDir)/examples/platforms/da15000/
@@ -66,6 +82,8 @@ COMMONCFLAGS                   := \
     -D$(CONFIG_FILE)              \
     -I$(CONFIG_FILE_PATH)         \
     $(NULL)
+
+include $(dir $(abspath $(lastword $(MAKEFILE_LIST))))/common-switches.mk
 
 CPPFLAGS                       += \
     $(COMMONCFLAGS)               \
@@ -91,7 +109,6 @@ LDFLAGS                        += \
     -specs=nano.specs             \
     -specs=nosys.specs            \
     -Wl,--gc-sections             \
-    -Wl,-Map=map.map              \
     $(NULL)
 
 ECHO                            := @echo

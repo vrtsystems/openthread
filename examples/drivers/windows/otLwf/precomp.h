@@ -61,7 +61,7 @@ RtlCopyBufferToMdl(
 
 #include <openthread-windows-config.h>
 #include <openthread-core-config.h>
-#include <openthread/openthread.h>
+#include <openthread/border_router.h>
 #include <openthread/dataset_ftd.h>
 #include <openthread/thread_ftd.h>
 #include <openthread/icmp6.h>
@@ -76,7 +76,7 @@ RtlCopyBufferToMdl(
 #include <openthread/platform/logging-windows.h>
 #include <openthread/platform/radio.h>
 #include <openthread/platform/misc.h>
-#include <openthread/platform/alarm.h>
+#include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/settings.h>
 #include <openthread/platform/messagepool.h>
 #include <ncp/spinel.h>

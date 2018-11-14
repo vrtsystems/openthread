@@ -33,8 +33,8 @@ include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 # since they are not part of the package.
 #
 noinst_HEADERS                                                      = \
-    test_platform.h                                                   \
     test_lowpan.hpp                                                   \
+    test_platform.h                                                   \
     test_util.h                                                       \
     test_util.hpp                                                     \
     $(NULL)
@@ -56,6 +56,19 @@ AM_CPPFLAGS                                                         = \
     -I$(top_srcdir)/src/core                                          \
     $(NULL)
 
+if OPENTHREAD_EXAMPLES_POSIX
+AM_CPPFLAGS                                                        += \
+    -I$(top_srcdir)/examples/platforms                                \
+    $(NULL)
+endif
+
+if OPENTHREAD_ENABLE_POSIX_APP
+AM_CPPFLAGS                                                        += \
+    -DOPENTHREAD_ENABLE_POSIX_APP=1                                   \
+    -I$(top_srcdir)/src/posix/platform                                \
+    $(NULL)
+endif
+
 if OPENTHREAD_ENABLE_NCP
 
 COMMON_LDADD                                                        = \
@@ -74,27 +87,36 @@ COMMON_LDADD                                                        = \
 endif # OPENTHREAD_ENABLE_NCP
 
 if OPENTHREAD_ENABLE_BUILTIN_MBEDTLS
-AM_CPPFLAGS                                                        += \
-    -I$(top_srcdir)/third_party/mbedtls/repo/include                  \
-    $(NULL)
-
 COMMON_LDADD                                                       += \
     $(top_builddir)/third_party/mbedtls/libmbedcrypto.a               \
     $(NULL)
 endif # OPENTHREAD_ENABLE_BUILTIN_MBEDTLS
 
+if OPENTHREAD_ENABLE_POSIX_APP
+COMMON_LDADD                                                       += \
+    -lutil
+    $(NULL)
+endif
+
 # Test applications that should be run when the 'check' target is run.
 
 check_PROGRAMS                                                      = \
     test-aes                                                          \
-    test-fuzz                                                         \
+    test-child                                                        \
+    test-child-table                                                  \
+    test-heap                                                         \
     test-hmac-sha256                                                  \
-    test-lowpan                                                       \
     test-link-quality                                                 \
+    test-lowpan                                                       \
     test-mac-frame                                                    \
     test-message                                                      \
     test-message-queue                                                \
+    test-network-data                                                 \
     test-priority-queue                                               \
+    test-pskc                                                         \
+    test-spinel-decoder                                               \
+    test-spinel-encoder                                               \
+    test-string                                                       \
     test-strlcat                                                      \
     test-strlcpy                                                      \
     test-strnlen                                                      \
@@ -104,12 +126,6 @@ check_PROGRAMS                                                      = \
 
 XFAIL_TESTS                                                         = \
     $(NULL)
-
-if OPENTHREAD_ENABLE_DIAG
-check_PROGRAMS                                                     += \
-    test-diag                                                         \
-    $(NULL)
-endif # OPENTHREAD_ENABLE_DIAG
 
 if OPENTHREAD_ENABLE_NCP
 check_PROGRAMS                                                     += \
@@ -135,6 +151,7 @@ TESTS                                                               = \
 # made available to all programs and scripts in TESTS.
 
 TESTS_ENVIRONMENT                                                   = \
+    top_srcdir='$(top_srcdir)'                                        \
     $(NULL)
 
 # Source, compiler, and linker options for test programs.
@@ -142,8 +159,14 @@ TESTS_ENVIRONMENT                                                   = \
 test_aes_LDADD               = $(COMMON_LDADD)
 test_aes_SOURCES             = test_platform.cpp test_aes.cpp
 
-test_fuzz_LDADD              = $(COMMON_LDADD)
-test_fuzz_SOURCES            = test_platform.cpp test_fuzz.cpp
+test_child_LDADD             = $(COMMON_LDADD)
+test_child_SOURCES           = test_platform.cpp test_child.cpp
+
+test_child_table_LDADD       = $(COMMON_LDADD)
+test_child_table_SOURCES     = test_platform.cpp test_child_table.cpp
+
+test_heap_LDADD              = $(COMMON_LDADD)
+test_heap_SOURCES            = test_platform.cpp test_heap.cpp
 
 test_hmac_sha256_LDADD       = $(COMMON_LDADD)
 test_hmac_sha256_SOURCES     = test_platform.cpp test_hmac_sha256.cpp
@@ -166,8 +189,17 @@ test_message_queue_SOURCES   = test_platform.cpp test_message_queue.cpp
 test_ncp_buffer_LDADD        = $(COMMON_LDADD)
 test_ncp_buffer_SOURCES      = test_platform.cpp test_ncp_buffer.cpp
 
+test_network_data_LDADD      = $(COMMON_LDADD)
+test_network_data_SOURCES    = test_platform.cpp test_network_data.cpp
+
 test_priority_queue_LDADD    = $(COMMON_LDADD)
 test_priority_queue_SOURCES  = test_platform.cpp test_priority_queue.cpp
+
+test_pskc_LDADD              = $(COMMON_LDADD)
+test_pskc_SOURCES            = test_platform.cpp test_pskc.cpp
+
+test_string_LDADD            = $(COMMON_LDADD)
+test_string_SOURCES          = test_platform.cpp test_string.cpp
 
 test_strlcat_LDADD           = $(COMMON_LDADD)
 test_strlcat_SOURCES         = test_strlcat.c
@@ -178,18 +210,43 @@ test_strlcpy_SOURCES         = test_strlcpy.c
 test_strnlen_LDADD           = $(COMMON_LDADD)
 test_strnlen_SOURCES         = test_strnlen.c
 
+test_spinel_decoder_LDADD    = $(COMMON_LDADD)
+test_spinel_decoder_SOURCES  = test_platform.cpp test_spinel_decoder.cpp
+
+test_spinel_encoder_LDADD    = $(COMMON_LDADD)
+test_spinel_encoder_SOURCES  = test_platform.cpp test_spinel_encoder.cpp
+
 test_timer_LDADD             = $(COMMON_LDADD)
 test_timer_SOURCES           = test_platform.cpp test_timer.cpp
 
 test_toolchain_LDADD         = $(COMMON_LDADD)
 test_toolchain_SOURCES       = test_platform.cpp test_toolchain.cpp test_toolchain_c.c
 
-if OPENTHREAD_ENABLE_DIAG
-test_diag_LDADD              = $(top_builddir)/src/diag/libopenthread-diag.a                  \
-                               $(top_builddir)/examples/platforms/posix/libopenthread-posix.a \
-                               $(NULL)
-test_diag_SOURCES            = test_diag.cpp
-endif
+PRETTY_FILES                                                        = \
+    $(test_address_sanitizer_SOURCES)                                 \
+    $(test_aes_SOURCES)                                               \
+    $(test_child_SOURCES)                                             \
+    $(test_child_table_SOURCES)                                       \
+    $(test_heap_SOURCES)                                              \
+    $(test_hmac_sha256_SOURCES)                                       \
+    $(test_link_quality_SOURCES)                                      \
+    $(test_lowpan_SOURCES)                                            \
+    $(test_mac_frame_SOURCES)                                         \
+    $(test_message_queue_SOURCES)                                     \
+    $(test_message_SOURCES)                                           \
+    $(test_ncp_buffer_SOURCES)                                        \
+    $(test_network_data_SOURCES)                                      \
+    $(test_priority_queue_SOURCES)                                    \
+    $(test_pskc_SOURCES)                                              \
+    $(test_spinel_decoder_SOURCES)                                    \
+    $(test_spinel_encoder_SOURCES)                                    \
+    $(test_string)                                                    \
+    $(test_strlcat_SOURCES)                                           \
+    $(test_strlcpy_SOURCES)                                           \
+    $(test_strnlen_SOURCES)                                           \
+    $(test_timer_SOURCES)                                             \
+    $(test_toolchain_SOURCES)                                         \
+    $(NULL)
 
 if OPENTHREAD_BUILD_COVERAGE
 CLEANFILES                   = $(wildcard *.gcda *.gcno)
@@ -198,3 +255,4 @@ endif # OPENTHREAD_BUILD_COVERAGE
 endif # OPENTHREAD_BUILD_TESTS
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am
+

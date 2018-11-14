@@ -34,21 +34,22 @@
 #ifndef MAC_HPP_
 #define MAC_HPP_
 
-#include <openthread/platform/radio.h>
-
 #include "openthread-core-config.h"
+
+#include <openthread/platform/radio.h>
+#include <openthread/platform/time.h>
+
+#include "common/locator.hpp"
 #include "common/tasklet.hpp"
 #include "common/timer.hpp"
-#include "mac/mac_blacklist.hpp"
+#include "mac/channel_mask.hpp"
+#include "mac/mac_filter.hpp"
 #include "mac/mac_frame.hpp"
-#include "mac/mac_whitelist.hpp"
 #include "thread/key_manager.hpp"
-#include "thread/network_diagnostic_tlvs.hpp"
+#include "thread/link_quality.hpp"
 #include "thread/topology.hpp"
 
 namespace ot {
-
-namespace Mle { class MleRouter; }
 
 /**
  * @addtogroup core-mac
@@ -68,171 +69,53 @@ namespace Mac {
  */
 enum
 {
-    kMinBE                = 3,                     ///< macMinBE (IEEE 802.15.4-2006)
-    kMaxBE                = 5,                     ///< macMaxBE (IEEE 802.15.4-2006)
-    kMaxCSMABackoffs      = 4,                     ///< macMaxCSMABackoffs (IEEE 802.15.4-2006)
-    kUnitBackoffPeriod    = 20,                    ///< Number of symbols (IEEE 802.15.4-2006)
+    kMinBE             = 3,  ///< macMinBE (IEEE 802.15.4-2006).
+    kMaxBE             = 5,  ///< macMaxBE (IEEE 802.15.4-2006).
+    kUnitBackoffPeriod = 20, ///< Number of symbols (IEEE 802.15.4-2006).
 
-    kMinBackoff           = 1,                     ///< Minimum backoff (milliseconds).
+    kMinBackoff = 1, ///< Minimum backoff (milliseconds).
 
-    kAckTimeout           = 16,                    ///< Timeout for waiting on an ACK (milliseconds).
-    kDataPollTimeout      = 100,                   ///< Timeout for receiving Data Frame (milliseconds).
-    kNonceSize            = 13,                    ///< Size of IEEE 802.15.4 Nonce (bytes).
+    kAckTimeout      = 16,  ///< Timeout for waiting on an ACK (milliseconds).
+    kDataPollTimeout = 100, ///< Timeout for receiving Data Frame (milliseconds).
+    kSleepDelay      = 300, ///< Max sleep delay when frame is pending (milliseconds).
+    kNonceSize       = 13,  ///< Size of IEEE 802.15.4 Nonce (bytes).
 
-    kScanChannelsAll      = OT_CHANNEL_ALL,        ///< All channels.
-    kScanDurationDefault  = 300,                   ///< Default interval between channels (milliseconds).
+    kScanChannelsAll     = OT_CHANNEL_ALL, ///< All channels.
+    kScanDurationDefault = 300,            ///< Default interval between channels (milliseconds).
 
-    /**
-     * Maximum number of MAC layer tx attempts for an outbound direct frame.
-     *
-     */
-    kDirectFrameMacTxAttempts   = OPENTHREAD_CONFIG_MAX_TX_ATTEMPTS_DIRECT,
+    kMaxCsmaBackoffsDirect =
+        OPENTHREAD_CONFIG_MAC_MAX_CSMA_BACKOFFS_DIRECT, ///< macMaxCsmaBackoffs for direct transmissions
+    kMaxCsmaBackoffsIndirect =
+        OPENTHREAD_CONFIG_MAC_MAX_CSMA_BACKOFFS_INDIRECT, ///< macMaxCsmaBackoffs for indirect transmissions
 
-    /**
-     * Maximum number of MAC layer tx attempts for an outbound indirect frame (for a sleepy child) after receiving
-     * a data request command (data poll) from the child.
-     *
-     */
-    kIndirectFrameMacTxAttempts = OPENTHREAD_CONFIG_MAX_TX_ATTEMPTS_INDIRECT_PER_POLL,
-};
+    kMaxFrameRetriesDirect =
+        OPENTHREAD_CONFIG_MAC_MAX_FRAME_RETRIES_DIRECT, ///< macMaxFrameRetries for direct transmissions
+    kMaxFrameRetriesIndirect =
+        OPENTHREAD_CONFIG_MAC_MAX_FRAME_RETRIES_INDIRECT, ///< macMaxFrameRetries for indirect transmissions
 
-/**
- * This class implements a MAC receiver client.
- *
- */
-class Receiver
-{
-    friend class Mac;
-
-public:
-    /**
-     * This function pointer is called when a MAC frame is received.
-     *
-     * @param[in]  aContext  A pointer to arbitrary context information.
-     * @param[in]  aFrame    A reference to the MAC frame.
-     *
-     */
-    typedef void (*ReceiveFrameHandler)(void *aContext, Frame &aFrame);
-
-    /**
-     * This function pointer is called on a data request command (data poll) timeout, i.e., when the ack in response to
-     * a data request command indicated a frame is pending, but no frame was received after `kDataPollTimeout` interval.
-     *
-     * @param[in]  aContext  A pointer to arbitrary context information.
-     *
-     */
-    typedef void (*DataPollTimeoutHandler)(void *aContext);
-
-    /**
-     * This constructor creates a MAC receiver client.
-     *
-     * @param[in]  aReceiveFrameHandler  A pointer to a function that is called on MAC frame reception.
-     * @param[in]  aPollTimeoutHandler   A pointer to a function called on data poll timeout (may be set to NULL).
-     * @param[in]  aContext              A pointer to arbitrary context information.
-     *
-     */
-    Receiver(ReceiveFrameHandler aReceiveFrameHandler, DataPollTimeoutHandler aPollTimeoutHandler, void *aContext) {
-        mReceiveFrameHandler = aReceiveFrameHandler;
-        mPollTimeoutHandler = aPollTimeoutHandler;
-        mContext = aContext;
-        mNext = NULL;
-    }
-
-private:
-    void HandleReceivedFrame(Frame &frame) { mReceiveFrameHandler(mContext, frame); }
-    void HandleDataPollTimeout(void) {
-        if (mPollTimeoutHandler != NULL) {
-            mPollTimeoutHandler(mContext);
-        }
-    }
-
-    ReceiveFrameHandler mReceiveFrameHandler;
-    DataPollTimeoutHandler mPollTimeoutHandler;
-    void *mContext;
-    Receiver *mNext;
-};
-
-/**
- * This class implements a MAC sender client.
- *
- */
-class Sender
-{
-    friend class Mac;
-
-public:
-    /**
-     * This function pointer is called when the MAC is about to transmit the frame.
-     *
-     * @param[in]  aContext  A pointer to arbitrary context information.
-     * @param[in]  aFrame    A reference to the MAC frame buffer.
-     *
-     */
-    typedef otError(*FrameRequestHandler)(void *aContext, Frame &aFrame);
-
-    /**
-     * This function pointer is called when the MAC is done sending the frame.
-     *
-     * @param[in]  aContext  A pointer to arbitrary context information.
-     * @param[in]  aFrame    A reference to the MAC frame buffer that was sent.
-     * @param[in]  aError    The status of the last MSDU transmission.
-     *
-     */
-    typedef void (*SentFrameHandler)(void *aContext, Frame &aFrame, otError aError);
-
-    /**
-     * This constructor creates a MAC sender client.
-     *
-     * @param[in]  aFrameRequestHandler  A pointer to a function that is called when about to send a MAC frame.
-     * @param[in]  aSentFrameHandler     A pointer to a function that is called when done sending the frame.
-     * @param[in]  aContext              A pointer to arbitrary context information.
-     *
-     */
-    Sender(FrameRequestHandler aFrameRequestHandler, SentFrameHandler aSentFrameHandler, void *aContext) {
-        mFrameRequestHandler = aFrameRequestHandler;
-        mSentFrameHandler = aSentFrameHandler;
-        mContext = aContext;
-        mNext = NULL;
-    }
-
-private:
-    otError HandleFrameRequest(Frame &frame) { return mFrameRequestHandler(mContext, frame); }
-    void HandleSentFrame(Frame &frame, otError error) { mSentFrameHandler(mContext, frame, error); }
-
-    FrameRequestHandler mFrameRequestHandler;
-    SentFrameHandler mSentFrameHandler;
-    void *mContext;
-    Sender *mNext;
+    kTxNumBcast = OPENTHREAD_CONFIG_TX_NUM_BCAST ///< Number of times each broadcast frame is transmitted
 };
 
 /**
  * This class implements the IEEE 802.15.4 MAC.
  *
  */
-class Mac
+class Mac : public InstanceLocator
 {
 public:
     /**
      * This constructor initializes the MAC object.
      *
-     * @param[in]  aThreadNetif  A reference to the network interface using this MAC.
+     * @param[in]  aInstance  A reference to the OpenThread instance.
      *
      */
-    explicit Mac(ThreadNetif &aThreadNetif);
-
-    /**
-     * This method returns the pointer to the parent otInstance structure.
-     *
-     * @returns The pointer to the parent otInstance structure.
-     *
-     */
-    otInstance *GetInstance(void);
+    explicit Mac(Instance &aInstance);
 
     /**
      * This function pointer is called on receiving an IEEE 802.15.4 Beacon during an Active Scan.
      *
      * @param[in]  aContext       A pointer to arbitrary context information.
-     * @param[in]  aBeaconFrame   A pointer to the Beacon frame.
+     * @param[in]  aBeaconFrame   A pointer to the Beacon frame or NULL to indicate end of Active Scan operation.
      *
      */
     typedef void (*ActiveScanHandler)(void *aContext, Frame *aBeaconFrame);
@@ -240,10 +123,14 @@ public:
     /**
      * This method starts an IEEE 802.15.4 Active Scan.
      *
-     * @param[in]  aScanChannels  A bit vector indicating which channels to scan.
-     * @param[in]  aScanDuration  The time in milliseconds to spend scanning each channel.
+     * @param[in]  aScanChannels  A bit vector indicating which channels to scan. Zero is mapped to all channels.
+     * @param[in]  aScanDuration  The time in milliseconds to spend scanning each channel. Zero duration maps to
+     *                            default value `kScanDurationDefault` = 300 ms.
      * @param[in]  aHandler       A pointer to a function that is called on receiving an IEEE 802.15.4 Beacon.
      * @param[in]  aContext       A pointer to arbitrary context information.
+     *
+     * @retval OT_ERROR_NONE  Successfully scheduled the Active Scan request.
+     * @retval OT_ERROR_BUSY  Could not schedule the scan (a scan is ongoing or scheduled).
      *
      */
     otError ActiveScan(uint32_t aScanChannels, uint16_t aScanDuration, ActiveScanHandler aHandler, void *aContext);
@@ -255,18 +142,19 @@ public:
      * @param[out] aResult                  A reference to `otActiveScanResult` where the result is stored.
      *
      * @retval OT_ERROR_NONE            Successfully converted the beacon into active scan result.
-     * @retavl OT_ERROR_INVALID_ARGS    The @a aBeaconFrame was NULL.
+     * @retval OT_ERROR_INVALID_ARGS    The @a aBeaconFrame was NULL.
      * @retval OT_ERROR_PARSE           Failed parsing the beacon frame.
      *
      */
     otError ConvertBeaconToActiveScanResult(Frame *aBeaconFrame, otActiveScanResult &aResult);
 
     /**
-     * This function pointer is called during an "Energy Scan" when the result for a channel is ready or the scan
+     * This function pointer is called during an Energy Scan when the result for a channel is ready or the scan
      * completes.
      *
      * @param[in]  aContext  A pointer to arbitrary context information.
-     * @param[in]  aResult   A valid pointer to the energy scan result information or NULL when the energy scan completes.
+     * @param[in]  aResult   A valid pointer to the energy scan result information or NULL when the energy scan
+     *                       completes.
      *
      */
     typedef void (*EnergyScanHandler)(void *aContext, otEnergyScanResult *aResult);
@@ -274,8 +162,9 @@ public:
     /**
      * This method starts an IEEE 802.15.4 Energy Scan.
      *
-     * @param[in]  aScanChannels     A bit vector indicating on which channels to perform energy scan.
-     * @param[in]  aScanDuration     The time in milliseconds to spend scanning each channel.
+     * @param[in]  aScanChannels     A bit vector indicating on which channels to scan. Zero is mapped to all channels.
+     * @param[in]  aScanDuration     The time in milliseconds to spend scanning each channel. If the duration is set to
+     *                               zero, a single RSSI sample will be taken per channel.
      * @param[in]  aHandler          A pointer to a function called to pass on scan result or indicate scan completion.
      * @param[in]  aContext          A pointer to arbitrary context information.
      *
@@ -326,61 +215,44 @@ public:
     void SetRxOnWhenIdle(bool aRxOnWhenIdle);
 
     /**
-     * This method registers a new MAC receiver client.
+     * This method requests a new MAC frame transmission.
      *
-     * @param[in]  aReceiver  A reference to the MAC receiver client.
-     *
-     * @retval OT_ERROR_NONE     Successfully registered the receiver.
-     * @retval OT_ERROR_ALREADY  The receiver was already registered.
-     *
-     */
-    otError RegisterReceiver(Receiver &aReceiver);
-
-    /**
-     * This method registers a new MAC sender client.
-     *
-     * @param[in]  aSender  A reference to the MAC sender client.
-     *
-     * @retval OT_ERROR_NONE     Successfully registered the sender.
-     * @retval OT_ERROR_ALREADY  The sender was already registered.
+     * @retval OT_ERROR_NONE           Frame transmission request is scheduled successfully.
+     * @retval OT_ERROR_ALREADY        MAC is busy sending earlier transmission request.
+     * @retval OT_ERROR_INVALID_STATE  The MAC layer is not enabled.
      *
      */
-    otError SendFrameRequest(Sender &aSender);
+    otError SendFrameRequest(void);
 
     /**
-     * This method generates a random IEEE 802.15.4 Extended Address.
+     * This method requests an Out of Band frame for MAC Transmission.
      *
-     * @param[out]  aExtAddress  A pointer to where the generated Extended Address is placed.
+     * An Out of Band frame is one that was generated outside of OpenThread.
+     *
+     * @param[in]  aOobFrame  A pointer to the frame.
+     *
+     * @retval OT_ERROR_NONE           Successfully scheduled the frame transmission.
+     * @retval OT_ERROR_ALREADY        MAC layer is busy sending a previously requested frame.
+     * @retval OT_ERROR_INVALID_STATE  The MAC layer is not enabled.
      *
      */
-    void GenerateExtAddress(ExtAddress *aExtAddress);
+    otError SendOutOfBandFrameRequest(otRadioFrame *aOobFrame);
 
     /**
-     * This method returns a pointer to the IEEE 802.15.4 Extended Address.
+     * This method returns a reference to the IEEE 802.15.4 Extended Address.
      *
      * @returns A pointer to the IEEE 802.15.4 Extended Address.
      *
      */
-    const ExtAddress *GetExtAddress(void) const { return &mExtAddress; }
+    const ExtAddress &GetExtAddress(void) const { return mExtAddress; }
 
     /**
-     * This method sets the IEEE 802.15.4 Extended Address
+     * This method sets the IEEE 802.15.4 Extended Address.
      *
      * @param[in]  aExtAddress  A reference to the IEEE 802.15.4 Extended Address.
      *
      */
     void SetExtAddress(const ExtAddress &aExtAddress);
-
-    /**
-     * This method gets the Hash Mac Address.
-     *
-     * Hash Mac Address is the first 64 bits of the result of computing SHA-256 over factory-assigned
-     * IEEE EUI-64, which is used as IEEE 802.15.4 Extended Address during commissioning process.
-     *
-     * @param[out]  aHashMacAddress    A pointer to where the Hash Mac Address is placed.
-     *
-     */
-    void GetHashMacAddress(ExtAddress *aHashMacAddress);
 
     /**
      * This method returns the IEEE 802.15.4 Short Address.
@@ -401,38 +273,81 @@ public:
     otError SetShortAddress(ShortAddress aShortAddress);
 
     /**
-     * This method returns the IEEE 802.15.4 Channel.
+     * This method returns the IEEE 802.15.4 PAN Channel.
      *
-     * @returns The IEEE 802.15.4 Channel.
+     * @returns The IEEE 802.15.4 PAN Channel.
      *
      */
-    uint8_t GetChannel(void) const { return mChannel; }
+    uint8_t GetPanChannel(void) const { return mPanChannel; }
 
     /**
-     * This method sets the IEEE 802.15.4 Channel.
+     * This method sets the IEEE 802.15.4 PAN Channel.
      *
-     * @param[in]  aChannel  The IEEE 802.15.4 Channel.
+     * @param[in]  aChannel  The IEEE 802.15.4 PAN Channel.
      *
-     * @retval OT_ERROR_NONE  Successfully set the IEEE 802.15.4 Channel.
+     * @retval OT_ERROR_NONE           Successfully set the IEEE 802.15.4 PAN Channel.
+     * @retval OT_ERROR_INVALID_ARGS   The @p aChannel is not in the supported channel mask.
      *
      */
-    otError SetChannel(uint8_t aChannel);
+    otError SetPanChannel(uint8_t aChannel);
 
     /**
-     * This method returns the maximum transmit power in dBm.
+     * This method returns the IEEE 802.15.4 Radio Channel.
      *
-     * @returns  The maximum transmit power in dBm.
+     * @returns The IEEE 802.15.4 Radio Channel.
      *
      */
-    int8_t GetMaxTransmitPower(void) const { return mMaxTransmitPower; }
+    uint8_t GetRadioChannel(void) const { return mRadioChannel; }
 
     /**
-     * This method sets the maximum transmit power in dBm.
+     * This method sets the IEEE 802.15.4 Radio Channel. It can only be called after successfully calling
+     * `AcquireRadioChannel()`.
      *
-     * @param[in]  aPower  The maximum transmit power in dBm.
+     * @param[in]  aChannel  The IEEE 802.15.4 Radio Channel.
+     *
+     * @retval OT_ERROR_NONE           Successfully set the IEEE 802.15.4 Radio Channel.
+     * @retval OT_ERROR_INVALID_ARGS   The @p aChannel is not in the supported channel mask.
+     * @retval OT_ERROR_INVALID_STATE  The acquisition ID is incorrect.
      *
      */
-    void SetMaxTransmitPower(int8_t aPower) { mMaxTransmitPower = aPower; }
+    otError SetRadioChannel(uint16_t aAcquisitionId, uint8_t aChannel);
+
+    /**
+     * This method acquires external ownership of the Radio channel so that future calls to `SetRadioChannel)()` will
+     * succeed.
+     *
+     * @param[out]  aAcquisitionId  The AcquisitionId that the caller should use when calling `SetRadioChannel()`.
+     *
+     * @retval OT_ERROR_NONE           Successfully acquired permission to Set the Radio Channel.
+     * @retval OT_ERROR_INVALID_STATE  Failed to acquire permission as the radio Channel has already been acquired.
+     *
+     */
+    otError AcquireRadioChannel(uint16_t *aAcquisitionId);
+
+    /**
+     * This method releases external ownership of the radio Channel that was acquired with `AcquireRadioChannel()`. The
+     * channel will re-adopt the PAN Channel when this API is called.
+     *
+     * @retval OT_ERROR_NONE  Successfully released the IEEE 802.15.4 Radio Channel.
+     *
+     */
+    otError ReleaseRadioChannel(void);
+
+    /**
+     * This method returns the supported channel mask.
+     *
+     * @returns The supported channel mask.
+     *
+     */
+    const ChannelMask &GetSupportedChannelMask(void) const { return mSupportedChannelMask; }
+
+    /**
+     * This method sets the supported channel mask
+     *
+     * @param[in] aMask   The supported channel mask.
+     *
+     */
+    void SetSupportedChannelMask(const ChannelMask &aMask);
 
     /**
      * This method returns the IEEE 802.15.4 Network Name.
@@ -445,12 +360,25 @@ public:
     /**
      * This method sets the IEEE 802.15.4 Network Name.
      *
-     * @param[in]  aNetworkName  A pointer to the IEEE 802.15.4 Network Name.
+     * @param[in]  aNetworkName  A pointer to the string. Must be null terminated.
      *
-     * @retval OT_ERROR_NONE  Successfully set the IEEE 802.15.4 Network Name.
+     * @retval OT_ERROR_NONE           Successfully set the IEEE 802.15.4 Network Name.
+     * @retval OT_ERROR_INVALID_ARGS   Given name is too long.
      *
      */
     otError SetNetworkName(const char *aNetworkName);
+
+    /**
+     * This method sets the IEEE 802.15.4 Network Name.
+     *
+     * @param[in]  aBuffer  A pointer to the char buffer containing the name. Does not need to be null terminated.
+     * @param[in]  aLength  Number of chars in the buffer.
+     *
+     * @retval OT_ERROR_NONE           Successfully set the IEEE 802.15.4 Network Name.
+     * @retval OT_ERROR_INVALID_ARGS   Given name is too long.
+     *
+     */
+    otError SetNetworkName(const char *aBuffer, uint8_t aLength);
 
     /**
      * This method returns the IEEE 802.15.4 PAN ID.
@@ -476,72 +404,57 @@ public:
      * @returns A pointer to the IEEE 802.15.4 Extended PAN ID.
      *
      */
-    const uint8_t *GetExtendedPanId(void) const { return mExtendedPanId.m8; }
+    const otExtendedPanId &GetExtendedPanId(void) const { return mExtendedPanId; }
 
     /**
      * This method sets the IEEE 802.15.4 Extended PAN ID.
      *
-     * @param[in]  aExtPanId  The IEEE 802.15.4 Extended PAN ID.
+     * @param[in]  aExtendedPanId  The IEEE 802.15.4 Extended PAN ID.
      *
      * @retval OT_ERROR_NONE  Successfully set the IEEE 802.15.4 Extended PAN ID.
      *
      */
-    otError SetExtendedPanId(const uint8_t *aExtPanId);
+    otError SetExtendedPanId(const otExtendedPanId &aExtendedPanId);
 
+#if OPENTHREAD_ENABLE_MAC_FILTER
     /**
-     * This method returns the MAC whitelist filter.
+     * This method returns the MAC filter.
      *
-     * @returns A reference to the MAC whitelist filter.
+     * @returns A reference to the MAC filter.
      *
      */
-    Whitelist &GetWhitelist(void) { return mWhitelist; }
+    Filter &GetFilter(void) { return mFilter; }
+#endif // OPENTHREAD_ENABLE_MAC_FILTER
 
     /**
-     * This method returns the MAC blacklist filter.
+     * This method is called to handle a received frame.
      *
-     * @returns A reference to the MAC blacklist filter.
+     * @param[in]  aFrame  A pointer to the received frame, or NULL if the receive operation was aborted.
+     * @param[in]  aError  OT_ERROR_NONE when successfully received a frame,
+     *                     OT_ERROR_ABORT when reception was aborted and a frame was not received.
      *
      */
-    Blacklist &GetBlacklist(void) { return mBlacklist; }
+    void HandleReceivedFrame(Frame *aFrame, otError aError);
 
     /**
-     * This method is called to handle receive events.
+     * This method is called to handle transmission start events.
      *
-     * @param[in]  aFrame  A pointer to the received frame, or NULL if the receive operation aborted.
-     * @param[in]  aError  OT_ERROR_NONE when successfully received a frame, OT_ERROR_ABORT when reception
-     *                     was aborted and a frame was not received.
-     *
+     * @param[in]  aFrame  A pointer to the frame that is transmitted.
      */
-    void ReceiveDoneTask(Frame *aFrame, otError aError);
+    void HandleTransmitStarted(otRadioFrame *aFrame);
 
-#if OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE
-    /**
-     * This method is called to handle transmit events.
-     *
-     * @param[in]  aFrame         A pointer to the frame that was transmitted.
-     * @param[in]  aFramePending  TRUE if an ACK frame was received and the Frame Pending bit was set.
-     * @param[in]  aError         OT_ERROR_NONE when the frame was transmitted, OT_ERROR_NO_ACK when the frame was
-     *                            transmitted but no ACK was received, OT_ERROR_CHANNEL_ACCESS_FAILURE when the
-     *                            transmission could not take place due to activity on the channel, OT_ERROR_ABORT when
-     *                            transmission was aborted for other reasons.
-     *
-     */
-    void TransmitDoneTask(otRadioFrame *aFrame, bool aRxPending, otError aError);
-
-#else // #if OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE
     /**
      * This method is called to handle transmit events.
      *
      * @param[in]  aFrame      A pointer to the frame that was transmitted.
      * @param[in]  aAckFrame   A pointer to the ACK frame, NULL if no ACK was received.
-     * @param[in]  aError      OT_ERROR_NONE when the frame was transmitted, OT_ERROR_NO_ACK when the frame was
-     *                         transmitted but no ACK was received, OT_ERROR_CHANNEL_ACCESS_FAILURE when the
-     *                         transmission could not take place due to activity on the channel, OT_ERROR_ABORT when
-     *                         transmission was aborted for other reasons.
+     * @param[in]  aError      OT_ERROR_NONE when the frame was transmitted,
+     *                         OT_ERROR_NO_ACK when the frame was transmitted but no ACK was received,
+     *                         OT_ERROR_CHANNEL_ACCESS_FAILURE when the tx failed due to activity on the channel,
+     *                         OT_ERROR_ABORT when transmission was aborted for other reasons.
      *
      */
-    void TransmitDoneTask(otRadioFrame *aFrame, otRadioFrame *aAckFrame, otError aError);
-#endif // OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE
+    void HandleTransmitDone(otRadioFrame *aFrame, otRadioFrame *aAckFrame, otError aError);
 
     /**
      * This method returns if an active scan is in progress.
@@ -568,8 +481,8 @@ public:
     /**
      * This method registers a callback to provide received raw IEEE 802.15.4 frames.
      *
-     * @param[in]  aPcapCallback     A pointer to a function that is called when receiving an IEEE 802.15.4 link frame or
-     *                               NULL to disable the callback.
+     * @param[in]  aPcapCallback     A pointer to a function that is called when receiving an IEEE 802.15.4 link frame
+     * or NULL to disable the callback.
      * @param[in]  aCallbackContext  A pointer to application-specific context.
      *
      */
@@ -595,14 +508,6 @@ public:
     void SetPromiscuous(bool aPromiscuous);
 
     /**
-     * This method fills network diagnostic MacCounterTlv.
-     *
-     * @param[in]  aMacCountersTlv The reference to the network diagnostic MacCounterTlv.
-     *
-     */
-    void FillMacCountersTlv(NetworkDiagnostic::MacCountersTlv &aMacCounters) const;
-
-    /**
      * This method resets mac counters
      *
      */
@@ -622,7 +527,7 @@ public:
      * @returns The noise floor value in dBm.
      *
      */
-    int8_t GetNoiseFloor(void) { return otPlatRadioGetReceiveSensitivity(GetInstance()); }
+    int8_t GetNoiseFloor(void);
 
     /**
      * This method indicates whether or not CSMA backoff is supported by the radio layer.
@@ -642,104 +547,211 @@ public:
      */
     bool RadioSupportsRetries(void);
 
-private:
-    enum ScanType
-    {
-        kScanTypeNone = 0,
-        kScanTypeActive,
-        kScanTypeEnergy,
-    };
+    /**
+     * This method returns the current CCA (Clear Channel Assessment) failure rate.
+     *
+     * The rate is maintained over a window of (roughly) last `OPENTHREAD_CONFIG_CCA_FAILURE_RATE_AVERAGING_WINDOW`
+     * frame transmissions.
+     *
+     * @returns The CCA failure rate with maximum value `0xffff` corresponding to 100% failure rate.
+     *
+     */
+    uint16_t GetCcaFailureRate(void) const { return mCcaSuccessRateTracker.GetFailureRate(); }
 
+    /**
+     * This method Starts/Stops the Link layer. It may only be used when the Netif Interface is down
+     *
+     * @param[in]  aEnable The requested State for the MAC layer. true - Start, false - Stop.
+     *
+     * @retval OT_ERROR_NONE   The operation succeeded or the new State equals the current State.
+     *
+     */
+    otError SetEnabled(bool aEnable);
+
+    /**
+     * This method indicates whether or not the link layer is enabled.
+     *
+     * @retval true   Link layer is enabled.
+     * @retval false  Link layer is not enabled.
+     *
+     */
+    bool IsEnabled(void) { return mEnabled; }
+
+    /**
+     * This method performs AES CCM on the frame which is going to be sent.
+     *
+     * @param[in]  aFrame       A reference to the MAC frame buffer that is going to be sent.
+     * @param[in]  aExtAddress  A pointer to the extended address, which will be used to generate nonce
+     *                          for AES CCM computation.
+     *
+     */
+    static void ProcessTransmitAesCcm(Frame &aFrame, const ExtAddress *aExtAddress);
+
+private:
     enum
     {
-        kInvalidRssiValue = 127
+        kInvalidRssiValue  = 127,
+        kMaxCcaSampleCount = OPENTHREAD_CONFIG_CCA_FAILURE_RATE_AVERAGING_WINDOW,
+        kMaxAcquisitionId  = 0xffff,
+
+    /**
+     * Interval between RSSI samples when performing Energy Scan.
+     *
+     * `mBackoffTimer` is used for adding delay between RSSI samples. If microsecond timer is supported, 128 usec
+     * time between samples is used, otherwise with a millisecond timer the minimum value of 1 msec is used.
+     *
+     */
+#if OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
+        kEnergyScanRssiSampleInterval = 128,
+#else
+        kEnergyScanRssiSampleInterval = 1,
+#endif
     };
 
-    void GenerateNonce(const ExtAddress &aAddress, uint32_t aFrameCounter, uint8_t aSecurityLevel, uint8_t *aNonce);
-    void NextOperation(void);
-    void ProcessTransmitSecurity(Frame &aFrame);
-    otError ProcessReceiveSecurity(Frame &aFrame, const Address &aSrcAddr, Neighbor *aNeighbor);
-    void ScheduleNextTransmission(void);
-    void SentFrame(otError aError);
-    void SendBeaconRequest(Frame &aFrame);
-    void SendBeacon(Frame &aFrame);
-    void StartBackoff(void);
-    void StartEnergyScan(void);
-    otError HandleMacCommand(Frame &aFrame);
+    enum Operation
+    {
+        kOperationIdle = 0,
+        kOperationActiveScan,
+        kOperationEnergyScan,
+        kOperationTransmitBeacon,
+        kOperationTransmitData,
+        kOperationWaitingForData,
+        kOperationTransmitOutOfBandFrame,
+    };
 
-    static void HandleMacTimer(void *aContext);
-    void HandleMacTimer(void);
-    static void HandleBeginTransmit(void *aContext);
-    void HandleBeginTransmit(void);
-    static void HandleReceiveTimer(void *aContext);
-    void HandleReceiveTimer(void);
-    static void HandleEnergyScanSampleRssi(void *aContext);
-    void HandleEnergyScanSampleRssi(void);
+    /**
+     * This method processes transmit security on the frame which is going to be sent.
+     *
+     * This method prepares the frame, fills Mac auxiliary header, and perform AES CCM immediately in most cases
+     * (depends on @p aProcessAesCcm). If aProcessAesCcm is False, it probably means that some content in the frame
+     * will be updated just before transmission, so AES CCM will be performed after that (before transmission).
+     *
+     * @param[in]  aFrame          A reference to the MAC frame buffer which is going to be sent.
+     * @param[in]  aProcessAesCcm  TRUE to perform AES CCM immediately, FALSE otherwise.
+     *
+     */
+    void ProcessTransmitSecurity(Frame &aFrame, bool aProcessAesCcm);
+
+    static void GenerateNonce(const ExtAddress &aAddress,
+                              uint32_t          aFrameCounter,
+                              uint8_t           aSecurityLevel,
+                              uint8_t *         aNonce);
+
+    otError ProcessReceiveSecurity(Frame &aFrame, const Address &aSrcAddr, Neighbor *aNeighbor);
+    void    UpdateIdleMode(void);
+    void    StartOperation(Operation aOperation);
+    void    FinishOperation(void);
+    void    PerformNextOperation(void);
+    void    SendBeaconRequest(Frame &aFrame);
+    void    SendBeacon(Frame &aFrame);
+    bool    ShouldSendBeacon(void) const;
+    void    StartBackoff(void);
+    void    BeginTransmit(void);
+    otError HandleMacCommand(Frame &aFrame);
+    Frame * GetOperationFrame(void);
+
+    static void HandleMacTimer(Timer &aTimer);
+    void        HandleMacTimer(void);
+    static void HandleBackoffTimer(Timer &aTimer);
+    void        HandleBackoffTimer(void);
+    static void HandleReceiveTimer(Timer &aTimer);
+    void        HandleReceiveTimer(void);
+    static void HandleOperationTask(Tasklet &aTasklet);
+    void        HandleOperationTask(void);
 
     void StartCsmaBackoff(void);
-    otError Scan(ScanType aType, uint32_t aScanChannels, uint16_t aScanDuration, void *aContext);
 
-    Timer mMacTimer;
-#if !OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_BACKOFF_TIMER
-    Timer mBackoffTimer;
+    void    Scan(Operation aScanOperation, uint32_t aScanChannels, uint16_t aScanDuration, void *aContext);
+    otError UpdateScanChannel(void);
+    void    PerformActiveScan(void);
+    void    PerformEnergyScan(void);
+    void    ReportEnergyScanResult(int8_t aRssi);
+    void    SampleRssi(void);
+
+    otError RadioTransmit(Frame *aSendFrame);
+    otError RadioReceive(uint8_t aChannel);
+    otError RadioSleep(void);
+
+    void LogFrameRxFailure(const Frame *aFrame, otError aError) const;
+    void LogFrameTxFailure(const Frame &aFrame, otError aError) const;
+    void LogBeacon(const char *aActionText, const BeaconPayload &aBeaconPayload) const;
+
+#if OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+    void    ProcessTimeIe(Frame &aFrame);
+    uint8_t GetTimeIeOffset(Frame &aFrame);
 #endif
-    Timer mReceiveTimer;
 
-    ThreadNetif &mNetif;
+    static const char *OperationToString(Operation aOperation);
 
-    ExtAddress mExtAddress;
+    Operation mOperation;
+
+    bool mPendingActiveScan : 1;
+    bool mPendingEnergyScan : 1;
+    bool mPendingTransmitBeacon : 1;
+    bool mPendingTransmitData : 1;
+    bool mPendingTransmitOobFrame : 1;
+    bool mPendingWaitingForData : 1;
+    bool mRxOnWhenIdle : 1;
+    bool mBeaconsEnabled : 1;
+    bool mTransmitAborted : 1;
+#if OPENTHREAD_CONFIG_STAY_AWAKE_BETWEEN_FRAGMENTS
+    bool mDelaySleep : 1;
+#endif
+
+    Tasklet mOperationTask;
+
+    TimerMilli mMacTimer;
+#if OPENTHREAD_CONFIG_ENABLE_PLATFORM_USEC_TIMER
+    TimerMicro mBackoffTimer;
+#else
+    TimerMilli mBackoffTimer;
+#endif
+    TimerMilli mReceiveTimer;
+
+    ExtAddress   mExtAddress;
     ShortAddress mShortAddress;
-    PanId mPanId;
-    uint8_t mChannel;
-    int8_t mMaxTransmitPower;
+    PanId        mPanId;
+    uint8_t      mPanChannel;
+    uint8_t      mRadioChannel;
+    uint16_t     mRadioChannelAcquisitionId;
+    ChannelMask  mSupportedChannelMask;
 
-    otNetworkName mNetworkName;
+    otNetworkName   mNetworkName;
     otExtendedPanId mExtendedPanId;
-
-    Sender *mSendHead, *mSendTail;
-    Receiver *mReceiveHead, *mReceiveTail;
-
-    enum
-    {
-        kStateIdle = 0,
-        kStateActiveScan,
-        kStateEnergyScan,
-        kStateTransmitBeacon,
-        kStateTransmitData,
-    };
-    uint8_t mState;
 
     uint8_t mBeaconSequence;
     uint8_t mDataSequence;
-    bool mRxOnWhenIdle;
-    uint8_t mCsmaAttempts;
-    uint8_t mTransmitAttempts;
-    bool mTransmitBeacon;
-    bool mBeaconsEnabled;
+    uint8_t mCsmaBackoffs;
+    uint8_t mTransmitRetries;
+    uint8_t mBroadcastTransmitCount;
 
-    ScanType mPendingScanRequest;
-    uint8_t mScanChannel;
-    uint32_t mScanChannels;
-    uint16_t mScanDuration;
-    void *mScanContext;
+    ChannelMask mScanChannelMask;
+    uint16_t    mScanDuration;
+    uint8_t     mScanChannel;
+    int8_t      mEnergyScanCurrentMaxRssi;
+    void *      mScanContext;
     union
     {
         ActiveScanHandler mActiveScanHandler;
         EnergyScanHandler mEnergyScanHandler;
     };
-    int8_t mEnergyScanCurrentMaxRssi;
-    Tasklet mEnergyScanSampleRssiTask;
 
     otLinkPcapCallback mPcapCallback;
-    void *mPcapCallbackContext;
+    void *             mPcapCallbackContext;
 
-    Whitelist mWhitelist;
-    Blacklist mBlacklist;
+#if OPENTHREAD_ENABLE_MAC_FILTER
+    Filter mFilter;
+#endif // OPENTHREAD_ENABLE_MAC_FILTER
 
     Frame *mTxFrame;
+    Frame *mOobFrame;
 
     otMacCounters mCounters;
-    uint32_t mKeyIdMode2FrameCounter;
+    uint32_t      mKeyIdMode2FrameCounter;
+
+    SuccessRateTracker mCcaSuccessRateTracker;
+    uint16_t           mCcaSampleCount;
+    bool               mEnabled;
 };
 
 /**
@@ -747,7 +759,7 @@ private:
  *
  */
 
-}  // namespace Mac
-}  // namespace ot
+} // namespace Mac
+} // namespace ot
 
-#endif  // MAC_HPP_
+#endif // MAC_HPP_

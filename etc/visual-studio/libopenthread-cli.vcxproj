@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="openthread.configuration.props" /> 
+  <Import Project="openthread.configuration.props" />
   <PropertyGroup Label="Globals">
     <ProjectGuid>{41B32069-632E-4578-855B-A36EBFA80B56}</ProjectGuid>
     <Keyword>StaticLibrary</Keyword>
@@ -40,7 +40,6 @@
         %(PreprocessorDefinitions);
         MBEDTLS_CONFIG_FILE="mbedtls-config.h";
         OPENTHREAD_CONFIG_FILE="openthread-windows-config.h";
-        OPENTHREAD_MULTIPLE_INSTANCE;
         OPENTHREAD_FTD=1;
         OTBUILD;
       </PreprocessorDefinitions>
@@ -60,7 +59,7 @@
     <ClCompile Include="..\..\src\cli\cli.cpp" />
     <ClCompile Include="..\..\src\cli\cli_dataset.cpp" />
     <ClCompile Include="..\..\src\cli\cli_uart.cpp" />
-    <ClCompile Include="..\..\src\cli\cli_udp.cpp" />
+    <ClCompile Include="..\..\src\cli\cli_udp_example.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -34,35 +34,28 @@
 #ifndef THREAD_NETIF_HPP_
 #define THREAD_NETIF_HPP_
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
-#include <openthread/types.h>
+#include "openthread-core-config.h"
 
 #include "coap/coap.hpp"
 #include "coap/coap_secure.hpp"
 #include "mac/mac.hpp"
 
-#if OPENTHREAD_ENABLE_BORDER_AGENT_PROXY && OPENTHREAD_FTD
-#include "meshcop/border_agent_proxy.hpp"
-#endif // OPENTHREAD_ENABLE_BORDER_AGENT_PROXY && OPENTHREAD_FTD
-
+#if OPENTHREAD_ENABLE_BORDER_AGENT
+#include "meshcop/border_agent.hpp"
+#endif
 #if OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
 #include "meshcop/commissioner.hpp"
-#endif  // OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
+#endif // OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
 
 #include "meshcop/dataset_manager.hpp"
 
 #if OPENTHREAD_ENABLE_DTLS
 #include "meshcop/dtls.hpp"
-#endif  // OPENTHREAD_ENABLE_DTLS
+#endif // OPENTHREAD_ENABLE_DTLS
 
 #if OPENTHREAD_ENABLE_JOINER
 #include "meshcop/joiner.hpp"
-#endif  // OPENTHREAD_ENABLE_JOINER
+#endif // OPENTHREAD_ENABLE_JOINER
 
 #include "meshcop/joiner_router.hpp"
 #include "meshcop/leader.hpp"
@@ -72,16 +65,18 @@
 #include "net/dns_client.hpp"
 #include "net/ip6_filter.hpp"
 #include "net/netif.hpp"
+#include "net/sntp_client.hpp"
 #include "thread/address_resolver.hpp"
 #include "thread/announce_begin_server.hpp"
 #include "thread/energy_scan_server.hpp"
-#include "thread/network_diagnostic.hpp"
 #include "thread/key_manager.hpp"
 #include "thread/mesh_forwarder.hpp"
 #include "thread/mle.hpp"
 #include "thread/mle_router.hpp"
 #include "thread/network_data_local.hpp"
+#include "thread/network_diagnostic.hpp"
 #include "thread/panid_query_server.hpp"
+#include "thread/time_sync_service.hpp"
 #include "utils/child_supervision.hpp"
 
 #if OPENTHREAD_ENABLE_JAM_DETECTION
@@ -99,16 +94,16 @@ namespace ot {
  * @{
  */
 
-class ThreadNetif: public Ip6::Netif
+class ThreadNetif : public Ip6::Netif
 {
 public:
     /**
      * This constructor initializes the Thread network interface.
      *
-     * @param[in]  aIp6  A reference to the IPv6 network object.
+     * @param[in]  aInstance  A reference to the OpenThread instance.
      *
      */
-    ThreadNetif(Ip6::Ip6 &aIp6);
+    explicit ThreadNetif(Instance &aInstance);
 
     /**
      * This method enables the Thread network interface.
@@ -180,17 +175,17 @@ public:
      *
      */
     Dhcp6::Dhcp6Client &GetDhcp6Client(void) { return mDhcp6Client; }
-#endif  // OPENTHREAD_ENABLE_DHCP6_CLIENT
+#endif // OPENTHREAD_ENABLE_DHCP6_CLIENT
 
 #if OPENTHREAD_ENABLE_DHCP6_SERVER
     /**
      * This method returns a reference to the dhcp server object.
      *
-     * @returns A reference to the the dhcp server object.
+     * @returns A reference to the dhcp server object.
      *
      */
     Dhcp6::Dhcp6Server &GetDhcp6Server(void) { return mDhcp6Server; }
-#endif  // OPENTHREAD_ENABLE_DHCP6_SERVER
+#endif // OPENTHREAD_ENABLE_DHCP6_SERVER
 
 #if OPENTHREAD_ENABLE_DNS_CLIENT
     /**
@@ -200,7 +195,7 @@ public:
      *
      */
     Dns::Client &GetDnsClient(void) { return mDnsClient; }
-#endif  // OPENTHREAD_ENABLE_DNS_CLIENT
+#endif // OPENTHREAD_ENABLE_DNS_CLIENT
 
     /**
      * This method returns a reference to the CoAP object.
@@ -258,6 +253,7 @@ public:
      */
     MeshForwarder &GetMeshForwarder(void) { return mMeshForwarder; }
 
+#if OPENTHREAD_ENABLE_BORDER_ROUTER || OPENTHREAD_ENABLE_SERVICE
     /**
      * This method returns a reference to the network data local object.
      *
@@ -265,6 +261,7 @@ public:
      *
      */
     NetworkData::Local &GetNetworkDataLocal(void) { return mNetworkDataLocal; }
+#endif // OPENTHREAD_ENABLE_BORDER_ROUTER || OPENTHREAD_ENABLE_SERVICE
 
     /**
      * This method returns a reference to the network data leader object.
@@ -314,7 +311,7 @@ public:
      *
      */
     AddressResolver &GetAddressResolver(void) { return mAddressResolver; }
-#endif  // OPENTHREAD_FTD
+#endif // OPENTHREAD_FTD
 
     /**
      * This method returns a reference to the announce begin server object.
@@ -324,15 +321,24 @@ public:
      */
     AnnounceBeginServer &GetAnnounceBeginServer(void) { return mAnnounceBegin; }
 
+#if OPENTHREAD_ENABLE_BORDER_AGENT
+    /**
+     * This method returns a reference to the border agent object.
+     *
+     * @returns A reference to the border agent object.
+     *
+     */
+    MeshCoP::BorderAgent &GetBorderAgent(void) { return mBorderAgent; }
+#endif
 #if OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
     /**
      * This method returns a reference to the commissioner object.
      *
-     * @returns A reference to the commissioenr object.
+     * @returns A reference to the commissioner object.
      *
      */
     MeshCoP::Commissioner &GetCommissioner(void) { return mCommissioner; }
-#endif  // OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
+#endif // OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
 
 #if OPENTHREAD_ENABLE_DTLS
     /**
@@ -350,7 +356,7 @@ public:
      *
      */
     Coap::CoapSecure &GetCoapSecure(void) { return mCoapSecure; }
-#endif  // OPENTHREAD_ENABLE_DTLS
+#endif // OPENTHREAD_ENABLE_DTLS
 
 #if OPENTHREAD_ENABLE_JOINER
     /**
@@ -360,7 +366,7 @@ public:
      *
      */
     MeshCoP::Joiner &GetJoiner(void) { return mJoiner; }
-#endif  // OPENTHREAD_ENABLE_JOINER
+#endif // OPENTHREAD_ENABLE_JOINER
 
 #if OPENTHREAD_ENABLE_JAM_DETECTION
     /**
@@ -372,16 +378,6 @@ public:
     Utils::JamDetector &GetJamDetector(void) { return mJamDetector; }
 #endif // OPENTHREAD_ENABLE_JAM_DETECTION
 
-#if OPENTHREAD_ENABLE_BORDER_AGENT_PROXY && OPENTHREAD_FTD
-    /**
-     * This method returns the border agent proxy object.
-     *
-     * @returns Reference to the border agent proxy object.
-     *
-     */
-    MeshCoP::BorderAgentProxy &GetBorderAgentProxy(void) { return mBorderAgentProxy; }
-#endif // OPENTHREAD_ENABLE_BORDER_AGENT_PROXY && OPENTHREAD_FTD
-
     /**
      * This method returns a reference to the child supervisor object.
      *
@@ -391,20 +387,57 @@ public:
     Utils::ChildSupervisor &GetChildSupervisor(void) { return mChildSupervisor; }
 
     /**
-      * This method returns a reference to the supervision listener object.
-      *
-      * @returns A reference to the supervision listener object.
-      *
-      */
+     * This method returns a reference to the supervision listener object.
+     *
+     * @returns A reference to the supervision listener object.
+     *
+     */
     Utils::SupervisionListener &GetSupervisionListener(void) { return mSupervisionListener; }
 
     /**
-     * This method returns the pointer to the parent otInstance structure.
+     * This method returns a reference to the energy scan server object.
      *
-     * @returns The pointer to the parent otInstance structure.
+     * @returns A reference to the energy scan server object.
      *
      */
-    otInstance *GetInstance(void);
+    EnergyScanServer &GetEnergyScanServer(void) { return mEnergyScan; }
+
+    /**
+     * This method returns a reference to the PAN ID query server object.
+     *
+     * @returns A reference to the PAN ID query server object.
+     *
+     */
+    PanIdQueryServer &GetPanIdQueryServer(void) { return mPanIdQuery; }
+
+#if OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+    /**
+     * This method returns a reference to the Time Synchronization Service object.
+     *
+     * @returns A reference to the Time Synchronization Service object.
+     *
+     */
+    TimeSync &GetTimeSync(void) { return mTimeSync; }
+#endif
+
+#if OPENTHREAD_ENABLE_SNTP_CLIENT
+    /**
+     * This method returns a reference to the SNTP client object.
+     *
+     * @returns A reference to the SNTP client object.
+     *
+     */
+    Sntp::Client &GetSntpClient(void) { return mSntpClient; }
+#endif // OPENTHREAD_ENABLE_SNTP_CLIENT
+
+    /**
+     * This method returns whether Thread Management Framework Addressing Rules are met.
+     *
+     * @retval TRUE   if Thread Management Framework Addressing Rules are met.
+     * @retval FALSE  if Thread Management Framework Addressing Rules are not met.
+     *
+     */
+    bool IsTmfMessage(const Ip6::MessageInfo &aMessageInfo);
 
 private:
     static otError TmfFilter(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo, void *aContext);
@@ -412,79 +445,73 @@ private:
     Coap::Coap mCoap;
 #if OPENTHREAD_ENABLE_DHCP6_CLIENT
     Dhcp6::Dhcp6Client mDhcp6Client;
-#endif  // OPENTHREAD_ENABLE_DHCP6_CLIENT
+#endif // OPENTHREAD_ENABLE_DHCP6_CLIENT
 #if OPENTHREAD_ENABLE_DHCP6_SERVER
     Dhcp6::Dhcp6Server mDhcp6Server;
-#endif  // OPENTHREAD_ENABLE_DHCP6_SERVER
+#endif // OPENTHREAD_ENABLE_DHCP6_SERVER
 #if OPENTHREAD_ENABLE_DNS_CLIENT
     Dns::Client mDnsClient;
-#endif  // OPENTHREAD_ENABLE_DNS_CLIENT
-    MeshCoP::ActiveDataset mActiveDataset;
+#endif // OPENTHREAD_ENABLE_DNS_CLIENT
+#if OPENTHREAD_ENABLE_SNTP_CLIENT
+    Sntp::Client mSntpClient;
+#endif // OPENTHREAD_ENABLE_SNTP_CLIENT
+    MeshCoP::ActiveDataset  mActiveDataset;
     MeshCoP::PendingDataset mPendingDataset;
-    Ip6::Filter mIp6Filter;
-    KeyManager mKeyManager;
-    Lowpan::Lowpan mLowpan;
-    Mac::Mac mMac;
-    MeshForwarder mMeshForwarder;
-    Mle::MleRouter mMleRouter;
+    Ip6::Filter             mIp6Filter;
+    KeyManager              mKeyManager;
+    Lowpan::Lowpan          mLowpan;
+    Mac::Mac                mMac;
+    MeshForwarder           mMeshForwarder;
+    Mle::MleRouter          mMleRouter;
+#if OPENTHREAD_ENABLE_BORDER_ROUTER || OPENTHREAD_ENABLE_SERVICE
     NetworkData::Local mNetworkDataLocal;
+#endif // OPENTHREAD_ENABLE_BORDER_ROUTER || OPENTHREAD_ENABLE_SERVICE
     NetworkData::Leader mNetworkDataLeader;
 #if OPENTHREAD_FTD || OPENTHREAD_ENABLE_MTD_NETWORK_DIAGNOSTIC
     NetworkDiagnostic::NetworkDiagnostic mNetworkDiagnostic;
 #endif // OPENTHREAD_FTD || OPENTHREAD_ENABLE_MTD_NETWORK_DIAGNOSTIC
     bool mIsUp;
 
+#if OPENTHREAD_ENABLE_BORDER_AGENT
+    MeshCoP::BorderAgent mBorderAgent;
+#endif
 #if OPENTHREAD_ENABLE_COMMISSIONER && OPENTHREAD_FTD
     MeshCoP::Commissioner mCommissioner;
-#endif  // OPENTHREAD_ENABLE_COMMISSIONER
+#endif // OPENTHREAD_ENABLE_COMMISSIONER
 
 #if OPENTHREAD_ENABLE_DTLS
-    MeshCoP::Dtls mDtls;
+    MeshCoP::Dtls    mDtls;
     Coap::CoapSecure mCoapSecure;
-#endif// OPENTHREAD_ENABLE_DTLS
+#endif // OPENTHREAD_ENABLE_DTLS
 
 #if OPENTHREAD_ENABLE_JOINER
     MeshCoP::Joiner mJoiner;
-#endif  // OPENTHREAD_ENABLE_JOINER
+#endif // OPENTHREAD_ENABLE_JOINER
 
 #if OPENTHREAD_ENABLE_JAM_DETECTION
     Utils::JamDetector mJamDetector;
 #endif // OPENTHREAD_ENABLE_JAM_DETECTION
 
-#if OPENTHREAD_ENABLE_BORDER_AGENT_PROXY && OPENTHREAD_FTD
-    MeshCoP::BorderAgentProxy mBorderAgentProxy;
-#endif // OPENTHREAD_ENABLE_BORDER_AGENT_PROXY && OPENTHREAD_FTD
-
 #if OPENTHREAD_FTD
     MeshCoP::JoinerRouter mJoinerRouter;
-    MeshCoP::Leader mLeader;
-    AddressResolver mAddressResolver;
-#endif  // OPENTHREAD_FTD
+    MeshCoP::Leader       mLeader;
+    AddressResolver       mAddressResolver;
+#endif // OPENTHREAD_FTD
 
-    Utils::ChildSupervisor mChildSupervisor;
+    Utils::ChildSupervisor     mChildSupervisor;
     Utils::SupervisionListener mSupervisionListener;
-    AnnounceBeginServer mAnnounceBegin;
-    PanIdQueryServer mPanIdQuery;
-    EnergyScanServer mEnergyScan;
-};
-
-/**
- * This structure represents Thread-specific link information.
- *
- */
-struct ThreadMessageInfo
-{
-    uint16_t mPanId;         ///< Source PAN ID
-    uint8_t  mChannel;       ///< 802.15.4 Channel
-    int8_t   mRss;           ///< Received Signal Strength in dBm.
-    uint8_t  mLqi;           ///< Link Quality Indicator for a received message.
-    bool     mLinkSecurity;  ///< Indicates whether or not link security is enabled.
+    AnnounceBeginServer        mAnnounceBegin;
+    PanIdQueryServer           mPanIdQuery;
+    EnergyScanServer           mEnergyScan;
+#if OPENTHREAD_CONFIG_ENABLE_TIME_SYNC
+    TimeSync mTimeSync;
+#endif
 };
 
 /**
  * @}
  */
 
-}  // namespace ot
+} // namespace ot
 
-#endif  // THREAD_NETIF_HPP_
+#endif // THREAD_NETIF_HPP_

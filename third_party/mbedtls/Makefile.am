@@ -41,26 +41,10 @@ libmbedcrypto_a_CPPFLAGS                      = \
     $(NULL)
 
 libmbedcrypto_a_SOURCES                       = \
-    hardware_entropy.c                          \
-    repo/library/md.c                           \
-    repo/library/md_wrap.c                      \
-    repo/library/memory_buffer_alloc.c          \
-    repo/library/platform.c                     \
-    repo/library/sha256.c                       \
-    $(NULL)
-
-if OPENTHREAD_EXAMPLES_EFR32
-nodist_libmbedcrypto_a_SOURCES                = \
-    @top_builddir@/third_party/silabs/gecko_sdk_suite/v1.0/util/third_party/mbedtls/sl_crypto/src/sl_aes.c \
-    $(NULL)
-else
-libmbedcrypto_a_SOURCES                      += \
     repo/library/aes.c                          \
-    $(NULL)
-endif  # OPENTHREAD_EXAMPLES_EFR32
-
-if OPENTHREAD_ENABLE_DTLS
-libmbedcrypto_a_SOURCES                      += \
+    repo/library/asn1parse.c                    \
+    repo/library/asn1write.c                    \
+    repo/library/base64.c                       \
     repo/library/bignum.c                       \
     repo/library/ccm.c                          \
     repo/library/cipher.c                       \
@@ -68,55 +52,38 @@ libmbedcrypto_a_SOURCES                      += \
     repo/library/cmac.c                         \
     repo/library/ctr_drbg.c                     \
     repo/library/debug.c                        \
+    repo/library/ecdh.c                         \
+    repo/library/ecdsa.c                        \
     repo/library/ecjpake.c                      \
     repo/library/ecp_curves.c                   \
     repo/library/entropy.c                      \
     repo/library/entropy_poll.c                 \
+    repo/library/md.c                           \
+    repo/library/md_wrap.c                      \
+    repo/library/memory_buffer_alloc.c          \
+    repo/library/oid.c                          \
+    repo/library/pem.c                          \
+    repo/library/pk.c                           \
+    repo/library/pk_wrap.c                      \
+    repo/library/pkparse.c                      \
+    repo/library/platform.c                     \
+    repo/library/platform_util.c                \
+    repo/library/sha256.c                       \
     repo/library/ssl_cookie.c                   \
     repo/library/ssl_ciphersuites.c             \
     repo/library/ssl_cli.c                      \
     repo/library/ssl_srv.c                      \
     repo/library/ssl_ticket.c                   \
     repo/library/ssl_tls.c                      \
+    repo/library/x509.c                         \
+    repo/library/x509_crt.c                     \
     $(NULL)
 
-if OPENTHREAD_EXAMPLES_EFR32
-nodist_libmbedcrypto_a_SOURCES               += \
-    @top_builddir@/third_party/silabs/gecko_sdk_suite/v1.0/util/third_party/mbedtls/library/ecp.c \
-    @top_builddir@/third_party/silabs/gecko_sdk_suite/v1.0/util/third_party/mbedtls/sl_crypto/src/sl_ecp.c \
-    $(NULL)
-else
+if !OPENTHREAD_EXAMPLES_EFR32
 libmbedcrypto_a_SOURCES                      += \
     repo/library/ecp.c                          \
     $(NULL)
-endif  # OPENTHREAD_EXAMPLES_EFR32
-
-#
-# mbedtls patches
-#
-
-MBEDTLS_ABS_SRCDIR                           := $(abspath $(top_srcdir)/third_party/mbedtls)
-
-EXTRA_DIST                                                         += \
-    patch/0001-Fix-commissioning-problem-with-retransmissions.patch   \
-    $(NULL)
-
-repo/library/libmbedcrypto_a-ssl_tls.$(OBJEXT): $(MBEDTLS_SRCDIR)/library/ssl_tls.c.patched
-
-$(MBEDTLS_SRCDIR)/library/ssl_tls.c.patched: $(MBEDTLS_ABS_SRCDIR)/patch/0001-Fix-commissioning-problem-with-retransmissions.patch
-	chmod u+w $(MBEDTLS_ABS_SRCDIR)/repo/library/
-	chmod u+w $(MBEDTLS_ABS_SRCDIR)/repo/library/ssl_tls.c
-	if [ -e $@ ]; then patch -R $(MBEDTLS_ABS_SRCDIR)/repo/library/ssl_tls.c $@; fi
-	patch $(MBEDTLS_ABS_SRCDIR)/repo/library/ssl_tls.c $<
-	cp $(MBEDTLS_ABS_SRCDIR)/patch/0001-Fix-commissioning-problem-with-retransmissions.patch $@
-
-all-local: libmbedcrypto.a
-	if [ -e $(MBEDTLS_SRCDIR)/library/ssl_tls.c.patched ]; then patch -R $(MBEDTLS_ABS_SRCDIR)/repo/library/ssl_tls.c $(MBEDTLS_ABS_SRCDIR)/patch/0001-Fix-commissioning-problem-with-retransmissions.patch; rm -f $(MBEDTLS_SRCDIR)/library/ssl_tls.c.patched; fi
-
-clean-local:
-	if [ -e $(MBEDTLS_SRCDIR)/library/ssl_tls.c.patched ]; then patch -R $(MBEDTLS_ABS_SRCDIR)/repo/library/ssl_tls.c $(MBEDTLS_ABS_SRCDIR)/patch/0001-Fix-commissioning-problem-with-retransmissions.patch; rm -f $(MBEDTLS_SRCDIR)/library/ssl_tls.c.patched; fi
-
-endif  # OPENTHREAD_ENABLE_DTLS
+endif
 
 if OPENTHREAD_BUILD_COVERAGE
 Dash                                          = -

@@ -34,8 +34,9 @@
  *   This file includes definitions for manipulating IPv6 routing tables.
  */
 
-#include <openthread/types.h>
+#include "openthread-core-config.h"
 
+#include "common/locator.hpp"
 #include "common/message.hpp"
 #include "net/ip6_address.hpp"
 #include "net/ip6_routes.hpp"
@@ -58,26 +59,26 @@ class Ip6;
  */
 struct Route
 {
-    Address       mPrefix;        ///< The IPv6 prefix.
-    uint8_t       mPrefixLength;  ///< The IPv6 prefix length.
-    int8_t        mInterfaceId;   ///< The interface identifier.
-    struct Route *mNext;          ///< A pointer to the next IPv6 route.
+    Address       mPrefix;       ///< The IPv6 prefix.
+    uint8_t       mPrefixLength; ///< The IPv6 prefix length.
+    int8_t        mInterfaceId;  ///< The interface identifier.
+    struct Route *mNext;         ///< A pointer to the next IPv6 route.
 };
 
 /**
  * This class implements IPv6 route management.
  *
  */
-class Routes
+class Routes : public InstanceLocator
 {
 public:
     /**
      * This constructor initializes the object.
      *
-     * @param[in]  aIp6  A reference to the IPv6 network object.
+     * @param[in]  aInstance  A reference to the OpenThread instance.
      *
      */
-    Routes(Ip6 &aIp6);
+    explicit Routes(Instance &aInstance);
 
     /**
      * This method adds an IPv6 route.
@@ -114,7 +115,6 @@ public:
 
 private:
     Route *mRoutes;
-    Ip6 &mIp6;
 };
 
 /**
@@ -122,7 +122,7 @@ private:
  *
  */
 
-}  // namespace Ip6
-}  // namespace ot
+} // namespace Ip6
+} // namespace ot
 
-#endif  // NET_IP6_ROUTES_HPP_
+#endif // NET_IP6_ROUTES_HPP_

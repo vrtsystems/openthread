@@ -28,7 +28,11 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
-lib_LIBRARIES                       = libopenthread-cc2650.a
+lib_LIBRARIES                                         = libopenthread-cc2650.a
+
+# Do not enable -pedantic-errors for cc26xx driverlib
+override CFLAGS                                      := $(filter-out -pedantic-errors,$(CFLAGS))
+override CXXFLAGS                                    := $(filter-out -pedantic-errors,$(CXXFLAGS))
 
 libopenthread_cc2650_a_CPPFLAGS                       = \
     -I$(top_srcdir)/include                             \
@@ -36,37 +40,43 @@ libopenthread_cc2650_a_CPPFLAGS                       = \
     -I$(top_srcdir)/src/core                            \
     -I$(top_srcdir)/examples/platforms                  \
     -I$(top_srcdir)/examples/platforms/cc2650           \
-    -I$(top_srcdir)/third_party/ti/cc26xxware           \
+    -I$(top_srcdir)/third_party/ti/devices/cc26x0       \
     -I$(top_srcdir)/third_party/mbedtls/repo/include    \
     $(MBEDTLS_CPPFLAGS)                                 \
     $(NULL)
 
-libopenthread_cc2650_a_SOURCES                        = \
+PLATFORM_SOURCES                                      = \
     alarm.c                                             \
+    diag.c                                              \
     flash.c                                             \
     misc.c                                              \
-    platform.c                                          \
+    logging.c                                           \
     radio.c                                             \
     random.c                                            \
+    system.c                                            \
     uart.c                                              \
     crypto/sha256_alt.c                                 \
     crypto/aes_alt.c                                    \
+    cxx_helpers.c                                       \
     cc2650_ccfg.c                                       \
     cc2650_startup.c                                    \
     $(NULL)
 
-libopenthread_cc2650_a_DEPENDENCIES =                                     \
-    $(top_srcdir)/third_party/ti/cc26xxware/driverlib/bin/gcc/driverlib.a \
-    $(NULL)
+libopenthread_cc2650_a_SOURCES                        = \
+   $(PLATFORM_SOURCES)                                  \
+   $(NULL)
 
-if OPENTHREAD_ENABLE_DIAG
-libopenthread_cc2650_a_SOURCES                       += \
-    diag.c                                              \
+libopenthread_cc2650_a_DEPENDENCIES                   =                       \
+    $(top_srcdir)/third_party/ti/devices/cc26x0/driverlib/bin/gcc/driverlib.a \
     $(NULL)
-endif
 
 noinst_HEADERS                                        = \
     platform-cc2650.h                                   \
+    $(NULL)
+
+PRETTY_FILES                                          = \
+    $(PLATFORM_SOURCES)                                 \
+    $(noinst_HEADERS)                                   \
     $(NULL)
 
 Dash                                                  = -

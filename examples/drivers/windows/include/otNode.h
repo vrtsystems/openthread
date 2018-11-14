@@ -29,13 +29,11 @@
 /**
  * @file
  * @brief
- *  This file defines a node interface for openthread.h to be used for certification tests
+ *  This file defines a node interface for openthread to be used for certification tests
  */
 
 #ifndef OTNODE_H_
 #define OTNODE_H_
-
-#include <openthread/openthread.h>
 
 #ifndef OTNODEAPI
 #define OTNODEAPI __declspec(dllimport)
@@ -146,9 +144,14 @@ OTNODEAPI uint16_t OTCALL otNodeGetAddr16(otNode* aNode);
 OTNODEAPI const char* OTCALL otNodeGetAddr64(otNode* aNode);
 
 /**
- * Gets the node's hash mac address
+ * Gets the node's eui-64 address
  */
-OTNODEAPI const char* OTCALL otNodeGetHashMacAddress(otNode* aNode);
+OTNODEAPI const char* OTCALL otNodeGetEui64(otNode* aNode);
+
+/**
+ * Gets the node's joiner id
+ */
+OTNODEAPI const char* OTCALL otNodeGetJoinerId(otNode* aNode);
 
 /**
  * Sets the channel for the node

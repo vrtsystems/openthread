@@ -45,10 +45,27 @@ extern uint8_t _init_array;
 extern uint8_t _einit_array;
 
 __extension__ typedef int __guard __attribute__((mode(__DI__)));
-int __cxa_guard_acquire(__guard *g) { return !*(char *)(g); }
-void __cxa_guard_release(__guard *g) { *(char *)g = 1; }
-void __cxa_guard_abort(__guard *g) { (void)g; }
-void __cxa_pure_virtual(void) { while (1); }
+
+int __cxa_guard_acquire(__guard *g)
+{
+    return !*(char *)(g);
+}
+
+void __cxa_guard_release(__guard *g)
+{
+    *(char *)g = 1;
+}
+
+void __cxa_guard_abort(__guard *g)
+{
+    (void)g;
+}
+
+void __cxa_pure_virtual(void)
+{
+    while (1)
+        ;
+}
 
 void IntDefaultHandler(void);
 void ResetHandler(void);
@@ -61,88 +78,191 @@ extern void main(void);
 
 static uint64_t stack[512] __attribute__((section(".stack")));
 
-__attribute__((section(".vectors"), used))
-void (*const vectors[])(void) =
-{
-    (void (*)(void))((unsigned long)stack + sizeof(stack)),   // Initial Stack Pointer
-    ResetHandler,                           // 1 The reset handler
-    ResetHandler,                       // 2 The NMI handler
-    IntDefaultHandler,                     // 3 The hard fault handler
-    IntDefaultHandler,                      // 4 The MPU fault handler
-    IntDefaultHandler,                      // 5 The bus fault handler
-    IntDefaultHandler,                      // 6 The usage fault handler
-    0,                                      // 7 Reserved
-    0,                                      // 8 Reserved
-    0,                                      // 9 Reserved
-    0,                                      // 10 Reserved
-    IntDefaultHandler,                      // 11 SVCall handler
-    IntDefaultHandler,                      // 12 Debug monitor handler
-    0,                                      // 13 Reserved
-    IntDefaultHandler,                      // 14 The PendSV handler
-    SysTick_Handler,                        // 15 The SysTick handler
-    IntDefaultHandler,                      // 16 GPIO Port A
-    IntDefaultHandler,                      // 17 GPIO Port B
-    IntDefaultHandler,                      // 18 GPIO Port C
-    IntDefaultHandler,                      // 19 GPIO Port D
-    0,                                      // 20 none
-    UART0IntHandler,                        // 21 UART0 Rx and Tx
-    IntDefaultHandler,                      // 22 UART1 Rx and Tx
-    IntDefaultHandler,                      // 23 SSI0 Rx and Tx
-    IntDefaultHandler,                      // 24 I2C Master and Slave
-    0,                                      // 25 Reserved
-    0,                                      // 26 Reserved
-    0,                                      // 27 Reserved
-    0,                                      // 28 Reserved
-    0,                                      // 29 Reserved
-    IntDefaultHandler,                      // 30 ADC Sequence 0
-    0,                                      // 31 Reserved
-    0,                                      // 32 Reserved
-    0,                                      // 33 Reserved
-    IntDefaultHandler,                      // 34 Watchdog timer, timer 0
-    IntDefaultHandler,                      // 35 Timer 0 subtimer A
-    IntDefaultHandler,                      // 36 Timer 0 subtimer B
-    IntDefaultHandler,                      // 37 Timer 1 subtimer A
-    IntDefaultHandler,                      // 38 Timer 1 subtimer B
-    IntDefaultHandler,                      // 39 Timer 2 subtimer A
-    IntDefaultHandler,                      // 40 Timer 2 subtimer B
-    IntDefaultHandler,                      // 41 Analog Comparator 0
-    RFCoreRxTxIntHandler,                   // 42 RFCore Rx/Tx
-    RFCoreErrIntHandler,                    // 43 RFCore Error
-    IntDefaultHandler,                      // 44 IcePick
-    IntDefaultHandler,                      // 45 FLASH Control
-    IntDefaultHandler,                      // 46 AES
-    IntDefaultHandler,                      // 47 PKA
-    IntDefaultHandler,                      // 48 Sleep Timer
-    IntDefaultHandler,                      // 49 MacTimer
-    IntDefaultHandler,                      // 50 SSI1 Rx and Tx
-    IntDefaultHandler,                      // 51 Timer 3 subtimer A
-    IntDefaultHandler,                      // 52 Timer 3 subtimer B
-    0,                                      // 53 Reserved
-    0,                                      // 54 Reserved
-    0,                                      // 55 Reserved
-    0,                                      // 56 Reserved
-    0,                                      // 57 Reserved
-    0,                                      // 58 Reserved
-    0,                                      // 59 Reserved
-    IntDefaultHandler,                      // 60 USB 2538
-    0,                                      // 61 Reserved
-    IntDefaultHandler,                      // 62 uDMA
-    IntDefaultHandler,                      // 63 uDMA Error
+__attribute__((section(".vectors"), used)) void (*const vectors[])(void) = {
+    (void (*)(void))((unsigned long)stack + sizeof(stack)), // Initial Stack Pointer
+    ResetHandler,                                           // 1 The reset handler
+    ResetHandler,                                           // 2 The NMI handler
+    IntDefaultHandler,                                      // 3 The hard fault handler
+    IntDefaultHandler,                                      // 4 The MPU fault handler
+    IntDefaultHandler,                                      // 5 The bus fault handler
+    IntDefaultHandler,                                      // 6 The usage fault handler
+    0,                                                      // 7 Reserved
+    0,                                                      // 8 Reserved
+    0,                                                      // 9 Reserved
+    0,                                                      // 10 Reserved
+    IntDefaultHandler,                                      // 11 SVCall handler
+    IntDefaultHandler,                                      // 12 Debug monitor handler
+    0,                                                      // 13 Reserved
+    IntDefaultHandler,                                      // 14 The PendSV handler
+    SysTick_Handler,                                        // 15 The SysTick handler
+    IntDefaultHandler,                                      // 16 GPIO Port A
+    IntDefaultHandler,                                      // 17 GPIO Port B
+    IntDefaultHandler,                                      // 18 GPIO Port C
+    IntDefaultHandler,                                      // 19 GPIO Port D
+    0,                                                      // 20 none
+    UART0IntHandler,                                        // 21 UART0 Rx and Tx
+    IntDefaultHandler,                                      // 22 UART1 Rx and Tx
+    IntDefaultHandler,                                      // 23 SSI0 Rx and Tx
+    IntDefaultHandler,                                      // 24 I2C Master and Slave
+    0,                                                      // 25 Reserved
+    0,                                                      // 26 Reserved
+    0,                                                      // 27 Reserved
+    0,                                                      // 28 Reserved
+    0,                                                      // 29 Reserved
+    IntDefaultHandler,                                      // 30 ADC Sequence 0
+    0,                                                      // 31 Reserved
+    0,                                                      // 32 Reserved
+    0,                                                      // 33 Reserved
+    IntDefaultHandler,                                      // 34 Watchdog timer, timer 0
+    IntDefaultHandler,                                      // 35 Timer 0 subtimer A
+    IntDefaultHandler,                                      // 36 Timer 0 subtimer B
+    IntDefaultHandler,                                      // 37 Timer 1 subtimer A
+    IntDefaultHandler,                                      // 38 Timer 1 subtimer B
+    IntDefaultHandler,                                      // 39 Timer 2 subtimer A
+    IntDefaultHandler,                                      // 40 Timer 2 subtimer B
+    IntDefaultHandler,                                      // 41 Analog Comparator 0
+    RFCoreRxTxIntHandler,                                   // 42 RFCore Rx/Tx
+    RFCoreErrIntHandler,                                    // 43 RFCore Error
+    IntDefaultHandler,                                      // 44 IcePick
+    IntDefaultHandler,                                      // 45 FLASH Control
+    IntDefaultHandler,                                      // 46 AES
+    IntDefaultHandler,                                      // 47 PKA
+    IntDefaultHandler,                                      // 48 Sleep Timer
+    IntDefaultHandler,                                      // 49 MacTimer
+    IntDefaultHandler,                                      // 50 SSI1 Rx and Tx
+    IntDefaultHandler,                                      // 51 Timer 3 subtimer A
+    IntDefaultHandler,                                      // 52 Timer 3 subtimer B
+    0,                                                      // 53 Reserved
+    0,                                                      // 54 Reserved
+    0,                                                      // 55 Reserved
+    0,                                                      // 56 Reserved
+    0,                                                      // 57 Reserved
+    0,                                                      // 58 Reserved
+    0,                                                      // 59 Reserved
+    IntDefaultHandler,                                      // 60 USB 2538
+    0,                                                      // 61 Reserved
+    IntDefaultHandler,                                      // 62 uDMA
+    IntDefaultHandler,                                      // 63 uDMA Error
+    0,                                      // 64 Reserved
+    0,                                      // 65 Reserved
+    0,                                      // 66 Reserved
+    0,                                      // 67 Reserved
+    0,                                      // 68 Reserved
+    0,                                      // 69 Reserved
+    0,                                      // 70 Reserved
+    0,                                      // 71 Reserved
+    0,                                      // 72 Reserved
+    0,                                      // 73 Reserved
+    0,                                      // 74 Reserved
+    0,                                      // 75 Reserved
+    0,                                      // 76 Reserved
+    0,                                      // 77 Reserved
+    0,                                      // 78 Reserved
+    0,                                      // 79 Reserved
+    0,                                      // 80 Reserved
+    0,                                      // 81 Reserved
+    0,                                      // 82 Reserved
+    0,                                      // 83 Reserved
+    0,                                      // 84 Reserved
+    0,                                      // 85 Reserved
+    0,                                      // 86 Reserved
+    0,                                      // 87 Reserved
+    0,                                      // 88 Reserved
+    0,                                      // 89 Reserved
+    0,                                      // 90 Reserved
+    0,                                      // 91 Reserved
+    0,                                      // 92 Reserved
+    0,                                      // 93 Reserved
+    0,                                      // 94 Reserved
+    0,                                      // 95 Reserved
+    0,                                      // 96 Reserved
+    0,                                      // 97 Reserved
+    0,                                      // 98 Reserved
+    0,                                      // 99 Reserved
+    0,                                      // 100 Reserved
+    0,                                      // 101 Reserved
+    0,                                      // 102 Reserved
+    0,                                      // 103 Reserved
+    0,                                      // 104 Reserved
+    0,                                      // 105 Reserved
+    0,                                      // 106 Reserved
+    0,                                      // 107 Reserved
+    0,                                      // 108 Reserved
+    0,                                      // 109 Reserved
+    0,                                      // 110 Reserved
+    0,                                      // 111 Reserved
+    0,                                      // 112 Reserved
+    0,                                      // 113 Reserved
+    0,                                      // 114 Reserved
+    0,                                      // 115 Reserved
+    0,                                      // 116 Reserved
+    0,                                      // 117 Reserved
+    0,                                      // 118 Reserved
+    0,                                      // 119 Reserved
+    0,                                      // 120 Reserved
+    0,                                      // 121 Reserved
+    0,                                      // 122 Reserved
+    0,                                      // 123 Reserved
+    0,                                      // 124 Reserved
+    0,                                      // 125 Reserved
+    0,                                      // 126 Reserved
+    0,                                      // 127 Reserved
+    0,                                      // 128 Reserved
+    0,                                      // 129 Reserved
+    0,                                      // 130 Reserved
+    0,                                      // 131 Reserved
+    0,                                      // 132 Reserved
+    0,                                      // 133 Reserved
+    0,                                      // 134 Reserved
+    0,                                      // 135 Reserved
+    0,                                      // 136 Reserved
+    0,                                      // 137 Reserved
+    0,                                      // 138 Reserved
+    0,                                      // 139 Reserved
+    0,                                      // 140 Reserved
+    0,                                      // 141 Reserved
+    0,                                      // 142 Reserved
+    0,                                      // 143 Reserved
+    0,                                      // 144 Reserved
+    0,                                      // 145 Reserved
+    0,                                      // 146 Reserved
+    0,                                      // 147 Reserved
+    0,                                      // 148 Reserved
+    0,                                      // 149 Reserved
+    0,                                      // 150 Reserved
+    0,                                      // 151 Reserved
+    0,                                      // 152 Reserved
+    0,                                      // 153 Reserved
+    0,                                      // 154 Reserved
+    0,                                      // 155 Reserved
+    0,                                      // 156 USB
+    RFCoreRxTxIntHandler,                   // 157 RF Core Rx/Tx
+    RFCoreErrIntHandler,                    // 158 RF Core Error
+    0,                                      // 159 AES
+    0,                                      // 160 PKA
+    0,                                      // 161 SM Timer
+    0,                                      // 162 MAC Timer
+    0,                                      // 163 Reserved
 };
 
 void IntDefaultHandler(void)
 {
-    while (1);
+    while (1)
+        ;
 }
 
-#define FLASH_CCA_BOOTLDR_CFG_DISABLE           0xEFFFFFFF ///< Disable backdoor function
-#define FLASH_CCA_BOOTLDR_CFG_ENABLE            0xF0FFFFFF ///< Enable backdoor function
-#define FLASH_CCA_BOOTLDR_CFG_ACTIVE_HIGH       0x08000000 ///< Selected pin on pad A active high
-#define FLASH_CCA_BOOTLDR_CFG_PORT_A_PIN_M      0x07000000 ///< Selected pin on pad A mask
-#define FLASH_CCA_BOOTLDR_CFG_PORT_A_PIN_S      24         ///< Selected pin on pad A shift
-#define FLASH_CCA_IMAGE_VALID                   0x00000000 ///< Indicates valid image in flash
+// clang-format off
+
+#define FLASH_CCA_BOOTLDR_CFG_DISABLE               0xEFFFFFFF ///< Disable backdoor function
+#define FLASH_CCA_BOOTLDR_CFG_ENABLE                0xF0FFFFFF ///< Enable backdoor function
+#define FLASH_CCA_BOOTLDR_CFG_ACTIVE_HIGH           0x08000000 ///< Selected pin on pad A active high
+#define FLASH_CCA_BOOTLDR_CFG_PORT_A_PIN_M          0x07000000 ///< Selected pin on pad A mask
+#define FLASH_CCA_BOOTLDR_CFG_PORT_A_PIN_S          24         ///< Selected pin on pad A shift
+#define FLASH_CCA_IMAGE_VALID                       0x00000000 ///< Indicates valid image in flash
 
 #define FLASH_CCA_CONF_BOOTLDR_BACKDOOR_PORT_A_PIN  3      ///< Select Button on SmartRF06 Eval Board
+
+// clang-format on
 
 typedef struct
 {
@@ -152,19 +272,12 @@ typedef struct
     uint8_t  ui8lock[32];
 } flash_cca_lock_page_t;
 
-__attribute__((__section__(".flashcca"), used))
-const flash_cca_lock_page_t flash_cca_lock_page =
-{
+__attribute__((__section__(".flashcca"), used)) const flash_cca_lock_page_t flash_cca_lock_page = {
     FLASH_CCA_BOOTLDR_CFG_ENABLE | (FLASH_CCA_CONF_BOOTLDR_BACKDOOR_PORT_A_PIN << FLASH_CCA_BOOTLDR_CFG_PORT_A_PIN_S),
     FLASH_CCA_IMAGE_VALID,
-    (uint32_t) &vectors,
-    {
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-    }
-};
+    (uint32_t)&vectors,
+    {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
 
 typedef void (*init_fn_t)(void);
 
@@ -197,5 +310,6 @@ void ResetHandler(void)
     main();
 
     // end here if main() returns
-    while (1);
+    while (1)
+        ;
 }

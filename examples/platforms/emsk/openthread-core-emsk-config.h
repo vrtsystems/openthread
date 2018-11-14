@@ -34,36 +34,53 @@
 #ifndef OPENTHREAD_CORE_EMSK_CONFIG_H_
 #define OPENTHREAD_CORE_EMSK_CONFIG_H_
 
- /**
-  * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
-  *
-  * Define to 1 if you want to enable software ACK timeout logic.
-  *
-  */
-#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT           0
-
- /**
-  * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
-  *
-  * Define to 1 if you want to enable software retransmission logic.
-  *
-  */
-#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT            0
-
- /**
-  * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
-  *
-  * Define to 1 if you want to enable software energy scanning logic.
-  *
-  */
-#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN           0
+/**
+ * @def OPENTHREAD_CONFIG_LOG_OUTPUT
+ *
+ * The emsk platform provides an otPlatLog() function.
+ */
+#ifndef OPENTHREAD_CONFIG_LOG_OUTPUT /* allow command line override */
+#define OPENTHREAD_CONFIG_LOG_OUTPUT  OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED
+#endif
 
 /**
-  * @def OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE
-  *
-  * Define to 1 if you want use legacy transmit done.
-  *
-  */
-#define OPENTHREAD_CONFIG_LEGACY_TRANSMIT_DONE 1
+ * @def OPENTHREAD_CONFIG_PLATFORM_INFO
+ *
+ * The platform-specific string to insert into the OpenThread version string.
+ *
+ */
+#define OPENTHREAD_CONFIG_PLATFORM_INFO                         "EMSK"
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT
+ *
+ * Define to 1 if you want to enable software ACK timeout logic.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ACK_TIMEOUT           0
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT
+ *
+ * Define to 1 if you want to enable software retransmission logic.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_RETRANSMIT            0
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF
+ *
+ * Define to 1 if you want to enable software CSMA-CA backoff logic.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_CSMA_BACKOFF          0
+
+/**
+ * @def OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN
+ *
+ * Define to 1 if you want to enable software energy scanning logic.
+ *
+ */
+#define OPENTHREAD_CONFIG_ENABLE_SOFTWARE_ENERGY_SCAN           0
 
 #endif  // OPENTHREAD_CORE_EMSK_CONFIG_H_

@@ -13,9 +13,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\third_party\mbedtls\hardware_entropy.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\third_party\mbedtls\repo\library\aes.c">
       <Filter>Source Files\repo\library</Filter>
     </ClCompile>
@@ -65,6 +62,9 @@
       <Filter>Source Files\repo\library</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\mbedtls\repo\library\platform.c">
+      <Filter>Source Files\repo\library</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\mbedtls\repo\library\platform_util.c">
       <Filter>Source Files\repo\library</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\mbedtls\repo\library\sha256.c">

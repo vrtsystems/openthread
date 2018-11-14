@@ -8,13 +8,13 @@ OpenThread test scripts use the CLI to execute test cases.
 ## OpenThread Command List
 
 * [autostart](#autostart)
-* [blacklist](#blacklist)
 * [bufferinfo](#bufferinfo)
 * [channel](#channel)
 * [child](#child-list)
 * [childmax](#childmax)
 * [childtimeout](#childtimeout)
-* [coap](#coap-server-phase)
+* [coap](#coap-start)
+* [coaps](#coaps-start-checkpeercert)
 * [commissioner](#commissioner-start-provisioningurl)
 * [contextreusedelay](#contextreusedelay)
 * [counter](#counter)
@@ -27,25 +27,31 @@ OpenThread test scripts use the CLI to execute test cases.
 * [extaddr](#extaddr)
 * [extpanid](#extpanid)
 * [factoryreset](#factoryreset)
-* [hashmacaddr](#hashmacaddr)
 * [ifconfig](#ifconfig)
 * [ipaddr](#ipaddr)
 * [ipmaddr](#ipmaddr)
 * [joiner](#joiner-start-pskd-provisioningurl)
+* [joinerid](#joinerid)
 * [joinerport](#joinerport-port)
 * [keysequence](#keysequence-counter)
 * [leaderdata](#leaderdata)
 * [leaderpartitionid](#leaderpartitionid)
 * [leaderweight](#leaderweight)
 * [linkquality](#linkquality-extaddr)
+* [logfilename](#logfilename)
+* [macfilter](#macfilter)
 * [masterkey](#masterkey)
 * [mode](#mode)
+* [neighbor](#neighbor-list)
 * [netdataregister](#netdataregister)
+* [netdatashow](#netdatashow)
 * [networkdiagnostic](#networkdiagnostic-get-addr-type-)
 * [networkidtimeout](#networkidtimeout)
 * [networkname](#networkname)
+* [networktime](#networktime)
 * [panid](#panid)
 * [parent](#parent)
+* [parentpriority](#parentpriority)
 * [ping](#ping-ipaddr-size-count-interval)
 * [pollperiod](#pollperiod-pollperiod)
 * [prefix](#prefix-add-prefix-pvdcsr-prf)
@@ -59,32 +65,33 @@ OpenThread test scripts use the CLI to execute test cases.
 * [routerrole](#routerrole)
 * [routerselectionjitter](#routerselectionjitter)
 * [routerupgradethreshold](#routerupgradethreshold)
-* [scan](#scan-channel)
+* [scan](#scan)
 * [singleton](#singleton)
+* [sntp](#sntp-query-sntp-server-ip-sntp-server-port)
 * [state](#state)
 * [thread](#thread-start)
-* [txpowermax](#txpowermax)
+* [txpower](#txpower)
 * [version](#version)
-* [whitelist](#whitelist)
 * [diag](#diag)
+* [service](#service)
 
 ## OpenThread Command Details
 
-### autostart true
+### autostart enable
 
 Automatically start Thread on initialization.
 
 ```bash
-> autostart true
+> autostart enable
 Done
 ```
 
-### autostart false
+### autostart disable
 
 Don't automatically start Thread on initialization.
 
 ```bash
-> autostart false
+> autostart disable
 Done
 ```
 
@@ -94,64 +101,7 @@ Show the status of automatically starting Thread on initialization.
 
 ```bash
 > autostart
-false
-Done
-```
-
-### blacklist
-
-List the blacklist entries.
-
-```bash
-> blacklist
-Enabled
-166e0a0000000002
-166e0a0000000003
-Done
-```
-
-### blacklist add \<extaddr\>
-
-Add an IEEE 802.15.4 Extended Address to the blacklist.
-
-```bash
-> blacklist add 166e0a0000000002
-Done
-```
-
-### blacklist clear
-
-Clear all entries from the blacklist.
-
-```bash
-> blacklist clear
-Done
-```
-
-### blacklist disable
-
-Disable MAC blacklist filtering.
-
-```bash
-> blacklist disable
-Done
-```
-
-### blacklist enable
-
-Enable MAC blacklist filtering.
-
-```bash
-> blacklist enable
-Done
-```
-
-### blacklist remove \<extaddr\>
-
-Remove an IEEE 802.15.4 Extended Address from the blacklist.
-
-```bash
-> blacklist remove 166e0a0000000002
+Disabled
 Done
 ```
 
@@ -208,10 +158,10 @@ Print table of attached children.
 
 ```bash
 > child table
-| ID  | RLOC16 | Timeout    | Age        | LQI In | C_VN |R|S|D|N| Extended MAC     |
-+-----+--------+------------+------------+--------+------+-+-+-+-+------------------+
-|   1 | 0xe001 |        240 |         44 |      3 |  237 |1|1|1|1| d28d7f875888fccb |
-|   2 | 0xe002 |        240 |         27 |      3 |  237 |0|1|0|1| e2b3540590b0fd87 |
+| ID  | RLOC16 | Timeout    | Age        | LQ In | C_VN |R|S|D|N| Extended MAC     |
++-----+--------+------------+------------+-------+------+-+-+-+-+------------------+
+|   1 | 0xe001 |        240 |         44 |     3 |  237 |1|1|1|1| d28d7f875888fccb |
+|   2 | 0xe002 |        240 |         27 |     3 |  237 |0|1|0|1| e2b3540590b0fd87 |
 Done
 ```
 
@@ -228,7 +178,7 @@ Mode: rsn
 Net Data: 184
 Timeout: 100
 Age: 0
-LQI: 3
+Link Quality In: 3
 RSSI: -20
 Done
 ```
@@ -271,55 +221,155 @@ Set the Thread Child Timeout value.
 Done
 ```
 
-### coap server \<phase\>
+### coap start
 
-Starts and stops the simple CoAP server.
-
-* phase: Either "start" or "stop" the server.
+Starts the application coap service.
 
 ```bash
-> coap server start
-Server started with resource '': Done
-> coap server stop
-Server stopped: Done
+> coap start
+Coap service started: Done
 ```
 
-### coap server name \[URI\]
+### coap stop
 
-Outputs the currently used URI String of the CoAP resource.
-
-* URI: If provided the URI String will be changed to the new value.
+Stops the application coap service.
 
 ```bash
-> coap server name
-Current resource name is '': Done
-> coap server name test
-Changing resource name to 'test': Done
+> coap stop
+Coap service stopped: Done
 ```
 
-### coap client \<method\> \<IPv6address\> \<URI\> \[payload\] \[messageType\]
+### coap resource \[uri-path\]
 
-Simple CoAP client that can send Non-/Confirmable GET/PUT/POST/DELETE messages.
+Sets the URI-Path for the test resource.
+
+```bash
+> coap resource test
+Resource name is 'test': Done
+> coap resource
+Resource name is 'test': Done
+```
+
+### coap \<method\> \<address\> \<uri\> \[payload\] \[type\]
 
 * method: CoAP method to be used (GET/PUT/POST/DELETE).
-* IPv6address: IP address of the CoAP server to query.
-* URI: URI String of the resource on the CoAP server.
+* address: IP address of the CoAP server to query.
+* uri: URI String of the resource on the CoAP server.
 * payload: In case of PUT/POST/DELETE a payload can be encapsulated.
-* messageType: Switch between confirmable ("con") and non-confirmable (default).
+* type: Switch between confirmable ("con") and non-confirmable (default).
 
 ```bash
-> coap client get fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc test
-Sending CoAP message: Done
-Received CoAP request from [fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc]: GET
-CoAP response sent successfully!
-Received CoAP response with payload: 30
-> coap client put fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc test non-con somePayload
-Sending CoAP message: Done
-> coap client put fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc test con 123
-Sending CoAP message: Done
-Received CoAP request from [fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc]: PUT with payload: ba 00 00 20
-CoAP response sent successfully!
-Received CoAP response
+> coap get fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc test
+Sending coap message: Done
+Received coap request from [fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc]: GET
+coap response sent successfully!
+Received coap response with payload: 30
+> coap put fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc test non-con somePayload
+Sending coap message: Done
+Received coap request from [fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc]: PUT with payload: 73 6f 6d 65 50 61 79 6c 6f 61 64
+> coap put fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc test con 123
+Sending coap message: Done
+Received coap request from [fdde:ad00:beef:0:dbaa:f1d0:8afb:30dc]: PUT with payload: 31 32 33
+coap response sent successfully!
+Received coap response
+```
+
+### coaps start \<checkPeerCert\>
+
+Starts the Application CoAP Secure Service.
+
+* checkPeerCert: Peer Certificate Check can be disabled by typing false.
+
+```bash
+> coaps start false
+Verify Peer Certificate: false. Coap Secure service started: Done
+> coaps start
+Verify Peer Certificate: true. Coap Secure service started: Done
+```
+
+### coaps stop
+
+Stops the Application CoAP Secure Service.
+
+```bash
+> coaps stop
+Coap Secure service stopped:  Done
+```
+
+### coaps set psk \<preSharedKey\> \<keyIdentity\>
+
+Set a pre-shared key with his identifier and the ciphersuite 
+"DTLS_PSK_WITH_AES_128_CCM_8" for the dtls session.
+
+* preSharedKey: The pre-shared key (PSK) for dtls session.
+* keyIdentity: The identifier for the PSK.
+
+```bash
+> coaps set psk myPreSharedSecret myIdentifier
+Coap Secure set PSK: Done
+```
+
+### coaps set x509
+
+Set X.509 Certificate with his private key, which is saved in
+src/cli/x509_cert_key.hpp.
+
+```bash
+> coaps set x509
+Coap Secure set own .X509 certificate: Done
+```
+
+### coaps connect \<serverAddress\> \[port\]
+
+Open a dtls session to a CoAP Secure Server.
+
+* serverAddress: IPv6 address of Server
+
+```bash
+> coaps connect 2001:1234::321
+Coap Secure connect: Done
+CoAP Secure connected!
+```
+
+### coaps disconnect
+
+Terminate the dtls session to the Server.
+
+```bash
+> coaps disconnect
+CoAP Secure not connected or disconnected.
+Done
+```
+
+### coaps \<method\> \<address\> \<uri\> \[type\] \[payload\]
+
+* method: CoAP method to be used (GET/PUT/POST/DELETE).
+* address: IPv6 address of the CoAP Secure server to query.
+* uri: URI String of the resource on the CoAP server.
+* type: Switch between confirmable ("con") and non-confirmable (default).
+* payload: In case of PUT/POST/DELETE a payload can be encapsulated.
+
+```bash
+> coaps get 2001:1234::321 secret
+Sending coap secure request: Done
+Received coap secure response
+    CoapSecure RX Header Informations:
+        Type 16 (NON CONF)
+        Code 69 (Coap Code CONTENT)
+    With payload (hex):
+4a756e2031322031353a30373a3336
+> coaps put 2001:1234::321 test non-con hello
+Sending coap secure request: Done
+> coaps post 2001:1234::321 test con
+Sending coap secure request: Done
+Received coap secure response
+    CoapSecure RX Header Informations:
+        Type 32 (NON CONF)
+        Code 69 (Coap Code CONTENT)
+    With payload (hex):
+4a756e2031322031353a30373a3336
+> coaps delete 2001:1234::321 test
+Sending coap secure request: Done
 ```
 
 ### commissioner start \<provisioningUrl\>
@@ -346,11 +396,11 @@ This command will cause the device to send LEAD_KA[Reject] messages.
 Done
 ```
 
-### commissioner joiner add \<hashmacaddr\> \<psdk\>
+### commissioner joiner add \<eui64\> \<psdk\>
 
 Add a Joiner entry.
 
-* hashmacaddr: The Extended Address of the Joiner or '*' to match any Joiner.
+* eui64: The IEEE EUI-64 of the Joiner or '*' to match any Joiner.
 * pskd: Pre-Shared Key for the Joiner.
 
 ```bash
@@ -358,11 +408,11 @@ Add a Joiner entry.
 Done
 ```
 
-### commissioner joiner remove \<hashmacaddr\>
+### commissioner joiner remove \<eui64\>
 
 Remove a Joiner entry.
 
-* hashmacaddr: The Extended Address of the Joiner or '*' to match any Joiner.
+* eui64: The IEEE EUI-64 of the Joiner or '*' to match any Joiner.
 
 ```bash
 > commissioner joiner remove d45e64fa83f81cf7
@@ -480,7 +530,7 @@ RxTotal: 2
     RxBeacon: 0
     RxBeaconRequest: 0
     RxOther: 0
-    RxWhitelistFiltered: 0
+    RxAddressFiltered: 0
     RxDestAddrFiltered: 0
     RxDuplicated: 0
     RxErrNoFrame: 0
@@ -656,6 +706,31 @@ Set network name.
 Done
 ```
 
+### networktime
+
+Get the Thread network time and the time sync parameters.
+
+```bash
+> networktime
+Network Time:     21084154us (synchronized)
+Time Sync Period: 100s
+XTAL Threshold:   300ppm
+Done
+```
+
+### networktime \<timesyncperiod\> \<xtalthreshold\>
+
+Set time sync parameters
+
+* timesyncperiod: The time synchronization period, in seconds.
+* xtalthreshold: The XTAL accuracy threshold for a device to become Router-Capable device, in PPM.
+
+```bash
+> networktime 100 300
+Done
+```
+
+
 ### dataset panid \<panid\>
 
 Set panid.
@@ -819,16 +894,6 @@ Delete all stored settings, and signal a platform reset.
 > factoryreset
 ```
 
-### hashmacaddr
-
-Get the HashMac address.
-
-```bash
-> hashmacaddr
-e0b220eb7d8dda7e
-Done
-```
-
 ### ifconfig
 
 Show the status of the IPv6 interface.
@@ -969,6 +1034,16 @@ Stop the Joiner role.
 Done
 ```
 
+### joinerid
+
+Get the Joiner ID.
+
+```bash
+> joinerid
+e0b220eb7d8dda7e
+Done
+```
+
 ### joinerport \<port\>
 
 Set the Joiner port.
@@ -1088,6 +1163,15 @@ Set the link quality on the link to a given extended address.
 Done
 ```
 
+### logfilename FILENAME
+
+- Note: POSIX Platform Only, ie: `OPENTHREAD_EXAMPLES_POSIX`
+- Requires `OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_DEBUG_UART`
+
+Specifies filename to capture otPlatLog() messages, useful when
+debugging automated test scripts on Linux when logging disrupts
+the automated test scripts.
+
 ### masterkey
 
 Get the Thread Master Key value.
@@ -1113,7 +1197,7 @@ Get the Thread Device Mode value.
 
 * r: rx-on-when-idle
 * s: Secure IEEE 802.15.4 data requests
-* d: Full Function Device
+* d: Full Thread Device
 * n: Full Network Data
 
 ```bash
@@ -1128,11 +1212,35 @@ Set the Thread Device Mode value.
 
 * r: rx-on-when-idle
 * s: Secure IEEE 802.15.4 data requests
-* d: Full Function Device
+* d: Full Thread Device
 * n: Full Network Data
 
 ```bash
 > mode rsdn
+Done
+```
+
+### neighbor list
+
+List RLOC16 of neighbors.
+
+```bash
+> neighbor list
+0xcc01 0xc800 0xf000
+Done
+```
+
+### neighbor table
+
+Print table of neighbors.
+
+```bash
+> neighbor table
+| Role | RLOC16 | Age | Avg RSSI | Last RSSI |R|S|D|N| Extended MAC     |
++------+--------+-----+----------+-----------+-+-+-+-+------------------+
+|   C  | 0xcc01 |  96 |      -46 |       -46 |1|1|1|1| 1eb9ba8a6522636b |
+|   R  | 0xc800 |   2 |      -29 |       -29 |1|0|1|1| 9a91556102c39ddb |
+|   R  | 0xf000 |   3 |      -28 |       -28 |1|0|1|1| 0ad7ed6beaa6016d |
 Done
 ```
 
@@ -1142,6 +1250,16 @@ Register local network data with Thread Leader.
 
 ```bash
 > netdataregister
+Done
+```
+
+### netdatashow
+
+Show Thread Leader network data.
+
+```bash
+> netdatashow
+08040b020000
 Done
 ```
 
@@ -1231,10 +1349,38 @@ Done
 
 Get the diagnostic information for a Thread Router as parent.
 
+Note: When operating as a Thread Router, this command will return the cached
+      information from when the device was previously attached as a Thread
+      Child. Returning cached information is necessary to support the Thread
+      Test Harness - Test Scenario 8.2.x requests the former parent (i.e. Joiner
+      Router's) MAC address even if the device has already promoted to a router.
+
 ```bash
 > parent
 Ext Addr: be1857c6c21dce55
 Rloc: 5c00
+Link Quality In: 3
+Link Quality Out: 3
+Age: 20
+Done
+```
+
+### parentpriority
+
+Get the assigned parent priority value, -2 means not assigned.
+
+```bash
+> parentpriority
+1
+Done
+```
+
+### parentpriority \<parentpriority\>
+
+Set the assigned parent priority value: 1, 0, -1 or -2.
+
+```bash
+> parentpriority 1
 Done
 ```
 
@@ -1245,6 +1391,15 @@ Send an ICMPv6 Echo Request.
 ```bash
 > ping fdde:ad00:beef:0:558:f56b:d688:799
 16 bytes from fdde:ad00:beef:0:558:f56b:d688:799: icmp_seq=1 hlim=64 time=28ms
+```
+
+### ping stop
+
+Stop sending ICMPv6 Echo Requests.
+
+```bash
+> ping stop
+Done
 ```
 
 ### pollperiod
@@ -1263,6 +1418,16 @@ Set the customized data poll period for sleepy end device (seconds). Only for ce
 
 ```bash
 > pollperiod 10
+Done
+```
+
+### prefix
+
+Get the prefix list in the local Network Data.
+
+```bash
+> prefix
+2001:dead:beef:cafe::/64 paros med
 Done
 ```
 
@@ -1346,9 +1511,19 @@ Get the Thread RLOC16 value.
 Done
 ```
 
+### route
+
+Get the external route list in the local Network Data.
+
+```bash
+> route
+2001:dead:beef:cafe::/64 s med
+Done
+```
+
 ### route add \<prefix\> [s] [prf]
 
-Add a valid prefix to the Network Data.
+Add a valid external route to the Network Data.
 
 * s: Stable flag
 * prf: Default Router Preference, which may be: 'high', 'med', or 'low'.
@@ -1360,7 +1535,7 @@ Done
 
 ### route remove \<prefix\>
 
-Invalidate a prefix in the Network Data.
+Invalidate a external route in the Network Data.
 
 ```bash
 > route remove 2001:dead:beef:cafe::/64
@@ -1383,10 +1558,10 @@ Print table of routers.
 
 ```bash
 > router table
-| ID | RLOC16 | Next Hop | Path Cost | LQI In | LQI Out | Age | Extended MAC     |
-+----+--------+----------+-----------+--------+---------+-----+------------------+
-| 21 | 0x5400 |       21 |         0 |      3 |       3 |   5 | d28d7f875888fccb |
-| 56 | 0xe000 |       56 |         0 |      0 |       0 | 182 | f2d92a82c8d8fe43 |
+| ID | RLOC16 | Next Hop | Path Cost | LQ In | LQ Out | Age | Extended MAC     |
++----+--------+----------+-----------+-------+--------+-----+------------------+
+| 21 | 0x5400 |       21 |         0 |     3 |      3 |   5 | d28d7f875888fccb |
+| 56 | 0xe000 |       56 |         0 |     0 |      0 | 182 | f2d92a82c8d8fe43 |
 Done
 ```
 
@@ -1403,8 +1578,8 @@ Next Hop: c800
 Link: 1
 Ext Addr: e2b3540590b0fd87
 Cost: 0
-LQI In: 3
-LQI Out: 3
+Link Quality In: 3
+Link Quality Out: 3
 Age: 3
 Done
 ```
@@ -1418,8 +1593,8 @@ Next Hop: c800
 Link: 1
 Ext Addr: e2b3540590b0fd87
 Cost: 0
-LQI In: 3
-LQI Out: 3
+Link Quality In: 3
+Link Quality Out: 3
 Age: 7
 Done
 ```
@@ -1523,6 +1698,35 @@ Perform an IEEE 802.15.4 Active Scan.
 Done
 ```
 
+### scan energy \[duration\]
+
+Perform an IEEE 802.15.4 Energy Scan.
+
+* duration: The time in milliseconds to spend scanning each channel.
+
+```bash
+> scan energy 10
+| Ch | RSSI |
++----+------+
+| 11 |  -59 |
+| 12 |  -62 |
+| 13 |  -67 |
+| 14 |  -61 |
+| 15 |  -87 |
+| 16 |  -86 |
+| 17 |  -86 |
+| 18 |  -52 |
+| 19 |  -58 |
+| 20 |  -82 |
+| 21 |  -76 |
+| 22 |  -82 |
+| 23 |  -74 |
+| 24 |  -81 |
+| 25 |  -88 |
+| 26 |  -71 |
+Done
+```
+
 ### singleton
 Return true when there are no other nodes in the network, otherwise return false.
 
@@ -1530,6 +1734,24 @@ Return true when there are no other nodes in the network, otherwise return false
 > singleton
 true or false
 Done
+```
+
+### sntp query \[SNTP server IP\] \[SNTP server port\]
+
+Send SNTP Query to obtain current unix epoch time (from 1st January 1970).
+The latter two parameters have following default values:
+ * NTP server IP: 2001:4860:4806:8:: (Google IPv6 NTP Server)
+ * NTP server port: 123
+
+```bash
+> sntp query
+> SNTP response - Unix time: 1540894725 (era: 0)
+```
+
+You can use NAT64 of OpenThread Border Router to reach e.g. Google IPv4 NTP Server:
+```bash
+> sntp query 64:ff9b::d8ef:2308
+> SNTP response - Unix time: 1540898611 (era: 0)
 ```
 
 ### state
@@ -1567,22 +1789,22 @@ Disable Thread protocol operation and detach from a Thread network.
 Done
 ```
 
-### txpowermax
+### txpower
 
-Get the maximum transmit power in dBm.
+Get the transmit power in dBm.
 
 ```bash
-> txpowermax
+> txpower
 -10 dBm
 Done
 ```
 
-### txpowermax \<txpowermax\>
+### txpower \<txpower\>
 
-Set the maximum transmit power.
+Set the transmit power.
 
 ```bash
-> txpowermax -10
+> txpower -10
 Done
 ```
 
@@ -1596,61 +1818,158 @@ OPENTHREAD/gf4f2f04; Jul  1 2016 17:00:09
 Done
 ```
 
-### whitelist
+### macfilter
 
-List the whitelist entries.
+List the macfilter status, including address and received signal strength filter settings.
 
 ```bash
-> whitelist
-Enabled
-e2b3540590b0fd87
-d38d7f875888fccb
-c467a90a2060fa0e
+> macfilter
+Address Mode: Whitelist
+0f6127e33af6b403 : rss -95 (lqi 1)
+0f6127e33af6b402
+RssIn List:
+0f6127e33af6b403 : rss -95 (lqi 1)
+Default rss : -50 (lqi 3)
 Done
 ```
 
-### whitelist add \<extaddr\>
+### macfilter addr
 
-Add an IEEE 802.15.4 Extended Address to the whitelist.
+List the address filter status.
 
 ```bash
-> whitelist add dead00beef00cafe
+> macfilter addr
+Whitelist
+0f6127e33af6b403 : rss -95 (lqi 1)
+0f6127e33af6b402
 Done
 ```
 
-### whitelist clear
+### macfilter addr disable
 
-Clear all entries from the whitelist.
+Disable address filter mode.
 
 ```bash
-> whitelist clear
+> macfilter addr disable
 Done
 ```
 
-### whitelist disable
+### macfilter addr whitelist
 
-Disable MAC whitelist filtering.
+Enable whitelist address filter mode.
 
 ```bash
-> whitelist disable
+> macfilter addr whitelist
 Done
 ```
 
-### whitelist enable
+### macfilter addr blacklist
 
-Enable MAC whitelist filtering.
+Enable blacklist address filter mode.
 
 ```bash
-> whitelist enable
+> macfilter addr blacklist
 Done
 ```
 
-### whitelist remove \<extaddr\>
+### macfilter addr add \<extaddr\> \[rss\]
 
-Remove an IEEE 802.15.4 Extended Address from the whitelist.
+Add an IEEE 802.15.4 Extended Address to the address filter, and fixed the received singal strength for
+the messages from the address if rss is specified.
 
 ```bash
-> whitelist remove dead00beef00cafe
+> macfilter addr add 0f6127e33af6b403 -95
+Done
+```
+
+```bash
+> macfilter addr add 0f6127e33af6b402
+Done
+```
+
+### macfilter addr remove \<extaddr\>
+
+Remove the IEEE802.15.4 Extended Address from the address filter.
+
+```bash
+> macfilter addr remove 0f6127e33af6b402
+Done
+```
+
+### macfilter addr clear
+
+Clear all the IEEE802.15.4 Extended Addresses from the address filter.
+
+```bash
+> macfilter addr clear
+Done
+```
+
+### macfilter rss
+
+List the rss filter status
+
+```bash
+> macfilter rss
+0f6127e33af6b403 : rss -95 (lqi 1)
+Default rss: -50 (lqi 3)
+Done
+```
+
+### macfilter rss add \<extaddr\> \<rss\>
+
+Set the received signal strength for the messages from the IEEE802.15.4 Extended Address.
+If extaddr is \*, default received signal strength for all received messages would be set.
+
+
+```bash
+> macfilter rss add * -50
+Done
+```
+
+```bash
+> macfilter rss add 0f6127e33af6b404 -85
+Done
+```
+
+### macfilter rss add-lqi \<extaddr\> \<lqi\>
+
+Set the received link quality for the messages from the IEEE802.15.4 Extended Address. Valid lqi range [0,3]
+If extaddr is \*, default received link quality for all received messages would be set.
+Equivalent with 'filter rss add' with similar usage
+
+
+```bash
+> macfilter rss add-lqi * 3
+Done
+```
+
+```bash
+> macfilter rss add 0f6127e33af6b404 2
+Done
+```
+
+### macfilter rss remove \<extaddr\>
+
+Removes the received signal strength or received link quality setting on the Extended Address.
+If extaddr is \*, default received signal strength or link quality for all received messages would be unset.
+
+```bash
+> macfilter rss remove *
+Done
+```
+
+```bash
+> macfilter rss remove 0f6127e33af6b404
+Done
+```
+
+### macfilter rss clear
+
+Clear all the received signal strength or received link quality settings.
+
+```bash
+> macfilter rss clear
 Done
 ```
 
@@ -1658,5 +1977,36 @@ Done
 
 Diagnostics module is enabled only when building OpenThread with --enable-diag option.
 Go [diagnostics module][1] for more information.
+
+### service
+
+Module for controlling service registration in Network Data.
+Each change in service registration must be sent to leader by `netdataregister` command
+before taking effect.
+
+### service add \<enterpriseNumber\> \<serviceData\> \<serverData\>
+
+Add service to the Network Data.
+
+```bash
+> service add 44970 foo bar
+Done
+> ipaddr
+fdde:ad00:beef:0:0:ff:fe00:fc10
+fdde:ad00:beef:0:0:ff:fe00:fc00
+fdde:ad00:beef:0:0:ff:fe00:7c00
+fe80:0:0:0:1486:2f57:3c:6e10
+fdde:ad00:beef:0:8ca4:19ed:217a:eff9
+Done
+```
+
+### service remove \<enterpriseNumber\> \<serviceData\>
+
+Remove service from Network Data.
+
+```bash
+> service remove 44970 foo
+Done
+```
 
 [1]:../diag/README.md

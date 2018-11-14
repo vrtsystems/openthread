@@ -34,10 +34,11 @@
 #ifndef CLI_UART_HPP_
 #define CLI_UART_HPP_
 
-#include <openthread/types.h>
+#include "openthread-core-config.h"
 
 #include "cli/cli.hpp"
 #include "cli/cli_server.hpp"
+#include "common/instance.hpp"
 #include "common/tasklet.hpp"
 
 namespace ot {
@@ -47,7 +48,7 @@ namespace Cli {
  * This class implements the CLI server on top of the UART platform abstraction.
  *
  */
-class Uart: public Server
+class Uart : public Server
 {
 public:
     /**
@@ -56,7 +57,19 @@ public:
      * @param[in]  aInstance  The OpenThread instance structure.
      *
      */
-    Uart(otInstance *aInstance);
+    Uart(Instance *aInstance);
+
+    /**
+     * This method returns whether line echoing is enabled or not.
+     */
+    bool GetLineEchoEnabled();
+
+    /**
+     * This method turns on or off echoing of characters back to the client.
+     *
+     * @param[in]  enable      Whether or not to enable line echo.
+     */
+    void EnableLineEcho(bool aEnable);
 
     /**
      * This method delivers raw characters to the client.
@@ -91,6 +104,14 @@ public:
      */
     int OutputFormatV(const char *aFmt, va_list aAp);
 
+    /**
+     * This method returns a reference to the interpreter object.
+     *
+     * @returns A reference to the interpreter object.
+     *
+     */
+    Interpreter &GetInterpreter(void) { return mInterpreter; }
+
     void ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength);
     void SendDoneTask(void);
 
@@ -99,29 +120,31 @@ public:
 private:
     enum
     {
-        kRxBufferSize = 512,
-        kTxBufferSize = 1024,
-        kMaxLineLength = 128,
+        kRxBufferSize  = OPENTHREAD_CONFIG_CLI_UART_RX_BUFFER_SIZE,
+        kTxBufferSize  = OPENTHREAD_CONFIG_CLI_UART_TX_BUFFER_SIZE,
+        kMaxLineLength = OPENTHREAD_CONFIG_CLI_MAX_LINE_LENGTH,
     };
 
     otError ProcessCommand(void);
-    void Send(void);
+    void    Send(void);
 
-    char mRxBuffer[kRxBufferSize];
+    char     mRxBuffer[kRxBufferSize];
     uint16_t mRxLength;
 
-    char mTxBuffer[kTxBufferSize];
+    char     mTxBuffer[kTxBufferSize];
     uint16_t mTxHead;
     uint16_t mTxLength;
 
     uint16_t mSendLength;
+
+    bool     mEnableLineEcho;
 
     Interpreter mInterpreter;
 
     friend class Interpreter;
 };
 
-}  // namespace Cli
-}  // namespace ot
+} // namespace Cli
+} // namespace ot
 
-#endif  // CLI_UART_HPP_
+#endif // CLI_UART_HPP_

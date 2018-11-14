@@ -31,12 +31,6 @@
  *   This file implements CRC16 computations.
  */
 
-#ifdef OPENTHREAD_CONFIG_FILE
-#include OPENTHREAD_CONFIG_FILE
-#else
-#include <openthread-config.h>
-#endif
-
 #include "crc16.hpp"
 
 namespace ot {
@@ -52,7 +46,7 @@ void Crc16::Update(uint8_t aByte)
     uint8_t i;
 
     mCrc = mCrc ^ static_cast<uint16_t>(aByte << 8);
-    i = 8;
+    i    = 8;
 
     do
     {
@@ -64,8 +58,7 @@ void Crc16::Update(uint8_t aByte)
         {
             mCrc = static_cast<uint16_t>(mCrc << 1);
         }
-    }
-    while (--i);
+    } while (--i);
 }
 
-}  // namespace ot
+} // namespace ot

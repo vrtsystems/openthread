@@ -122,10 +122,26 @@ per scanned channel with following format:
 * `C`: Channel
 * `c`: RSSI (in dBm)
 
+### PROP 58: PROP_MAC_DATA_POLL_PERIOD {#prop-mac-data-poll-period
+* Type: Read-Write
+* Packed-Encoding: `L`
+
+The (user-specified) data poll (802.15.4 MAC Data Request) period
+in milliseconds. Value zero means there is no user-specified
+poll period, and the network stack determines the maximum period
+based on the MLE Child Timeout.
+
+If the value is non-zero, it specifies the maximum period between
+data poll transmissions. Note that the network stack may send data
+request transmissions more frequently when expecting a control-message
+(e.g., when waiting for an MLE Child ID Response).
+
+This property is only present on NCPs which implement 802.15.4.
+
 ### PROP 4864: PROP_MAC_WHITELIST  {#prop-mac-whitelist}
 * Type: Read-Write
 * Packed-Encoding: `A(T(Ec))`
-* **OPTIONAL**
+* Required capability: `CAP_MAC_WHITELIST`
 
 Structure Parameters:
 
@@ -139,6 +155,7 @@ Structure Parameters:
 ### PROP 4865: PROP_MAC_WHITELIST_ENABLED  {#prop-mac-whitelist-enabled}
 * Type: Read-Write
 * Packed-Encoding: `b`
+* Required capability: `CAP_MAC_WHITELIST`
 
 ### PROP 4867: SPINEL_PROP_MAC_SRC_MATCH_ENABLED  {#prop-mac-src-match-enabled}
 * Type: Write
@@ -171,3 +188,23 @@ Structure Parameters:
 
 * `E`: EUI64 address for hardware generated ACKs
 
+### PROP 4870: PROP_MAC_BLACKLIST  {#prop-mac-blacklist}
+* Type: Read-Write
+* Packed-Encoding: `A(T(E))`
+* Required capability: `CAP_MAC_WHITELIST`
+
+Structure Parameters:
+
+* `E`: EUI64 address of node
+
+### PROP 4871: PROP_MAC_BLACKLIST_ENABLED  {#prop-mac-blacklist-enabled}
+* Type: Read-Write
+* Packed-Encoding: `b`
+* Required capability: `CAP_MAC_WHITELIST`
+
+### PROP 4873: PROP_MAC_CCA_FAILURE_RATE  {#prop-mac-cca-failure-rate}
+ * Type: Read Only
+ * Packed-Encoding: `S`
+
+This property provides the current CCA (Clear Channel Assessment) failure rate.
+Maximum value `0xffff` corresponding to 100% failure rate.
