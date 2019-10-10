@@ -195,6 +195,33 @@ CCASFLAGS                       += \
     assembler-with-cpp             \
     $(NULL)
 
+ifeq ($(BOARD),bt840x)
+# Fanstel BT840X(E) dongle
+UART_PIN_RX ?= 22
+UART_PIN_TX ?= 24
+endif
+
+ifneq ($(UART_PIN_RX),)
+CPPFLAGS                        += \
+    -DUART_PIN_RX=$(UART_PIN_RX)   \
+    $(NULL)
+endif
+ifneq ($(UART_PIN_TX),)
+CPPFLAGS                        += \
+    -DUART_PIN_TX=$(UART_PIN_TX)   \
+    $(NULL)
+endif
+ifneq ($(UART_PIN_RTS),)
+CPPFLAGS                        += \
+    -DUART_PIN_RTS=$(UART_PIN_RTS) \
+    $(NULL)
+endif
+ifneq ($(UART_PIN_CTS),)
+CPPFLAGS                        += \
+    -DUART_PIN_CTS=$(UART_PIN_CTS) \
+    $(NULL)
+endif
+
 ECHO                            := @echo
 MAKE                            := make
 MKDIR_P                         := mkdir -p
