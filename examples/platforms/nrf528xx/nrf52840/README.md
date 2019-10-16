@@ -577,9 +577,9 @@ The <i>nRF5 SDK for Thread and Zigbee</i> includes:
 # Support for the Fanstel BT840X, BT840XE and USB840X
 
 The Fanstel [USB840X][USB840X] is a FCC-approved pre-packaged Bluetooth dongle
-built around the nRF52840 SoC and the SKY66112 PA/LNA front-end.  Also
-available is a module, the [BT840X][BT840X] and [BT840XE][BT840XE] which can
-be incorporated into designs.  All three share the same basic hardware.
+built around the nRF52840 SoC and the [SKY66112 PA/LNA front-end][SKY66112].
+Also available is a module, the [BT840X][BT840X] and [BT840XE][BT840XE] which
+can be incorporated into designs.  All three share the same basic hardware.
 
 To do this, you'll need [nrfutil][nrfutil], and the Fanstel boot-loader
 private key (available by contacting Fanstel directly).
@@ -620,4 +620,5 @@ The device should reset afterwards, and appear as an OpenThread device.
 [BT840X]: https://www.fanstel.com/bt840f-nrf52840-ble-5-module-secure-iot-802154-thread-zigbee-1
 [BT840XE]: https://www.fanstel.com/bt840x-nrf52840-module-with-pa
 [USB840X]: https://www.fanstel.com/usb840x
+[SKY66112]: https://www.skyworksinc.com/products/front-end-modules/sky66112-11
 [nrfutil]: https://pypi.org/project/nrfutil/
