@@ -573,3 +573,51 @@ The <i>nRF5 SDK for Thread and Zigbee</i> includes:
 - software modules inherited from the nRF5 SDK e.g. peripheral drivers, NFC libraries, Bluetooth Low Energy libraries etc.
 
 [nrf5-sdk-thread-zigbee]: https://www.nordicsemi.com/Software-and-Tools/Software/nRF5-SDK-for-Thread-and-Zigbee
+
+# Support for the Fanstel BT840X, BT840XE and USB840X
+
+The Fanstel [USB840X][USB840X] is a FCC-approved pre-packaged Bluetooth dongle
+built around the nRF52840 SoC and the SKY66112 PA/LNA front-end.  Also
+available is a module, the [BT840X][BT840X] and [BT840XE][BT840XE] which can
+be incorporated into designs.  All three share the same basic hardware.
+
+To do this, you'll need [nrfutil][nrfutil], and the Fanstel boot-loader
+private key (available by contacting Fanstel directly).
+
+To build OpenThread for these devices:
+
+1. Include `BOARD=bt840x` in the call to `make`, e.g. for a border-router capable NCP:
+   ```
+   make -f examples/Makefile-nrf52840 BORDER_AGENT=1 BORDER_ROUTER=1 \
+            COMMISSIONER=1 UDP_FORWARD=1 BOARD=bt840x BOOTLOADER=USB \
+            USB=1 COAP=1 clean all
+   ```
+2. Convert the ELF binary produced by the OpenThread build system to Intel Hex format:
+   ```
+   arm-none-eabi-objcopy -O ihex output/nrf52840/bin/ot-ncp-ftd ot-ncp-ftd.nrf.hex
+   ```
+3. Wrap this in a boot-loader payload using `nrfutil`:
+   ```
+   nrfutil pkg generate --hw-version 52 --sd-req 0 \
+           --application ot-ncp-ftd.nrf.hex \
+           --application-version 1 \
+           --key-file private.pem ot-ncp-ftd.zip
+   ```
+
+Then to program:
+
+1. Plug the dongle in whilst holding in SW1 (near the USB plug on USB840X,
+   you may need a flat non-conductive object like a ruler to press it),
+   a red LED should glow solid.
+2. Run `nrfutil` (adjust `/dev/ttyACM0` according to where your dongle
+   appears, see `dmesg` if in doubt):
+   ```
+   nrfutil dfu usb-serial -pkg ot-ncp-ftd.zip -p /dev/ttyACM0
+   ```
+
+The device should reset afterwards, and appear as an OpenThread device.
+
+[BT840X]: https://www.fanstel.com/bt840f-nrf52840-ble-5-module-secure-iot-802154-thread-zigbee-1
+[BT840XE]: https://www.fanstel.com/bt840x-nrf52840-module-with-pa
+[USB840X]: https://www.fanstel.com/usb840x
+[nrfutil]: https://pypi.org/project/nrfutil/
