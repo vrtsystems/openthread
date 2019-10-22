@@ -116,6 +116,12 @@ enum
     CC2592_RECEIVE_SENSITIVITY_HGM = -101,
 };
 
+enum
+{
+    // Mask for all interrupts used in this driver
+    CC2538_ALL_USED_INTERRUPTS_MASK = RFCORE_XREG_RFIRQM0_RXPKTDONE | RFCORE_XREG_RFIRQM0_SRC_MATCH_FOUND
+};
+
 typedef struct TxPowerTable
 {
     int8_t  mTxPowerVal;
@@ -170,6 +176,7 @@ static int8_t  sTxPower = 0;
 
 static otRadioState sState             = OT_RADIO_STATE_DISABLED;
 static bool         sIsReceiverEnabled = false;
+static bool         sSrcMatchFound     = false;
 
 #if OPENTHREAD_CONFIG_LOG_PLATFORM && OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
 // Debugging _and_ logging are enabled, so if there's a dropped frame
@@ -262,6 +269,11 @@ void setTxPower(int8_t aTxPower)
     }
 }
 
+static bool cc2538SrcMatchEnabled()
+{
+    return (HWREG(RFCORE_XREG_FRMCTRL1) & RFCORE_XREG_FRMCTRL1_PENDING_OR) == 0;
+}
+
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64)
 {
     OT_UNUSED_VARIABLE(aInstance);
@@ -336,7 +348,7 @@ void cc2538RadioInit(void)
     // Enable interrupts for RX/TX, interrupt 26.
     // That's NVIC index 0 (26 >> 5) bit 26 (26 & 0x1f).
     HWREG(NVIC_EN0 + (0 * 4)) = (1 << 26);
-    HWREG(RFCORE_XREG_RFIRQM0) |= RFCORE_XREG_RFIRQM0_RXPKTDONE;
+    HWREG(RFCORE_XREG_RFIRQM0) |= CC2538_ALL_USED_INTERRUPTS_MASK;
 #endif
 
     // enable clock
@@ -704,6 +716,8 @@ static void readFrame(void)
     {
         sReceiveFrame.mLength            = length;
         sReceiveFrame.mInfo.mRxInfo.mLqi = crcCorr & CC2538_LQI_BIT_MASK;
+        // sSrcMatchFound should have been set if this frame is acked with FP
+        sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending = cc2538SrcMatchEnabled() ? sSrcMatchFound : true;
     }
     else
     {
@@ -719,6 +733,8 @@ static void readFrame(void)
         otLogDebgPlat("Dropping %d received bytes (Invalid CRC)", length);
 #endif
     }
+
+    sSrcMatchFound = false; // clear for receiving next frame
 
     // check for rxfifo overflow
     if ((HWREG(RFCORE_XREG_FSMSTAT1) & RFCORE_XREG_FSMSTAT1_FIFOP) != 0 &&
@@ -737,7 +753,7 @@ void cc2538RadioProcess(otInstance *aInstance)
 #if OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
     // Disable the receive interrupt so that sReceiveFrame doesn't get
     // blatted by the interrupt handler while we're polling.
-    HWREG(RFCORE_XREG_RFIRQM0) &= ~RFCORE_XREG_RFIRQM0_RXPKTDONE;
+    HWREG(RFCORE_XREG_RFIRQM0) &= ~CC2538_ALL_USED_INTERRUPTS_MASK;
 #endif
 
     readFrame();
@@ -753,9 +769,6 @@ void cc2538RadioProcess(otInstance *aInstance)
     if ((sState == OT_RADIO_STATE_RECEIVE && sReceiveFrame.mLength > 0) ||
         (sState == OT_RADIO_STATE_TRANSMIT && sReceiveFrame.mLength > IEEE802154_ACK_LENGTH))
     {
-        // TODO Set this flag only when the packet is really acknowledged with frame pending set.
-        // See https://github.com/openthread/openthread/pull/3785
-        sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending = true;
 #if OPENTHREAD_CONFIG_DIAG_ENABLE
 
         if (otPlatDiagModeGet())
@@ -813,13 +826,19 @@ void cc2538RadioProcess(otInstance *aInstance)
 
 #if OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
     // Turn the receive interrupt handler back on now the buffer is clear.
-    HWREG(RFCORE_XREG_RFIRQM0) |= RFCORE_XREG_RFIRQM0_RXPKTDONE;
+    HWREG(RFCORE_XREG_RFIRQM0) |= CC2538_ALL_USED_INTERRUPTS_MASK;
 #endif
 }
 
 void RFCoreRxTxIntHandler(void)
 {
 #if OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
+
+    if (HWREG(RFCORE_SFR_RFIRQF0) & RFCORE_SFR_RFIRQF0_SRC_MATCH_FOUND)
+    {
+        sSrcMatchFound = true; // the next message received will have frame pending set
+    }
+
     if (HWREG(RFCORE_SFR_RFIRQF0) & RFCORE_SFR_RFIRQF0_RXPKTDONE)
     {
         readFrame();
@@ -829,7 +848,7 @@ void RFCoreRxTxIntHandler(void)
             // A frame has been received, disable the interrupt handler
             // until the main loop has dealt with this previous frame,
             // otherwise we might overwrite it whilst it is being read.
-            HWREG(RFCORE_XREG_RFIRQM0) &= ~RFCORE_XREG_RFIRQM0_RXPKTDONE;
+            HWREG(RFCORE_XREG_RFIRQM0) &= ~CC2538_ALL_USED_INTERRUPTS_MASK;
         }
     }
 #endif
