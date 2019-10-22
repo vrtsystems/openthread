@@ -717,7 +717,14 @@ static void readFrame(void)
         sReceiveFrame.mLength            = length;
         sReceiveFrame.mInfo.mRxInfo.mLqi = crcCorr & CC2538_LQI_BIT_MASK;
         // sSrcMatchFound should have been set if this frame is acked with FP
-        sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending = cc2538SrcMatchEnabled() ? sSrcMatchFound : true;
+        if (length > IEEE802154_ACK_LENGTH)
+        {
+#if OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
+            sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending = cc2538SrcMatchEnabled() ? sSrcMatchFound : true;
+#else
+            sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending = true;
+#endif
+        }
     }
     else
     {
