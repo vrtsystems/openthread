@@ -720,8 +720,12 @@ static void readFrame(void)
         if (length > IEEE802154_ACK_LENGTH)
         {
 #if OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
+            // Set ACK FP flag for the received frame according to whether SRC_MATCH_FOUND was triggered just before
+            // if SRC MATCH is not enabled, SRC_MATCH_FOUND is not triggered and all ACK FP is always set
             sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending = cc2538SrcMatchEnabled() ? sSrcMatchFound : true;
 #else
+            // TODO Set this flag only when the packet is really acknowledged with frame pending set.
+            // See https://github.com/openthread/openthread/pull/3785
             sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending = true;
 #endif
         }
