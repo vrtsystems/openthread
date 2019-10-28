@@ -116,6 +116,14 @@ enum
     CC2592_RECEIVE_SENSITIVITY_HGM = -101,
 };
 
+#if OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
+enum
+{
+    // Mask for all interrupts used in this driver
+    CC2538_ALL_USED_INTERRUPTS_MASK = RFCORE_XREG_RFIRQM0_RXPKTDONE | RFCORE_XREG_RFIRQM0_SRC_MATCH_FOUND
+};
+#endif
+
 typedef struct TxPowerTable
 {
     int8_t  mTxPowerVal;
@@ -262,6 +270,21 @@ void setTxPower(int8_t aTxPower)
     }
 }
 
+static bool cc2538SrcMatchEnabled(void)
+{
+    return (HWREG(RFCORE_XREG_FRMCTRL1) & RFCORE_XREG_FRMCTRL1_PENDING_OR) == 0;
+}
+
+static bool cc2538GetSrcMatchFoundIntFlag(void)
+{
+    bool flag = (HWREG(RFCORE_SFR_RFIRQF0) & RFCORE_SFR_RFIRQF0_SRC_MATCH_FOUND) != 0;
+    if (flag)
+    {
+        HWREG(RFCORE_SFR_RFIRQF0) &= ~RFCORE_SFR_RFIRQF0_SRC_MATCH_FOUND;
+    }
+    return flag;
+}
+
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64)
 {
     OT_UNUSED_VARIABLE(aInstance);
@@ -336,7 +359,9 @@ void cc2538RadioInit(void)
     // Enable interrupts for RX/TX, interrupt 26.
     // That's NVIC index 0 (26 >> 5) bit 26 (26 & 0x1f).
     HWREG(NVIC_EN0 + (0 * 4)) = (1 << 26);
-    HWREG(RFCORE_XREG_RFIRQM0) |= RFCORE_XREG_RFIRQM0_RXPKTDONE;
+    HWREG(RFCORE_XREG_RFIRQM0) |= CC2538_ALL_USED_INTERRUPTS_MASK;
+#else
+    HWREG(RFCORE_XREG_RFIRQM0) |= RFCORE_XREG_RFIRQM0_SRC_MATCH_FOUND;
 #endif
 
     // enable clock
@@ -704,6 +729,14 @@ static void readFrame(void)
     {
         sReceiveFrame.mLength            = length;
         sReceiveFrame.mInfo.mRxInfo.mLqi = crcCorr & CC2538_LQI_BIT_MASK;
+
+        if (length > IEEE802154_ACK_LENGTH)
+        {
+            // Set ACK FP flag for the received frame according to whether SRC_MATCH_FOUND was triggered just before
+            // if SRC MATCH is not enabled, SRC_MATCH_FOUND is not triggered and all ACK FP is always set
+            sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending =
+                cc2538SrcMatchEnabled() ? cc2538GetSrcMatchFoundIntFlag() : true;
+        }
     }
     else
     {
@@ -737,7 +770,7 @@ void cc2538RadioProcess(otInstance *aInstance)
 #if OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
     // Disable the receive interrupt so that sReceiveFrame doesn't get
     // blatted by the interrupt handler while we're polling.
-    HWREG(RFCORE_XREG_RFIRQM0) &= ~RFCORE_XREG_RFIRQM0_RXPKTDONE;
+    HWREG(RFCORE_XREG_RFIRQM0) &= ~CC2538_ALL_USED_INTERRUPTS_MASK;
 #endif
 
     readFrame();
@@ -753,9 +786,6 @@ void cc2538RadioProcess(otInstance *aInstance)
     if ((sState == OT_RADIO_STATE_RECEIVE && sReceiveFrame.mLength > 0) ||
         (sState == OT_RADIO_STATE_TRANSMIT && sReceiveFrame.mLength > IEEE802154_ACK_LENGTH))
     {
-        // TODO Set this flag only when the packet is really acknowledged with frame pending set.
-        // See https://github.com/openthread/openthread/pull/3785
-        sReceiveFrame.mInfo.mRxInfo.mAckedWithFramePending = true;
 #if OPENTHREAD_CONFIG_DIAG_ENABLE
 
         if (otPlatDiagModeGet())
@@ -813,7 +843,7 @@ void cc2538RadioProcess(otInstance *aInstance)
 
 #if OPENTHREAD_CONFIG_CC2538_USE_RADIO_RX_INTERRUPT
     // Turn the receive interrupt handler back on now the buffer is clear.
-    HWREG(RFCORE_XREG_RFIRQM0) |= RFCORE_XREG_RFIRQM0_RXPKTDONE;
+    HWREG(RFCORE_XREG_RFIRQM0) |= CC2538_ALL_USED_INTERRUPTS_MASK;
 #endif
 }
 
@@ -829,12 +859,12 @@ void RFCoreRxTxIntHandler(void)
             // A frame has been received, disable the interrupt handler
             // until the main loop has dealt with this previous frame,
             // otherwise we might overwrite it whilst it is being read.
-            HWREG(RFCORE_XREG_RFIRQM0) &= ~RFCORE_XREG_RFIRQM0_RXPKTDONE;
+            HWREG(RFCORE_XREG_RFIRQM0) &= ~CC2538_ALL_USED_INTERRUPTS_MASK;
         }
+
+        HWREG(RFCORE_SFR_RFIRQF0) &= ~RFCORE_SFR_RFIRQF0_RXPKTDONE;
     }
 #endif
-
-    HWREG(RFCORE_SFR_RFIRQF0) = 0;
 }
 
 void RFCoreErrIntHandler(void)
