@@ -249,6 +249,251 @@
 #endif
 
 /**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM
+ *
+ * Define as 1 to support configuration of the Front-End Module management.
+ *
+ * This is needed on some Nordic-based boards which feature a front-end module such
+ * as the Skyworks SKY66112 (present in the Fanstel BT840X modules).
+ *
+ * If you have such a board, change this to 1.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM
+#define OPENTHREAD_CONFIG_NRF5_FEM 0
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_PA_TIME_IN_ADVANCE_US
+ *
+ * This sets the time delay between us signalling the PA to come on and the PA
+ * actually turning on in microseconds.  The default value is taken from the Nordic
+ * SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_PA_TIME_IN_ADVANCE_US
+#define OPENTHREAD_CONFIG_NRF5_FEM_PA_TIME_IN_ADVANCE_US NRF_FEM_PA_TIME_IN_ADVANCE_US
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_LNA_TIME_IN_ADVANCE_US
+ *
+ * This sets the time delay between us signalling the LNA to come on and the LNA
+ * actually turning on in microseconds.  The default value is taken from the Nordic
+ * SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_LNA_TIME_IN_ADVANCE_US
+#define OPENTHREAD_CONFIG_NRF5_FEM_LNA_TIME_IN_ADVANCE_US NRF_FEM_LNA_TIME_IN_ADVANCE_US
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_PDN_SETTLE_US
+ *
+ * This sets the time delay between the PDN signal being asserted and the signal
+ * taking effect in microseconds.  The default value is taken from the Nordic
+ * SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_PDN_SETTLE_US
+#define OPENTHREAD_CONFIG_NRF5_FEM_PDN_SETTLE_US NRF_FEM_PDN_SETTLE_US
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_LNA_TIME_IN_ADVANCE_US
+ *
+ * This sets the time delay between the PDN signal being de-asserted and the signal
+ * taking effect in microseconds.  The default value is taken from the Nordic
+ * SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_TRX_HOLD_US
+#define OPENTHREAD_CONFIG_NRF5_FEM_TRX_HOLD_US NRF_FEM_TRX_HOLD_US
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_ENABLE
+ *
+ * This enables (1) or disables (0) control of the PA enable pin.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_ENABLE
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_ENABLE 1
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_ACTIVE_HIGH
+ *
+ * This defines whether the PA enable pin is active-high (1) or active-low (0).
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_ACTIVE_HIGH
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_ACTIVE_HIGH 1
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_PIN
+ *
+ * This defines which GPIO pin is used to control the PA enable signal.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_PIN
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_PIN NRF_FEM_CONTROL_DEFAULT_PA_PIN
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_GPIOTE_CHANNEL
+ *
+ * This defines which GPIOTE channel is used to control the PA enable signal.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_GPIOTE_CHANNEL
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PA_GPIOTE_CHANNEL NRF_FEM_CONTROL_DEFAULT_PA_GPIOTE_CHANNEL
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_ENABLE
+ *
+ * This enables (1) or disables (0) control of the LNA enable pin.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_ENABLE
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_ENABLE 1
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_ACTIVE_HIGH
+ *
+ * This defines whether the LNA enable pin is active-high (1) or active-low (0).
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_ACTIVE_HIGH
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_ACTIVE_HIGH 1
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_PIN
+ *
+ * This defines which GPIO pin is used to control the LNA enable signal.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_PIN
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_PIN NRF_FEM_CONTROL_DEFAULT_LNA_PIN
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_GPIOTE_CHANNEL
+ *
+ * This defines which GPIOTE channel is used to control the LNA enable signal.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_GPIOTE_CHANNEL
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_LNA_GPIOTE_CHANNEL NRF_FEM_CONTROL_DEFAULT_LNA_GPIOTE_CHANNEL
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_ENABLE
+ *
+ * This enables (1) or disables (0) control of the power-down pin.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_ENABLE
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_ENABLE 1
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_ACTIVE_HIGH
+ *
+ * This defines whether the power-down pin is active-high (1) or active-low (0).
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_ACTIVE_HIGH
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_ACTIVE_HIGH 1
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_PIN
+ *
+ * This defines which GPIO pin is used to control the power-down signal.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_PIN
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_PIN NRF_FEM_CONTROL_DEFAULT_PDN_PIN
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_GPIOTE_CHANNEL
+ *
+ * This defines which GPIOTE channel is used to control the power-down signal.
+ * The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_GPIOTE_CHANNEL
+#define OPENTHREAD_CONFIG_NRF5_FEM_CONTROL_PDN_GPIOTE_CHANNEL NRF_FEM_CONTROL_DEFAULT_PDN_GPIOTE_CHANNEL
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_SET_PPI_CHANNEL
+ *
+ * This defines which Programmable Peripheral Interconnect channel will be used to
+ * control setting the control pins.  The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_SET_PPI_CHANNEL
+#define OPENTHREAD_CONFIG_NRF5_FEM_SET_PPI_CHANNEL NRF_FEM_CONTROL_DEFAULT_SET_PPI_CHANNEL
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_CLR_PPI_CHANNEL
+ *
+ * This defines which Programmable Peripheral Interconnect channel will be used to
+ * control clearing the control pins.  The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_CLR_PPI_CHANNEL
+#define OPENTHREAD_CONFIG_NRF5_FEM_CLR_PPI_CHANNEL NRF_FEM_CONTROL_DEFAULT_CLR_PPI_CHANNEL
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_PDN_PPI_CHANNEL
+ *
+ * This defines which Programmable Peripheral Interconnect channel will be used to
+ * manage the power-down pin.  The default value is taken from the Nordic SDK.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_PDN_PPI_CHANNEL
+#define OPENTHREAD_CONFIG_NRF5_FEM_PDN_PPI_CHANNEL NRF_FEM_CONTROL_DEFAULT_PDN_PPI_CHANNEL
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_WITH_SKY66112
+ *
+ * Define as 1 to support control of additional signals on the SKY66112.
+ *
+ * This is needed on some Nordic-based boards which feature the Skyworks SKY66112
+ * (present in the Fanstel BT840X modules).
+ *
+ * If you have such a board, change this to 1.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_WITH_SKY66112
+#define OPENTHREAD_CONFIG_NRF5_WITH_SKY66112 0
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_SKY66112_CHL_PIN
+ *
+ * This controls whether the SKY66112 is in high-gain mode or not.  The default
+ * is consistent with Fanstel BT840X modules -- note that OpenThread normally assigns
+ * UART_TX to this same pin: this will need to be re-located elsewhere when compiling
+ * for the BT840X.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_SKY66112_CHL_PIN
+#define OPENTHREAD_CONFIG_NRF5_SKY66112_CHL_PIN 8
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_NRF5_SKY66112_CHL_DEFAULT_STATE
+ *
+ * Define the default state of the SKY66112's CHL pin.
+ *
+ * The default is to turn high-gain mode on.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_SKY66112_CHL_DEFAULT_STATE
+#define OPENTHREAD_CONFIG_NRF5_SKY66112_CHL_DEFAULT_STATE true
+#endif
+
+/**
  * @def RADIO_CONFIG_SRC_MATCH_SHORT_ENTRY_NUM
  *
  * The number of short source address table entries.
