@@ -201,6 +201,12 @@ UART_PIN_RX ?= 22
 UART_PIN_TX ?= 24
 FEM ?= 1
 SKY66112 ?= 1
+CONTROL_PA_PIN ?= 17    # aka CTX
+CONTROL_LNA_PIN ?= 19   # aka CRX
+CONTROL_PDN_PIN ?= 6    # aka CPS
+
+# Nordic SDK normally treats PDN as active-low, so we need to swap that
+CONTROL_PDN_ACTIVE_HIGH ?= 0
 endif
 
 ifneq ($(UART_PIN_RX),)
