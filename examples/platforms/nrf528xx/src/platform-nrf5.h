@@ -197,4 +197,25 @@ otError nrf5SdErrorToOtError(uint32_t aSdError);
 void nrf5SdSocFlashProcess(uint32_t aEvtId);
 #endif // SOFTDEVICE_PRESENT
 
+#if OPENTHREAD_CONFIG_NRF5_FEM
+#if OPENTHREAD_CONFIG_NRF5_WITH_SKY66112
+/**
+ * Retrieve the state of the CHL pin on the SKY66112.
+ *
+ * @retval	true	CHL is high (SKY66112 is in high-gain mode)
+ * @retval	false	CHL is low (SKY66112 is in low-gain mode)
+ */
+bool nrf5RadioGetChl(void);
+
+/**
+ * Set the state of the CHL pin on the SKY66112.  Putting the pin in
+ * a high state (`aState=true`) enables high-gain mode.
+ *
+ * @param	aState	State of the CHL pin.
+ */
+void nrf5RadioSetChl(bool aState);
+#endif // OPENTHREAD_CONFIG_NRF5_WITH_SKY66112
+#endif // OPENTHREAD_CONFIG_NRF5_FEM
+
+
 #endif // PLATFORM_NRF5_H_
