@@ -58,6 +58,7 @@ COMMONCPPFLAGS                                                                  
     -I$(top_srcdir)/examples/platforms/nrf528xx/src/transport                                                \
     -I$(top_srcdir)/src/core                                                                                 \
     -I$(top_srcdir)/third_party/NordicSemiconductor/drivers/radio                                            \
+    -I$(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/fem                                        \
     -I$(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/fem/three_pin_gpio                         \
     -I$(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/mac_features                               \
     -I$(top_srcdir)/third_party/NordicSemiconductor/drivers/radio/mac_features/ack_generator                 \
