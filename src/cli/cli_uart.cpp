@@ -106,12 +106,12 @@ static OT_DEFINE_ALIGNED_VAR(sCliUartRaw, sizeof(Uart), uint64_t);
 
 extern "C" bool otCliUartGetLineEchoEnabled()
 {
-    return Uart::sUartServer->GetLineEchoEnabled();
+    return static_cast<Uart *>(Server::sServer)->GetLineEchoEnabled();
 }
 
 extern "C" void otCliUartEnableLineEcho(bool aEnable)
 {
-    Uart::sUartServer->EnableLineEcho(aEnable);
+    static_cast<Uart *>(Server::sServer)->EnableLineEcho(aEnable);
 }
 
 extern "C" void otCliUartInit(otInstance *aInstance)
