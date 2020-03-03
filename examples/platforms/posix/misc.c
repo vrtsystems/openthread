@@ -28,18 +28,14 @@
 
 #include "platform-posix.h"
 
-#ifndef _WIN32
 #include <setjmp.h>
 #include <unistd.h>
-#endif
 
 #include <openthread/platform/misc.h>
 
 #include "openthread-system.h"
 
-#ifndef _WIN32
 extern jmp_buf gResetJump;
-#endif
 
 static otPlatResetReason   sPlatResetReason = OT_PLAT_RESET_REASON_POWER_ON;
 bool                       gPlatformPseudoResetWasRequested;
@@ -47,14 +43,13 @@ static otPlatMcuPowerState gPlatMcuPowerState = OT_PLAT_MCU_POWER_STATE_ON;
 
 void otPlatReset(otInstance *aInstance)
 {
-#if _WIN32
-    // This function does nothing on the Windows platform.
+    OT_UNUSED_VARIABLE(aInstance);
 
-#elif OPENTHREAD_PLATFORM_USE_PSEUDO_RESET // if _WIN32
+#if OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
     gPlatformPseudoResetWasRequested = true;
     sPlatResetReason                 = OT_PLAT_RESET_REASON_SOFTWARE;
 
-#else // elif OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
+#else // OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
     // Restart the process using execvp.
     otSysDeinit();
     platformUartRestore();
@@ -62,14 +57,13 @@ void otPlatReset(otInstance *aInstance)
     longjmp(gResetJump, 1);
     assert(false);
 
-#endif // else OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
-
-    (void)aInstance;
+#endif // OPENTHREAD_PLATFORM_USE_PSEUDO_RESET
 }
 
 otPlatResetReason otPlatGetResetReason(otInstance *aInstance)
 {
-    (void)aInstance;
+    OT_UNUSED_VARIABLE(aInstance);
+
     return sPlatResetReason;
 }
 
@@ -80,9 +74,9 @@ void otPlatWakeHost(void)
 
 otError otPlatSetMcuPowerState(otInstance *aInstance, otPlatMcuPowerState aState)
 {
-    otError error = OT_ERROR_NONE;
+    OT_UNUSED_VARIABLE(aInstance);
 
-    (void)aInstance;
+    otError error = OT_ERROR_NONE;
 
     switch (aState)
     {
@@ -101,6 +95,7 @@ otError otPlatSetMcuPowerState(otInstance *aInstance, otPlatMcuPowerState aState
 
 otPlatMcuPowerState otPlatGetMcuPowerState(otInstance *aInstance)
 {
-    (void)aInstance;
+    OT_UNUSED_VARIABLE(aInstance);
+
     return gPlatMcuPowerState;
 }

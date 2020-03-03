@@ -78,7 +78,7 @@ otError utilsFlashInit(void)
         create = true;
     }
 
-    sFlashFd = open(fileName, O_RDWR | O_CREAT, 0600);
+    sFlashFd = open(fileName, O_RDWR | O_CREAT | O_CLOEXEC, 0600);
     lseek(sFlashFd, 0, SEEK_SET);
 
     otEXPECT_ACTION(sFlashFd >= 0, error = OT_ERROR_FAILED);
@@ -127,7 +127,8 @@ exit:
 
 otError utilsFlashStatusWait(uint32_t aTimeout)
 {
-    (void)aTimeout;
+    OT_UNUSED_VARIABLE(aTimeout);
+
     return OT_ERROR_NONE;
 }
 

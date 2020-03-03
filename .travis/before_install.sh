@@ -27,6 +27,8 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 #
 
+[ -n "$BUILD_TARGET" ] || exit 0
+
 die() {
 	echo " *** ERROR: " $*
 	exit 1
@@ -37,6 +39,7 @@ set -x
 cd /tmp || die
 
 [ $TRAVIS_OS_NAME != linux ] || {
+    (cd /etc/apt/sources.list.d && sudo rm -rf cassandra.list* couchdb.list* mongodb-3.4.list* rabbitmq_rabbitmq-server.list* chris-lea-redis-server.list* github_git-lfs.list* pgdg.list)
     sudo apt-get update || die
 
     [ $BUILD_TARGET != posix-distcheck -a $BUILD_TARGET != posix-32-bit -a $BUILD_TARGET != posix-app-cli -a $BUILD_TARGET != posix-mtd -a $BUILD_TARGET != posix-ncp -a $BUILD_TARGET != posix-app-ncp ] || {
@@ -58,22 +61,9 @@ cd /tmp || die
         ) || die
     }
 
-    [ $BUILD_TARGET != pretty-check ] || {
-        clang-format --version || die
-    }
-
     [ $BUILD_TARGET != posix-app-pty ] || {
-        sudo apt-get install socat expect libdbus-1-dev autoconf-archive || die
+        sudo apt-get install socat expect || die
         JOBS=$(getconf _NPROCESSORS_ONLN)
-        (
-        WPANTUND_TMPDIR=/tmp/wpantund
-        git clone --depth 1 https://github.com/openthread/wpantund.git $WPANTUND_TMPDIR
-        cd $WPANTUND_TMPDIR
-        ./bootstrap.sh
-        ./configure --prefix= --exec-prefix=/usr --disable-ncp-dummy --enable-static-link-ncp-plugin=spinel
-        make -j $JOBS
-        sudo make install
-        ) || die
         (
         LIBCOAP_TMPDIR=/tmp/libcoap
         mkdir $LIBCOAP_TMPDIR
@@ -86,10 +76,6 @@ cd /tmp || die
         make -j $JOBS
         sudo make install
         ) || die
-    }
-
-    [ $BUILD_TARGET != scan-build ] || {
-        sudo apt-get install clang || die
     }
 
     [ $BUILD_TARGET != arm-gcc-4 ] || {
@@ -113,11 +99,6 @@ cd /tmp || die
         tar xjf gcc-arm-none-eabi-6-2017-q2-update-linux.tar.bz2 || die
         export PATH=/tmp/gcc-arm-none-eabi-6-2017-q2-update/bin:$PATH || die
         arm-none-eabi-gcc --version || die
-
-        wget https://github.com/foss-for-synopsys-dwc-arc-processors/toolchain/releases/download/arc-2017.03-rc2/arc_gnu_2017.03-rc2_prebuilt_elf32_le_linux_install.tar.gz || die
-        tar xzf arc_gnu_2017.03-rc2_prebuilt_elf32_le_linux_install.tar.gz
-        export PATH=/tmp/arc_gnu_2017.03-rc2_prebuilt_elf32_le_linux_install/bin:$PATH || die
-        arc-elf32-gcc --version || die
     }
 
     [ $BUILD_TARGET != arm-gcc-7 ] || {
@@ -127,17 +108,19 @@ cd /tmp || die
         arm-none-eabi-gcc --version || die
     }
 
+    [ $BUILD_TARGET != arm-gcc-8 ] || {
+        wget https://developer.arm.com/-/media/Files/downloads/gnu-rm/8-2018q4/gcc-arm-none-eabi-8-2018-q4-major-linux.tar.bz2 || die
+        tar xjf gcc-arm-none-eabi-8-2018-q4-major-linux.tar.bz2 || die
+        export PATH=/tmp/gcc-arm-none-eabi-8-2018-q4-major/bin:$PATH || die
+        arm-none-eabi-gcc --version || die
+    }
+
     [ $BUILD_TARGET != posix-32-bit -a $BUILD_TARGET != posix-mtd ] || {
         sudo apt-get install g++-multilib || die
     }
 
     [ $BUILD_TARGET != posix-distcheck ] || {
-        sudo apt-get install clang || die
-        sudo apt-get install llvm-3.4-runtime || die
-    }
-
-    [ $BUILD_TARGET != posix -o "$CC" != clang ] || {
-        sudo apt-get install clang || die
+        sudo apt-get install llvm-runtime || die
     }
 
     [ $BUILD_TARGET != toranj-test-framework ] || {

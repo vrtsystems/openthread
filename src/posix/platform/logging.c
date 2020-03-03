@@ -26,85 +26,50 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "openthread-core-config.h"
 #include "platform-posix.h"
-#include <openthread-core-config.h>
 
 #include <assert.h>
-#include <inttypes.h>
 #include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <syslog.h>
 
 #include <openthread/platform/logging.h>
 
-#include "code_utils.h"
-
-#define LOGGING_MAX_LOG_STRING_SIZE 512
-
-void platformLoggingInit(const char *aName)
+#if OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED
+void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
 {
-#if (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED) || \
-    (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_NCP_SPINEL)
+    OT_UNUSED_VARIABLE(aLogRegion);
 
-    openlog(aName, LOG_PID, LOG_USER);
-    setlogmask(setlogmask(0) & LOG_UPTO(LOG_DEBUG));
+    va_list args;
 
-#else
-    (void)aName;
-#endif
-}
-
-#if (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED) || \
-    (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_NCP_SPINEL)
-OT_TOOL_WEAK void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
-{
-    char         logString[LOGGING_MAX_LOG_STRING_SIZE];
-    int          charsWritten;
-    va_list      args;
-    int          logLevel;
-    unsigned int offset = 0;
-
-    charsWritten = snprintf(&logString[offset], sizeof(logString), "[%" PRIx64 "] ", gNodeId);
-    otEXPECT_ACTION(charsWritten >= 0, logString[offset] = 0);
-    offset += (unsigned int)charsWritten;
-    otEXPECT_ACTION(offset < sizeof(logString), logString[sizeof(logString) - 1] = 0);
-
-    va_start(args, aFormat);
-    charsWritten = vsnprintf(&logString[offset], sizeof(logString) - offset, aFormat, args);
-    va_end(args);
-
-    otEXPECT_ACTION(charsWritten >= 0, logString[offset] = 0);
-
-exit:
     switch (aLogLevel)
     {
     case OT_LOG_LEVEL_NONE:
-        logLevel = LOG_ALERT;
+        aLogLevel = LOG_ALERT;
         break;
     case OT_LOG_LEVEL_CRIT:
-        logLevel = LOG_CRIT;
+        aLogLevel = LOG_CRIT;
         break;
     case OT_LOG_LEVEL_WARN:
-        logLevel = LOG_WARNING;
+        aLogLevel = LOG_WARNING;
         break;
     case OT_LOG_LEVEL_NOTE:
-        logLevel = LOG_NOTICE;
+        aLogLevel = LOG_NOTICE;
         break;
     case OT_LOG_LEVEL_INFO:
-        logLevel = LOG_INFO;
+        aLogLevel = LOG_INFO;
         break;
     case OT_LOG_LEVEL_DEBG:
-        logLevel = LOG_DEBUG;
+        aLogLevel = LOG_DEBUG;
         break;
     default:
         assert(false);
-        logLevel = LOG_DEBUG;
+        aLogLevel = LOG_DEBUG;
         break;
     }
-    syslog(logLevel, "%s", logString);
 
-    (void)aLogRegion;
+    va_start(args, aFormat);
+    vsyslog(aLogLevel, aFormat, args);
+    va_end(args);
 }
-
-#endif // #if (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED)
+#endif // OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED

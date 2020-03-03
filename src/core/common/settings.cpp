@@ -31,11 +31,11 @@
  *   This file includes definitions for non-volatile storage of settings.
  */
 
-#define WPP_NAME "settings.tmh"
-
 #include "settings.hpp"
 
 #include <openthread/platform/settings.h>
+
+#include "utils/wrap_string.h"
 
 #include "common/code_utils.hpp"
 #include "common/instance.hpp"
@@ -44,6 +44,8 @@
 #include "thread/mle.hpp"
 
 namespace ot {
+
+// LCOV_EXCL_START
 
 #if (OPENTHREAD_CONFIG_LOG_UTIL != 0)
 #if (OPENTHREAD_CONFIG_LOG_LEVEL >= OT_LOG_LEVEL_INFO)
@@ -88,9 +90,16 @@ void SettingsBase::LogFailure(otError error, const char *aText, bool aIsDelete) 
 #endif // #if (OPENTHREAD_CONFIG_LOG_LEVEL >= OT_LOG_LEVEL_WARN)
 #endif // #if (OPENTHREAD_CONFIG_LOG_UTIL != 0)
 
+// LCOV_EXCL_STOP
+
 void Settings::Init(void)
 {
     otPlatSettingsInit(&GetInstance());
+}
+
+void Settings::Deinit(void)
+{
+    otPlatSettingsDeinit(&GetInstance());
 }
 
 void Settings::Wipe(void)
@@ -142,7 +151,15 @@ exit:
 
 otError Settings::SaveNetworkInfo(const NetworkInfo &aNetworkInfo)
 {
-    otError error;
+    otError     error = OT_ERROR_NONE;
+    NetworkInfo prevNetworkInfo;
+
+    if ((ReadFixedSize(kKeyNetworkInfo, &prevNetworkInfo, sizeof(NetworkInfo)) == OT_ERROR_NONE) &&
+        (memcmp(&prevNetworkInfo, &aNetworkInfo, sizeof(NetworkInfo)) == 0))
+    {
+        LogNetworkInfo("Re-saved", aNetworkInfo);
+        ExitNow();
+    }
 
     SuccessOrExit(error = Save(kKeyNetworkInfo, &aNetworkInfo, sizeof(NetworkInfo)));
     LogNetworkInfo("Saved", aNetworkInfo);
@@ -177,7 +194,15 @@ exit:
 
 otError Settings::SaveParentInfo(const ParentInfo &aParentInfo)
 {
-    otError error;
+    otError    error = OT_ERROR_NONE;
+    ParentInfo prevParentInfo;
+
+    if ((ReadFixedSize(kKeyParentInfo, &prevParentInfo, sizeof(ParentInfo)) == OT_ERROR_NONE) &&
+        (memcmp(&prevParentInfo, &aParentInfo, sizeof(ParentInfo)) == 0))
+    {
+        LogParentInfo("Re-saved", aParentInfo);
+        ExitNow();
+    }
 
     SuccessOrExit(error = Save(kKeyParentInfo, &aParentInfo, sizeof(ParentInfo)));
     LogParentInfo("Saved", aParentInfo);
@@ -298,14 +323,14 @@ exit:
     return error;
 }
 
-otError Settings::Save(Key aKey, const void *aBuffer, uint16_t aSize)
+otError Settings::Save(Key aKey, const void *aValue, uint16_t aSize)
 {
-    return otPlatSettingsSet(&GetInstance(), aKey, reinterpret_cast<const uint8_t *>(aBuffer), aSize);
+    return otPlatSettingsSet(&GetInstance(), aKey, reinterpret_cast<const uint8_t *>(aValue), aSize);
 }
 
-otError Settings::Add(Key aKey, const void *aBuffer, uint16_t aSize)
+otError Settings::Add(Key aKey, const void *aValue, uint16_t aSize)
 {
-    return otPlatSettingsAdd(&GetInstance(), aKey, reinterpret_cast<const uint8_t *>(aBuffer), aSize);
+    return otPlatSettingsAdd(&GetInstance(), aKey, reinterpret_cast<const uint8_t *>(aValue), aSize);
 }
 
 otError Settings::Delete(Key aKey)

@@ -141,8 +141,8 @@ int8_t GetRandomRss(void)
 {
     uint32_t value;
 
-    value = otPlatRandomGet() % 128;
-    return static_cast<int8_t>(-value);
+    value = rand() % 128;
+    return -static_cast<int8_t>(value);
 }
 
 void TestRssAveraging(void)

@@ -40,18 +40,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "../nrf_802154_debug.h"
 #include "nrf_802154_notification.h"
 #include "nrf_802154_procedures_duration.h"
 #include "nrf_802154_request.h"
 #include "timer_scheduler/nrf_802154_timer_sched.h"
 
-#define RETRY_DELAY     500      ///< Procedure is delayed by this time if it cannot be performed at the moment [us].
-#define MAX_RETRY_DELAY 1000000  ///< Maximum allowed delay of procedure retry [us].
+#define RETRY_DELAY     500     ///< Procedure is delayed by this time if it cannot be performed at the moment [us].
+#define MAX_RETRY_DELAY 1000000 ///< Maximum allowed delay of procedure retry [us].
 
 static void timeout_timer_retry(void);
 
-static uint32_t           m_timeout = NRF_802154_PRECISE_ACK_TIMEOUT_DEFAULT_TIMEOUT;  ///< ACK timeout in us.
-static nrf_802154_timer_t m_timer;                                                     ///< Timer used to notify when the ACK frama is not received for too long.
+static uint32_t           m_timeout = NRF_802154_PRECISE_ACK_TIMEOUT_DEFAULT_TIMEOUT; ///< ACK timeout in us.
+static nrf_802154_timer_t m_timer;                                                    ///< Timer used to notify when the ACK frama is not received for too long.
 static volatile bool      m_procedure_is_active;
 static const uint8_t    * mp_frame;
 
@@ -65,6 +66,8 @@ static void notify_tx_error(bool result)
 
 static void timeout_timer_fired(void * p_context)
 {
+    nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_ACK_TIMEOUT_FIRED);
+
     (void)p_context;
 
     if (m_procedure_is_active)
@@ -81,6 +84,8 @@ static void timeout_timer_fired(void * p_context)
             timeout_timer_retry();
         }
     }
+
+    nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_ACK_TIMEOUT_FIRED);
 }
 
 static void timeout_timer_retry(void)
@@ -113,7 +118,7 @@ static void timeout_timer_stop(void)
     // this function.
     __DMB();
 
-    nrf_802154_timer_sched_remove(&m_timer);
+    nrf_802154_timer_sched_remove(&m_timer, NULL);
 }
 
 void nrf_802154_ack_timeout_time_set(uint32_t time)
@@ -156,6 +161,13 @@ bool nrf_802154_ack_timeout_abort(nrf_802154_term_t term_lvl, req_originator_t r
 void nrf_802154_ack_timeout_transmitted_hook(const uint8_t * p_frame)
 {
     assert((p_frame == mp_frame) || (!m_procedure_is_active));
+
+    timeout_timer_stop();
+}
+
+void nrf_802154_ack_timeout_rx_ack_started_hook(void)
+{
+    assert(m_procedure_is_active);
 
     timeout_timer_stop();
 }

@@ -32,134 +32,37 @@
  *   This file includes the platform-specific initializers.
  */
 
+#include "openthread-core-config.h"
 #include "platform-posix.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <getopt.h>
-#include <libgen.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
+#include <openthread-core-config.h>
 #include <openthread/tasklet.h>
 #include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/radio.h>
 
 uint64_t gNodeId = 0;
 
-static void PrintUsage(const char *aProgramName, FILE *aStream, int aExitCode)
+otInstance *otSysInit(otPlatformConfig *aPlatformConfig)
 {
-    fprintf(aStream,
-            "Syntax:\n"
-            "    %s [Options] NodeId|Device|Command [DeviceConfig|CommandArgs]\n"
-            "Options:\n"
-            "    -n  --dry-run               Just verify if arguments is valid and radio spinel is compatible.\n"
-            "        --radio-version         Print radio firmware version\n"
-            "    -s  --time-speed factor     Time speed up factor.\n"
-            "    -h  --help                  Display this usage information.\n",
-            aProgramName);
-    exit(aExitCode);
-}
-
-otInstance *otSysInit(int aArgCount, char *aArgVector[])
-{
-    const char *radioFile         = NULL;
-    const char *radioConfig       = "";
-    otInstance *instance          = NULL;
-    uint32_t    speedUpFactor     = 1;
-    bool        isDryRun          = false;
-    bool        printRadioVersion = false;
-
-    while (true)
-    {
-        int                 index = 0;
-        int                 option;
-        const struct option options[] = {{"dry-run", no_argument, NULL, 'n'},
-                                         {"radio-version", no_argument, NULL, 0},
-                                         {"help", no_argument, NULL, 'h'},
-                                         {"time-speed", required_argument, NULL, 's'},
-                                         {0, 0, 0, 0}};
-
-        option = getopt_long(aArgCount, aArgVector, "hns:", options, &index);
-
-        if (option == -1)
-        {
-            break;
-        }
-
-        switch (option)
-        {
-        case 'h':
-            PrintUsage(aArgVector[0], stdout, OT_EXIT_SUCCESS);
-            break;
-        case 'n':
-            isDryRun = true;
-            break;
-        case 's':
-        {
-            char *endptr  = NULL;
-            speedUpFactor = (uint32_t)strtol(optarg, &endptr, 0);
-
-            if (*endptr != '\0' || speedUpFactor == 0)
-            {
-                fprintf(stderr, "Invalid value for TimerSpeedUpFactor: %s\n", optarg);
-                exit(OT_EXIT_INVALID_ARGUMENTS);
-            }
-            break;
-        }
-        case 0:
-            if (!strcmp(options[index].name, "radio-version"))
-            {
-                printRadioVersion = true;
-            }
-            break;
-        case '?':
-            PrintUsage(aArgVector[0], stderr, OT_EXIT_INVALID_ARGUMENTS);
-            break;
-        default:
-            assert(false);
-            break;
-        }
-    }
-
-    if (optind >= aArgCount)
-    {
-        PrintUsage(aArgVector[0], stderr, OT_EXIT_INVALID_ARGUMENTS);
-    }
-
-    radioFile = aArgVector[optind];
-    if (optind + 1 < aArgCount)
-    {
-        radioConfig = aArgVector[optind + 1];
-    }
-
-    platformLoggingInit(basename(aArgVector[0]));
+    otInstance *instance = NULL;
 
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    otSimInit();
+    platformSimInit();
 #endif
-    platformAlarmInit(speedUpFactor);
-    platformRadioInit(radioFile, radioConfig);
+    platformAlarmInit(aPlatformConfig->mSpeedUpFactor);
+    platformRadioInit(aPlatformConfig->mRadioFile, aPlatformConfig->mRadioConfig, aPlatformConfig->mResetRadio);
     platformRandomInit();
-#if OPENTHREAD_ENABLE_PLATFORM_UDP
-    platformUdpInit();
-#endif
 
     instance = otInstanceInitSingle();
-    assert(instance);
+    assert(instance != NULL);
 
-    if (printRadioVersion)
-    {
-        printf("%s\n", otPlatRadioGetVersionString(instance));
-    }
-
-    if (isDryRun)
-    {
-        exit(OT_EXIT_SUCCESS);
-    }
+#if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
+    platformNetifInit(instance);
+#elif OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE
+    platformUdpInit(aPlatformConfig->mInterfaceName);
+#endif
 
     return instance;
 }
@@ -167,7 +70,7 @@ otInstance *otSysInit(int aArgCount, char *aArgVector[])
 void otSysDeinit(void)
 {
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    otSimDeinit();
+    platformSimDeinit();
 #endif
     platformRadioDeinit();
 }
@@ -205,50 +108,50 @@ static int trySelect(fd_set *aReadFdSet, fd_set *aWriteFdSet, fd_set *aErrorFdSe
 }
 #endif // OPENTHREAD_POSIX_VIRTUAL_TIME
 
-void otSysProcessDrivers(otInstance *aInstance)
+void otSysMainloopUpdate(otInstance *aInstance, otSysMainloopContext *aMainloop)
 {
-    fd_set         readFdSet;
-    fd_set         writeFdSet;
-    fd_set         errorFdSet;
-    struct timeval timeout;
-    int            maxFd = -1;
-    int            rval;
-
-    FD_ZERO(&readFdSet);
-    FD_ZERO(&writeFdSet);
-    FD_ZERO(&errorFdSet);
-
-    platformAlarmUpdateTimeout(&timeout);
-    platformUartUpdateFdSet(&readFdSet, &writeFdSet, &errorFdSet, &maxFd);
-#if OPENTHREAD_ENABLE_PLATFORM_UDP
-    platformUdpUpdateFdSet(aInstance, &readFdSet, &maxFd);
+    platformAlarmUpdateTimeout(&aMainloop->mTimeout);
+    platformUartUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet,
+                            &aMainloop->mMaxFd);
+#if OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE
+    platformUdpUpdateFdSet(aInstance, &aMainloop->mReadFdSet, &aMainloop->mMaxFd);
+#endif
+#if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
+    platformNetifUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet,
+                             &aMainloop->mMaxFd);
 #endif
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    otSimUpdateFdSet(&readFdSet, &writeFdSet, &errorFdSet, &maxFd, &timeout);
+    platformSimUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet, &aMainloop->mMaxFd,
+                           &aMainloop->mTimeout);
 #else
-    platformRadioUpdateFdSet(&readFdSet, &writeFdSet, &maxFd, &timeout);
+    platformRadioUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mMaxFd, &aMainloop->mTimeout);
 #endif
 
     if (otTaskletsArePending(aInstance))
     {
-        timeout.tv_sec  = 0;
-        timeout.tv_usec = 0;
+        aMainloop->mTimeout.tv_sec  = 0;
+        aMainloop->mTimeout.tv_usec = 0;
     }
+}
+
+int otSysMainloopPoll(otSysMainloopContext *aMainloop)
+{
+    int rval;
 
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    if (timerisset(&timeout))
+    if (timerisset(&aMainloop->mTimeout))
     {
         // Make sure there are no data ready in UART
-        rval = trySelect(&readFdSet, &writeFdSet, &errorFdSet, maxFd);
+        rval = trySelect(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet, aMainloop->mMaxFd);
 
         if (rval == 0)
         {
             bool noWrite = true;
 
             // If there are write requests, the device is supposed to wake soon
-            for (int i = 0; i < maxFd + 1; ++i)
+            for (int i = 0; i < aMainloop->mMaxFd + 1; ++i)
             {
-                if (FD_ISSET(i, &writeFdSet))
+                if (FD_ISSET(i, &aMainloop->mWriteFdSet))
                 {
                     noWrite = false;
                     break;
@@ -257,33 +160,36 @@ void otSysProcessDrivers(otInstance *aInstance)
 
             if (noWrite)
             {
-                otSimSendSleepEvent(&timeout);
+                platformSimSendSleepEvent(&aMainloop->mTimeout);
             }
 
-            rval = select(maxFd + 1, &readFdSet, &writeFdSet, &errorFdSet, NULL);
-            assert(rval > 0);
+            rval = select(aMainloop->mMaxFd + 1, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet,
+                          &aMainloop->mErrorFdSet, NULL);
         }
     }
     else
 #endif
     {
-        rval = select(maxFd + 1, &readFdSet, &writeFdSet, &errorFdSet, &timeout);
+        rval = select(aMainloop->mMaxFd + 1, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet,
+                      &aMainloop->mTimeout);
     }
 
-    if ((rval < 0) && (errno != EINTR))
-    {
-        perror("select");
-        exit(OT_EXIT_FAILURE);
-    }
+    return rval;
+}
 
+void otSysMainloopProcess(otInstance *aInstance, const otSysMainloopContext *aMainloop)
+{
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    otSimProcess(aInstance, &readFdSet, &writeFdSet, &errorFdSet);
+    platformSimProcess(aInstance, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet);
 #else
-    platformRadioProcess(aInstance, &readFdSet, &writeFdSet);
+    platformRadioProcess(aInstance, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet);
 #endif
-    platformUartProcess(&readFdSet, &writeFdSet, &errorFdSet);
+    platformUartProcess(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet);
     platformAlarmProcess(aInstance);
-#if OPENTHREAD_ENABLE_PLATFORM_UDP
-    platformUdpProcess(aInstance, &readFdSet);
+#if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
+    platformNetifProcess(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet);
+#endif
+#if OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE
+    platformUdpProcess(aInstance, &aMainloop->mReadFdSet);
 #endif
 }

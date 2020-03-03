@@ -46,6 +46,7 @@
 #include "spinel.h"
 
 #include <errno.h>
+#include <limits.h>
 
 #ifndef SPINEL_PLATFORM_HEADER
 /* These are all already included in the spinel platform header
@@ -81,12 +82,6 @@
 // errno to in this case, so we just pick the
 // value '1' somewhat arbitrarily.
 #define ENOMEM 1
-#endif
-
-#ifdef _KERNEL_MODE
-#define va_copy(destination, source) ((destination) = (source))
-#undef errno
-#define assert_printf(fmt, ...)
 #endif
 
 #if defined(errno) && SPINEL_PLATFORM_DOESNT_IMPLEMENT_ERRNO_VAR
@@ -144,6 +139,65 @@ typedef struct
 #define SPINEL_MAX_PACK_LENGTH 32767
 
 // ----------------------------------------------------------------------------
+
+// This function validates whether a given byte sequence (string) follows UTF8 encoding.
+static bool spinel_validate_utf8(const uint8_t *string)
+{
+    bool    ret = true;
+    uint8_t byte;
+    uint8_t continuation_bytes = 0;
+
+    while ((byte = *string++) != 0)
+    {
+        if ((byte & 0x80) == 0)
+        {
+            continue;
+        }
+
+        // This is a leading byte 1xxx-xxxx.
+
+        if ((byte & 0x40) == 0) // 10xx-xxxx
+        {
+            // We got a continuation byte pattern without seeing a leading byte earlier.
+            ret = false;
+            goto bail;
+        }
+        else if ((byte & 0x20) == 0) // 110x-xxxx
+        {
+            continuation_bytes = 1;
+        }
+        else if ((byte & 0x10) == 0) // 1110-xxxx
+        {
+            continuation_bytes = 2;
+        }
+        else if ((byte & 0x08) == 0) // 1111-0xxx
+        {
+            continuation_bytes = 3;
+        }
+        else // 1111-1xxx  (invalid pattern).
+        {
+            ret = false;
+            goto bail;
+        }
+
+        while (continuation_bytes-- != 0)
+        {
+            byte = *string++;
+
+            // Verify the continuation byte pattern 10xx-xxxx
+            if ((byte & 0xc0) != 0x80)
+            {
+                ret = false;
+                goto bail;
+            }
+        }
+    }
+
+bail:
+    return ret;
+}
+
+// ----------------------------------------------------------------------------
 // MARK: -
 
 spinel_ssize_t spinel_packed_uint_decode(const uint8_t *bytes, spinel_size_t len, unsigned int *value_ptr)
@@ -151,17 +205,17 @@ spinel_ssize_t spinel_packed_uint_decode(const uint8_t *bytes, spinel_size_t len
     spinel_ssize_t ret   = 0;
     unsigned int   value = 0;
 
-    int i = 0;
+    unsigned int i = 0;
 
     do
     {
-        if (len < sizeof(uint8_t))
+        if ((len < sizeof(uint8_t)) || (i >= sizeof(unsigned int) * CHAR_BIT))
         {
             ret = -1;
             break;
         }
 
-        value |= (unsigned int)((bytes[0] & 0x7F) << i);
+        value |= (unsigned int)(bytes[0] & 0x7F) << i;
         i += 7;
         ret += sizeof(uint8_t);
         bytes += sizeof(uint8_t);
@@ -252,7 +306,7 @@ const char *spinel_next_packed_datatype(const char *pack_format)
 }
 
 static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
-                                               const uint8_t *data_ptr,
+                                               const uint8_t *data_in,
                                                spinel_size_t  data_len,
                                                const char *   pack_format,
                                                va_list_obj *  args)
@@ -279,11 +333,11 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
 
             if (arg_ptr)
             {
-                *arg_ptr = data_ptr[0] != 0;
+                *arg_ptr = data_in[0] != 0;
             }
 
             ret += sizeof(uint8_t);
-            data_ptr += sizeof(uint8_t);
+            data_in += sizeof(uint8_t);
             data_len -= sizeof(uint8_t);
             break;
         }
@@ -296,11 +350,11 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
 
             if (arg_ptr)
             {
-                *arg_ptr = data_ptr[0];
+                *arg_ptr = data_in[0];
             }
 
             ret += sizeof(uint8_t);
-            data_ptr += sizeof(uint8_t);
+            data_in += sizeof(uint8_t);
             data_len -= sizeof(uint8_t);
             break;
         }
@@ -313,11 +367,11 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
 
             if (arg_ptr)
             {
-                *arg_ptr = (uint16_t)((data_ptr[1] << 8) | data_ptr[0]);
+                *arg_ptr = (uint16_t)((data_in[1] << 8) | data_in[0]);
             }
 
             ret += sizeof(uint16_t);
-            data_ptr += sizeof(uint16_t);
+            data_in += sizeof(uint16_t);
             data_len -= sizeof(uint16_t);
             break;
         }
@@ -330,11 +384,11 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
 
             if (arg_ptr)
             {
-                *arg_ptr = (uint32_t)((data_ptr[3] << 24) | (data_ptr[2] << 16) | (data_ptr[1] << 8) | data_ptr[0]);
+                *arg_ptr = (uint32_t)((data_in[3] << 24) | (data_in[2] << 16) | (data_in[1] << 8) | data_in[0]);
             }
 
             ret += sizeof(uint32_t);
-            data_ptr += sizeof(uint32_t);
+            data_in += sizeof(uint32_t);
             data_len -= sizeof(uint32_t);
             break;
         }
@@ -347,14 +401,14 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
 
             if (arg_ptr)
             {
-                uint32_t l32 = (uint32_t)((data_ptr[3] << 24) | (data_ptr[2] << 16) | (data_ptr[1] << 8) | data_ptr[0]);
-                uint32_t h32 = (uint32_t)((data_ptr[7] << 24) | (data_ptr[6] << 16) | (data_ptr[5] << 8) | data_ptr[4]);
+                uint32_t l32 = (uint32_t)((data_in[3] << 24) | (data_in[2] << 16) | (data_in[1] << 8) | data_in[0]);
+                uint32_t h32 = (uint32_t)((data_in[7] << 24) | (data_in[6] << 16) | (data_in[5] << 8) | data_in[4]);
 
                 *arg_ptr = ((uint64_t)l32) | (((uint64_t)h32) << 32);
             }
 
             ret += sizeof(uint64_t);
-            data_ptr += sizeof(uint64_t);
+            data_in += sizeof(uint64_t);
             data_len -= sizeof(uint64_t);
             break;
         }
@@ -368,7 +422,7 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
                 spinel_ipv6addr_t *arg = va_arg(args->obj, spinel_ipv6addr_t *);
                 if (arg)
                 {
-                    memcpy(arg, data_ptr, sizeof(spinel_ipv6addr_t));
+                    memcpy(arg, data_in, sizeof(spinel_ipv6addr_t));
                 }
             }
             else
@@ -376,12 +430,12 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
                 const spinel_ipv6addr_t **arg_ptr = va_arg(args->obj, const spinel_ipv6addr_t **);
                 if (arg_ptr)
                 {
-                    *arg_ptr = (const spinel_ipv6addr_t *)data_ptr;
+                    *arg_ptr = (const spinel_ipv6addr_t *)data_in;
                 }
             }
 
             ret += sizeof(spinel_ipv6addr_t);
-            data_ptr += sizeof(spinel_ipv6addr_t);
+            data_in += sizeof(spinel_ipv6addr_t);
             data_len -= sizeof(spinel_ipv6addr_t);
             break;
         }
@@ -395,7 +449,7 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
                 spinel_eui64_t *arg = va_arg(args->obj, spinel_eui64_t *);
                 if (arg)
                 {
-                    memcpy(arg, data_ptr, sizeof(spinel_eui64_t));
+                    memcpy(arg, data_in, sizeof(spinel_eui64_t));
                 }
             }
             else
@@ -403,12 +457,12 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
                 const spinel_eui64_t **arg_ptr = va_arg(args->obj, const spinel_eui64_t **);
                 if (arg_ptr)
                 {
-                    *arg_ptr = (const spinel_eui64_t *)data_ptr;
+                    *arg_ptr = (const spinel_eui64_t *)data_in;
                 }
             }
 
             ret += sizeof(spinel_eui64_t);
-            data_ptr += sizeof(spinel_eui64_t);
+            data_in += sizeof(spinel_eui64_t);
             data_len -= sizeof(spinel_eui64_t);
             break;
         }
@@ -422,7 +476,7 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
                 spinel_eui48_t *arg = va_arg(args->obj, spinel_eui48_t *);
                 if (arg)
                 {
-                    memcpy(arg, data_ptr, sizeof(spinel_eui48_t));
+                    memcpy(arg, data_in, sizeof(spinel_eui48_t));
                 }
             }
             else
@@ -430,12 +484,12 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
                 const spinel_eui48_t **arg_ptr = va_arg(args->obj, const spinel_eui48_t **);
                 if (arg_ptr)
                 {
-                    *arg_ptr = (const spinel_eui48_t *)data_ptr;
+                    *arg_ptr = (const spinel_eui48_t *)data_in;
                 }
             }
 
             ret += sizeof(spinel_eui48_t);
-            data_ptr += sizeof(spinel_eui48_t);
+            data_in += sizeof(spinel_eui48_t);
             data_len -= sizeof(spinel_eui48_t);
             break;
         }
@@ -443,7 +497,7 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
         case SPINEL_DATATYPE_UINT_PACKED_C:
         {
             unsigned int * arg_ptr = va_arg(args->obj, unsigned int *);
-            spinel_ssize_t pui_len = spinel_packed_uint_decode(data_ptr, data_len, arg_ptr);
+            spinel_ssize_t pui_len = spinel_packed_uint_decode(data_in, data_len, arg_ptr);
 
             // Range check
             require_action(NULL == arg_ptr || (*arg_ptr < SPINEL_MAX_UINT_PACKED), bail, (ret = -1, errno = ERANGE));
@@ -453,7 +507,7 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
             require(pui_len <= (spinel_ssize_t)data_len, bail);
 
             ret += pui_len;
-            data_ptr += pui_len;
+            data_in += pui_len;
             data_len -= (spinel_size_t)pui_len;
             break;
         }
@@ -468,10 +522,13 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
             // Add 1 for zero termination. If not zero terminated,
             // len will then be data_len+1, which we will detect
             // in the next check.
-            len = strnlen((const char *)data_ptr, data_len) + 1;
+            len = strnlen((const char *)data_in, data_len) + 1;
 
             // Verify that the string is zero terminated.
             require_action(len <= data_len, bail, (ret = -1, errno = EOVERFLOW));
+
+            // Verify the string follows valid UTF8 encoding.
+            require_action(spinel_validate_utf8(data_in), bail, (ret = -1, errno = EINVAL));
 
             if (in_place)
             {
@@ -480,7 +537,7 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
                 if (arg)
                 {
                     require_action(len_arg >= len, bail, (ret = -1, errno = ENOMEM));
-                    memcpy(arg, data_ptr, len);
+                    memcpy(arg, data_in, len);
                 }
             }
             else
@@ -488,12 +545,12 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
                 const char **arg_ptr = va_arg(args->obj, const char **);
                 if (arg_ptr)
                 {
-                    *arg_ptr = (const char *)data_ptr;
+                    *arg_ptr = (const char *)data_in;
                 }
             }
 
             ret += (spinel_size_t)len;
-            data_ptr += len;
+            data_in += len;
             data_len -= (spinel_size_t)len;
             break;
         }
@@ -503,14 +560,14 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
         {
             spinel_ssize_t pui_len       = 0;
             uint16_t       block_len     = 0;
-            const uint8_t *block_ptr     = data_ptr;
+            const uint8_t *block_ptr     = data_in;
             void *         arg_ptr       = va_arg(args->obj, void *);
             unsigned int * block_len_ptr = va_arg(args->obj, unsigned int *);
             char           nextformat    = *spinel_next_packed_datatype(pack_format);
 
             if ((pack_format[0] == SPINEL_DATATYPE_DATA_WLEN_C) || ((nextformat != 0) && (nextformat != ')')))
             {
-                pui_len = spinel_datatype_unpack(data_ptr, data_len, SPINEL_DATATYPE_UINT16_S, &block_len);
+                pui_len = spinel_datatype_unpack(data_in, data_len, SPINEL_DATATYPE_UINT16_S, &block_len);
                 block_ptr += pui_len;
 
                 require(pui_len > 0, bail);
@@ -545,7 +602,7 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
 
             block_len += (uint16_t)pui_len;
             ret += block_len;
-            data_ptr += block_len;
+            data_in += block_len;
             data_len -= block_len;
             break;
         }
@@ -556,12 +613,12 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
             spinel_ssize_t pui_len    = 0;
             uint16_t       block_len  = 0;
             spinel_ssize_t actual_len = 0;
-            const uint8_t *block_ptr  = data_ptr;
+            const uint8_t *block_ptr  = data_in;
             char           nextformat = *spinel_next_packed_datatype(pack_format);
 
             if ((pack_format[0] == SPINEL_DATATYPE_STRUCT_C) || ((nextformat != 0) && (nextformat != ')')))
             {
-                pui_len = spinel_datatype_unpack(data_ptr, data_len, SPINEL_DATATYPE_UINT16_S, &block_len);
+                pui_len = spinel_datatype_unpack(data_in, data_len, SPINEL_DATATYPE_UINT16_S, &block_len);
                 block_ptr += pui_len;
 
                 require(pui_len > 0, bail);
@@ -589,7 +646,7 @@ static spinel_ssize_t spinel_datatype_vunpack_(bool           in_place,
             }
 
             ret += block_len;
-            data_ptr += block_len;
+            data_in += block_len;
             data_len -= block_len;
             break;
         }
@@ -613,7 +670,7 @@ bail:
     return ret;
 }
 
-spinel_ssize_t spinel_datatype_unpack_in_place(const uint8_t *data_ptr,
+spinel_ssize_t spinel_datatype_unpack_in_place(const uint8_t *data_in,
                                                spinel_size_t  data_len,
                                                const char *   pack_format,
                                                ...)
@@ -622,25 +679,25 @@ spinel_ssize_t spinel_datatype_unpack_in_place(const uint8_t *data_ptr,
     va_list_obj    args;
     va_start(args.obj, pack_format);
 
-    ret = spinel_datatype_vunpack_(true, data_ptr, data_len, pack_format, &args);
+    ret = spinel_datatype_vunpack_(true, data_in, data_len, pack_format, &args);
 
     va_end(args.obj);
     return ret;
 }
 
-spinel_ssize_t spinel_datatype_unpack(const uint8_t *data_ptr, spinel_size_t data_len, const char *pack_format, ...)
+spinel_ssize_t spinel_datatype_unpack(const uint8_t *data_in, spinel_size_t data_len, const char *pack_format, ...)
 {
     spinel_ssize_t ret;
     va_list_obj    args;
     va_start(args.obj, pack_format);
 
-    ret = spinel_datatype_vunpack_(false, data_ptr, data_len, pack_format, &args);
+    ret = spinel_datatype_vunpack_(false, data_in, data_len, pack_format, &args);
 
     va_end(args.obj);
     return ret;
 }
 
-spinel_ssize_t spinel_datatype_vunpack_in_place(const uint8_t *data_ptr,
+spinel_ssize_t spinel_datatype_vunpack_in_place(const uint8_t *data_in,
                                                 spinel_size_t  data_len,
                                                 const char *   pack_format,
                                                 va_list        args)
@@ -649,13 +706,13 @@ spinel_ssize_t spinel_datatype_vunpack_in_place(const uint8_t *data_ptr,
     va_list_obj    args_obj;
     va_copy(args_obj.obj, args);
 
-    ret = spinel_datatype_vunpack_(true, data_ptr, data_len, pack_format, &args_obj);
+    ret = spinel_datatype_vunpack_(true, data_in, data_len, pack_format, &args_obj);
 
     va_end(args_obj.obj);
     return ret;
 }
 
-spinel_ssize_t spinel_datatype_vunpack(const uint8_t *data_ptr,
+spinel_ssize_t spinel_datatype_vunpack(const uint8_t *data_in,
                                        spinel_size_t  data_len,
                                        const char *   pack_format,
                                        va_list        args)
@@ -664,13 +721,13 @@ spinel_ssize_t spinel_datatype_vunpack(const uint8_t *data_ptr,
     va_list_obj    args_obj;
     va_copy(args_obj.obj, args);
 
-    ret = spinel_datatype_vunpack_(false, data_ptr, data_len, pack_format, &args_obj);
+    ret = spinel_datatype_vunpack_(false, data_in, data_len, pack_format, &args_obj);
 
     va_end(args_obj.obj);
     return ret;
 }
 
-static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
+static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_out,
                                              spinel_size_t data_len_max,
                                              const char *  pack_format,
                                              va_list_obj * args)
@@ -679,6 +736,11 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
     // Buffer length sanity check
     require_action(data_len_max <= SPINEL_MAX_PACK_LENGTH, bail, (ret = -1, errno = EINVAL));
+
+    if (data_out == NULL)
+    {
+        data_len_max = 0;
+    }
 
     for (; *pack_format != 0; pack_format = spinel_next_packed_datatype(pack_format))
     {
@@ -697,8 +759,8 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= sizeof(uint8_t))
             {
-                data_ptr[0] = (arg != false);
-                data_ptr += sizeof(uint8_t);
+                data_out[0] = (arg != false);
+                data_out += sizeof(uint8_t);
                 data_len_max -= sizeof(uint8_t);
             }
             else
@@ -717,8 +779,8 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= sizeof(uint8_t))
             {
-                data_ptr[0] = arg;
-                data_ptr += sizeof(uint8_t);
+                data_out[0] = arg;
+                data_out += sizeof(uint8_t);
                 data_len_max -= sizeof(uint8_t);
             }
             else
@@ -737,9 +799,9 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= sizeof(uint16_t))
             {
-                data_ptr[1] = (arg >> 8) & 0xff;
-                data_ptr[0] = (arg >> 0) & 0xff;
-                data_ptr += sizeof(uint16_t);
+                data_out[1] = (arg >> 8) & 0xff;
+                data_out[0] = (arg >> 0) & 0xff;
+                data_out += sizeof(uint16_t);
                 data_len_max -= sizeof(uint16_t);
             }
             else
@@ -758,11 +820,11 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= sizeof(uint32_t))
             {
-                data_ptr[3] = (arg >> 24) & 0xff;
-                data_ptr[2] = (arg >> 16) & 0xff;
-                data_ptr[1] = (arg >> 8) & 0xff;
-                data_ptr[0] = (arg >> 0) & 0xff;
-                data_ptr += sizeof(uint32_t);
+                data_out[3] = (arg >> 24) & 0xff;
+                data_out[2] = (arg >> 16) & 0xff;
+                data_out[1] = (arg >> 8) & 0xff;
+                data_out[0] = (arg >> 0) & 0xff;
+                data_out += sizeof(uint32_t);
                 data_len_max -= sizeof(uint32_t);
             }
             else
@@ -776,21 +838,21 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
         case SPINEL_DATATYPE_INT64_C:
         case SPINEL_DATATYPE_UINT64_C:
         {
-            uint64_t arg = (uint64_t)va_arg(args->obj, uint64_t);
+            uint64_t arg = va_arg(args->obj, uint64_t);
 
             ret += sizeof(uint64_t);
 
             if (data_len_max >= sizeof(uint64_t))
             {
-                data_ptr[7] = (arg >> 56) & 0xff;
-                data_ptr[6] = (arg >> 48) & 0xff;
-                data_ptr[5] = (arg >> 40) & 0xff;
-                data_ptr[4] = (arg >> 32) & 0xff;
-                data_ptr[3] = (arg >> 24) & 0xff;
-                data_ptr[2] = (arg >> 16) & 0xff;
-                data_ptr[1] = (arg >> 8) & 0xff;
-                data_ptr[0] = (arg >> 0) & 0xff;
-                data_ptr += sizeof(uint64_t);
+                data_out[7] = (arg >> 56) & 0xff;
+                data_out[6] = (arg >> 48) & 0xff;
+                data_out[5] = (arg >> 40) & 0xff;
+                data_out[4] = (arg >> 32) & 0xff;
+                data_out[3] = (arg >> 24) & 0xff;
+                data_out[2] = (arg >> 16) & 0xff;
+                data_out[1] = (arg >> 8) & 0xff;
+                data_out[0] = (arg >> 0) & 0xff;
+                data_out += sizeof(uint64_t);
                 data_len_max -= sizeof(uint64_t);
             }
             else
@@ -808,8 +870,8 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= sizeof(spinel_ipv6addr_t))
             {
-                *(spinel_ipv6addr_t *)data_ptr = *arg;
-                data_ptr += sizeof(spinel_ipv6addr_t);
+                *(spinel_ipv6addr_t *)data_out = *arg;
+                data_out += sizeof(spinel_ipv6addr_t);
                 data_len_max -= sizeof(spinel_ipv6addr_t);
             }
             else
@@ -827,8 +889,8 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= sizeof(spinel_eui48_t))
             {
-                *(spinel_eui48_t *)data_ptr = *arg;
-                data_ptr += sizeof(spinel_eui48_t);
+                *(spinel_eui48_t *)data_out = *arg;
+                data_out += sizeof(spinel_eui48_t);
                 data_len_max -= sizeof(spinel_eui48_t);
             }
             else
@@ -846,8 +908,8 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= sizeof(spinel_eui64_t))
             {
-                *(spinel_eui64_t *)data_ptr = *arg;
-                data_ptr += sizeof(spinel_eui64_t);
+                *(spinel_eui64_t *)data_out = *arg;
+                data_out += sizeof(spinel_eui64_t);
                 data_len_max -= sizeof(spinel_eui64_t);
             }
             else
@@ -869,12 +931,12 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
                 errno = EINVAL;
             });
 
-            encoded_size = spinel_packed_uint_encode(data_ptr, data_len_max, arg);
+            encoded_size = spinel_packed_uint_encode(data_out, data_len_max, arg);
             ret += encoded_size;
 
             if ((spinel_ssize_t)data_len_max >= encoded_size)
             {
-                data_ptr += encoded_size;
+                data_out += encoded_size;
                 data_len_max -= (spinel_size_t)encoded_size;
             }
             else
@@ -904,9 +966,9 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= string_arg_len)
             {
-                memcpy(data_ptr, string_arg, string_arg_len);
+                memcpy(data_out, string_arg, string_arg_len);
 
-                data_ptr += string_arg_len;
+                data_out += string_arg_len;
                 data_len_max -= (spinel_size_t)string_arg_len;
             }
             else
@@ -927,7 +989,7 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if ((pack_format[0] == SPINEL_DATATYPE_DATA_WLEN_C) || ((nextformat != 0) && (nextformat != ')')))
             {
-                size_len = spinel_datatype_pack(data_ptr, data_len_max, SPINEL_DATATYPE_UINT16_S, data_size_arg);
+                size_len = spinel_datatype_pack(data_out, data_len_max, SPINEL_DATATYPE_UINT16_S, data_size_arg);
                 require_action(size_len > 0, bail, {
                     ret   = -1;
                     errno = EINVAL;
@@ -938,12 +1000,15 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (data_len_max >= (spinel_size_t)size_len + data_size_arg)
             {
-                data_ptr += size_len;
+                data_out += size_len;
                 data_len_max -= (spinel_size_t)size_len;
 
-                memcpy(data_ptr, arg, data_size_arg);
+                if (data_out && arg)
+                {
+                    memcpy(data_out, arg, data_size_arg);
+                }
 
-                data_ptr += data_size_arg;
+                data_out += data_size_arg;
                 data_len_max -= data_size_arg;
             }
             else
@@ -976,7 +1041,7 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if ((pack_format[0] == SPINEL_DATATYPE_STRUCT_C) || ((nextformat != 0) && (nextformat != ')')))
             {
-                size_len = spinel_datatype_pack(data_ptr, data_len_max, SPINEL_DATATYPE_UINT16_S, struct_len);
+                size_len = spinel_datatype_pack(data_out, data_len_max, SPINEL_DATATYPE_UINT16_S, struct_len);
                 require_action(size_len > 0, bail, {
                     ret   = -1;
                     errno = EINVAL;
@@ -987,12 +1052,12 @@ static spinel_ssize_t spinel_datatype_vpack_(uint8_t *     data_ptr,
 
             if (struct_len + size_len <= (spinel_ssize_t)data_len_max)
             {
-                data_ptr += size_len;
+                data_out += size_len;
                 data_len_max -= (spinel_size_t)size_len;
 
-                struct_len = spinel_datatype_vpack_(data_ptr, data_len_max, pack_format + 2, args);
+                struct_len = spinel_datatype_vpack_(data_out, data_len_max, pack_format + 2, args);
 
-                data_ptr += struct_len;
+                data_out += struct_len;
                 data_len_max -= (spinel_size_t)struct_len;
             }
             else
@@ -1019,19 +1084,19 @@ bail:
     return ret;
 }
 
-spinel_ssize_t spinel_datatype_pack(uint8_t *data_ptr, spinel_size_t data_len_max, const char *pack_format, ...)
+spinel_ssize_t spinel_datatype_pack(uint8_t *data_out, spinel_size_t data_len_max, const char *pack_format, ...)
 {
     int         ret;
     va_list_obj args;
     va_start(args.obj, pack_format);
 
-    ret = spinel_datatype_vpack_(data_ptr, data_len_max, pack_format, &args);
+    ret = spinel_datatype_vpack_(data_out, data_len_max, pack_format, &args);
 
     va_end(args.obj);
     return ret;
 }
 
-spinel_ssize_t spinel_datatype_vpack(uint8_t *     data_ptr,
+spinel_ssize_t spinel_datatype_vpack(uint8_t *     data_out,
                                      spinel_size_t data_len_max,
                                      const char *  pack_format,
                                      va_list       args)
@@ -1040,7 +1105,7 @@ spinel_ssize_t spinel_datatype_vpack(uint8_t *     data_ptr,
     va_list_obj args_obj;
     va_copy(args_obj.obj, args);
 
-    ret = spinel_datatype_vpack_(data_ptr, data_len_max, pack_format, &args_obj);
+    ret = spinel_datatype_vpack_(data_out, data_len_max, pack_format, &args_obj);
 
     va_end(args_obj.obj);
     return ret;
@@ -1049,7 +1114,7 @@ spinel_ssize_t spinel_datatype_vpack(uint8_t *     data_ptr,
 // ----------------------------------------------------------------------------
 // MARK: -
 
-// **** LCOV_EXCL_START ****
+// LCOV_EXCL_START
 
 const char *spinel_command_to_cstr(unsigned int command)
 {
@@ -1294,6 +1359,10 @@ const char *spinel_prop_key_to_cstr(spinel_prop_key_t prop_key)
         ret = "PHY_PCAP_ENABLED";
         break;
 
+    case SPINEL_PROP_PHY_CHAN_PREFERRED:
+        ret = "PHY_CHAN_PREFERRED";
+        break;
+
     case SPINEL_PROP_JAM_DETECT_ENABLE:
         ret = "JAM_DETECT_ENABLE";
         break;
@@ -1336,6 +1405,14 @@ const char *spinel_prop_key_to_cstr(spinel_prop_key_t prop_key)
 
     case SPINEL_PROP_CHANNEL_MONITOR_CHANNEL_OCCUPANCY:
         ret = "CHANNEL_MONITOR_CHANNEL_OCCUPANCY";
+        break;
+
+    case SPINEL_PROP_RADIO_COEX_METRICS:
+        ret = "RADIO_COEX_METRICS";
+        break;
+
+    case SPINEL_PROP_RADIO_COEX_ENABLE:
+        ret = "RADIO_COEX_ENABLE";
         break;
 
     case SPINEL_PROP_MAC_SCAN_STATE:
@@ -1420,6 +1497,14 @@ const char *spinel_prop_key_to_cstr(spinel_prop_key_t prop_key)
 
     case SPINEL_PROP_MAC_CCA_FAILURE_RATE:
         ret = "MAC_CCA_FAILURE_RATE";
+        break;
+
+    case SPINEL_PROP_MAC_MAX_RETRY_NUMBER_DIRECT:
+        ret = "MAC_MAX_RETRY_NUMBER_DIRECT";
+        break;
+
+    case SPINEL_PROP_MAC_MAX_RETRY_NUMBER_INDIRECT:
+        ret = "MAC_MAX_RETRY_NUMBER_INDIRECT";
         break;
 
     case SPINEL_PROP_NET_SAVED:
@@ -1690,6 +1775,10 @@ const char *spinel_prop_key_to_cstr(spinel_prop_key_t prop_key)
         ret = "DATASET_DEST_ADDRESS";
         break;
 
+    case SPINEL_PROP_THREAD_NEW_DATASET:
+        ret = "THREAD_NEW_DATASET";
+        break;
+
     case SPINEL_PROP_MESHCOP_JOINER_STATE:
         ret = "MESHCOP_JOINER_STATE";
         break;
@@ -1794,6 +1883,10 @@ const char *spinel_prop_key_to_cstr(spinel_prop_key_t prop_key)
         ret = "MESHCOP_COMMISSIONER_MGMT_SET";
         break;
 
+    case SPINEL_PROP_MESHCOP_COMMISSIONER_GENERATE_PSKC:
+        ret = "MESHCOP_COMMISSIONER_GENERATE_PSKC";
+        break;
+
     case SPINEL_PROP_CHANNEL_MANAGER_NEW_CHANNEL:
         ret = "CHANNEL_MANAGER_NEW_CHANNEL";
         break;
@@ -1848,6 +1941,22 @@ const char *spinel_prop_key_to_cstr(spinel_prop_key_t prop_key)
 
     case SPINEL_PROP_PARENT_RESPONSE_INFO:
         ret = "PARENT_RESPONSE_INFO";
+        break;
+
+    case SPINEL_PROP_SLAAC_ENABLED:
+        ret = "SLAAC_ENABLED";
+        break;
+
+    case SPINEL_PROP_SERVER_ALLOW_LOCAL_DATA_CHANGE:
+        ret = "SERVER_ALLOW_LOCAL_DATA_CHANGE";
+        break;
+
+    case SPINEL_PROP_SERVER_SERVICES:
+        ret = "SERVER_SERVICES";
+        break;
+
+    case SPINEL_PROP_SERVER_LEADER_SERVICES:
+        ret = "SERVER_LEADER_SERVICES";
         break;
 
     case SPINEL_PROP_UART_BITRATE:
@@ -2060,6 +2169,14 @@ const char *spinel_prop_key_to_cstr(spinel_prop_key_t prop_key)
 
     case SPINEL_PROP_CNTR_ALL_MAC_COUNTERS:
         ret = "CNTR_ALL_MAC_COUNTERS";
+        break;
+
+    case SPINEL_PROP_CNTR_MLE_COUNTERS:
+        ret = "CNTR_MLE_COUNTERS";
+        break;
+
+    case SPINEL_PROP_CNTR_ALL_IP_COUNTERS:
+        ret = "CNTR_ALL_IP_COUNTERS";
         break;
 
     case SPINEL_PROP_NEST_STREAM_MFG:
@@ -2411,6 +2528,18 @@ const char *spinel_capability_to_cstr(unsigned int capability)
         ret = "802_15_4_868MHZ_ASK";
         break;
 
+    case SPINEL_CAP_CONFIG_FTD:
+        ret = "CONFIG_FTD";
+        break;
+
+    case SPINEL_CAP_CONFIG_MTD:
+        ret = "CONFIG_MTD";
+        break;
+
+    case SPINEL_CAP_CONFIG_RADIO:
+        ret = "CONFIG_RADIO";
+        break;
+
     case SPINEL_CAP_ROLE_ROUTER:
         ret = "ROLE_ROUTER";
         break;
@@ -2463,6 +2592,14 @@ const char *spinel_capability_to_cstr(unsigned int capability)
         ret = "POSIX_APP";
         break;
 
+    case SPINEL_CAP_SLAAC:
+        ret = "SLAAC";
+        break;
+
+    case SPINEL_CAP_RADIO_COEX:
+        ret = "RADIO_COEX";
+        break;
+
     case SPINEL_CAP_ERROR_RATE_TRACKING:
         ret = "ERROR_RATE_TRACKING";
         break;
@@ -2481,6 +2618,14 @@ const char *spinel_capability_to_cstr(unsigned int capability)
 
     case SPINEL_CAP_THREAD_JOINER:
         ret = "THREAD_JOINER";
+        break;
+
+    case SPINEL_CAP_THREAD_BORDER_ROUTER:
+        ret = "THREAD_BORDER_ROUTER";
+        break;
+
+    case SPINEL_CAP_THREAD_SERVICE:
+        ret = "THREAD_SERVICE";
         break;
 
     case SPINEL_CAP_NEST_LEGACY_INTERFACE:
@@ -2502,7 +2647,7 @@ const char *spinel_capability_to_cstr(unsigned int capability)
     return ret;
 }
 
-// **** LCOV_EXCL_STOP ****
+// LCOV_EXCL_STOP
 
 /* -------------------------------------------------------------------------- */
 
@@ -2770,6 +2915,72 @@ int main(void)
         {
             printf("error:%d: memcmp(&eui64, &static_eui64, sizeof(spinel_eui64_t)) != 0\n", __LINE__);
             goto bail;
+        }
+    }
+
+    {
+        // Test UTF8 validation - Good/Valid strings
+
+        // Single symbols
+        const uint8_t single1[] = {0};                            // 0000
+        const uint8_t single2[] = {0x7F, 0x00};                   // 007F
+        const uint8_t single3[] = {0xC2, 0x80, 0x00};             // 080
+        const uint8_t single4[] = {0xDF, 0xBF, 0x00};             // 07FF
+        const uint8_t single5[] = {0xE0, 0xA0, 0x80, 0x00};       // 0800
+        const uint8_t single6[] = {0xEF, 0xBF, 0xBF, 0x00};       // FFFF
+        const uint8_t single7[] = {0xF0, 0x90, 0x80, 0x80, 0x00}; // 010000
+        const uint8_t single8[] = {0xF4, 0x8F, 0xBF, 0xBF, 0x00}; // 10FFFF
+
+        // Strings
+        const uint8_t str1[] = "spinel";
+        const uint8_t str2[] = "OpenThread";
+        const uint8_t str3[] = {0x41, 0x7F, 0xEF, 0xBF, 0xBF, 0xC2, 0x80, 0x21, 0x33, 0x00};
+        const uint8_t str4[] = {0xCE, 0xBA, 0xE1, 0xBD, 0xB9, 0xCF, 0x83, 0xCE, 0xBC, 0xCE, 0xB5, 0x00}; // κόσμε
+        const uint8_t str5[] = {0x3D, 0xF4, 0x8F, 0xBF, 0xBF, 0x01, 0xE0, 0xA0, 0x83, 0x22, 0xEF, 0xBF, 0xBF, 0x00};
+        const uint8_t str6[] = {0xE5, 0xA2, 0x82, 0xE0, 0xA0, 0x80, 0xC2, 0x83, 0xC2, 0x80, 0xF4,
+                                0x8F, 0xBF, 0xBF, 0xF4, 0x8F, 0xBF, 0xBF, 0xDF, 0xBF, 0x21, 0x00};
+
+        const uint8_t * good_strings[] = {single1, single2, single3, single4, single5, single6, single7, single8,
+                                         str1,    str2,    str3,    str4,    str5,    str6,    NULL};
+        const uint8_t **str_ptr;
+
+        for (str_ptr = &good_strings[0]; *str_ptr != NULL; str_ptr++)
+        {
+            if (!spinel_validate_utf8(*str_ptr))
+            {
+                printf("error: spinel_validate_utf8() did not correctly detect a valid UTF8 sequence!\n");
+                goto bail;
+            }
+        }
+    }
+
+    {
+        // Test UTF8 validation - Bad/Invalid strings
+
+        // Single symbols (invalid)
+        const uint8_t single1[] = {0xF8, 0x00};
+        const uint8_t single2[] = {0xF9, 0x00};
+        const uint8_t single3[] = {0xFA, 0x00};
+        const uint8_t single4[] = {0xFF, 0x00};
+
+        // Bad continuations
+        const uint8_t bad1[] = {0xDF, 0x0F, 0x00};
+        const uint8_t bad2[] = {0xE0, 0xA0, 0x10, 0x00};
+        const uint8_t bad3[] = {0xF0, 0x90, 0x80, 0x60, 0x00};
+        const uint8_t bad4[] = {0xF4, 0x8F, 0xBF, 0x0F, 0x00};
+        const uint8_t bad5[] = {0x21, 0xA0, 0x00};
+        const uint8_t bad6[] = {0xCE, 0xBA, 0xE1, 0xBD, 0xB9, 0xCF, 0x83, 0xCE, 0xBC, 0xCE, 0x00};
+
+        const uint8_t * bad_strings[] = {single1, single2, single3, single4, bad1, bad2, bad3, bad4, bad5, bad6, NULL};
+        const uint8_t **str_ptr;
+
+        for (str_ptr = &bad_strings[0]; *str_ptr != NULL; str_ptr++)
+        {
+            if (spinel_validate_utf8(*str_ptr))
+            {
+                printf("error: spinel_validate_utf8() did not correctly detect an invalid UTF8 sequence\n");
+                goto bail;
+            }
         }
     }
 

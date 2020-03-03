@@ -61,10 +61,10 @@ openthread_headers                      = \
     dataset.h                             \
     dataset_ftd.h                         \
     diag.h                                \
-    dhcp6_client.h                        \
-    dhcp6_server.h                        \
     dns.h                                 \
+    entropy.h                             \
     error.h                               \
+    heap.h                                \
     icmp6.h                               \
     instance.h                            \
     ip6.h                                 \
@@ -77,6 +77,8 @@ openthread_headers                      = \
     ncp.h                                 \
     netdata.h                             \
     network_time.h                        \
+    random_crypto.h                       \
+    random_noncrypto.h                    \
     server.h                              \
     sntp.h                                \
     tasklet.h                             \

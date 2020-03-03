@@ -42,6 +42,7 @@ display_usage() {
     echo ""
     echo "Options:"
     echo "        -c/--enable-coverage  Enable code coverage"
+    echo "        -t/--enable-tests     Enable tests"
     echo ""
 }
 
@@ -51,12 +52,17 @@ die() {
 }
 
 coverage=no
+tests=no
 
 while [ $# -ge 2 ]
 do
     case $1 in
         -c|--enable-coverage)
             coverage=yes
+            shift
+            ;;
+        -t|--enable-tests)
+            tests=yes
             shift
             ;;
         *)
@@ -76,21 +82,10 @@ build_config=$1
 
 configure_options="                \
     --disable-docs                 \
-    --disable-tests                \
-    --enable-border-router         \
-    --enable-channel-manager       \
-    --enable-channel-monitor       \
-    --enable-child-supervision     \
-    --enable-commissioner          \
+    --enable-tests=$tests          \
     --enable-coverage=$coverage    \
-    --enable-diag                  \
     --enable-ftd                   \
-    --enable-jam-detection         \
-    --enable-legacy                \
-    --enable-mac-filter            \
     --enable-ncp                   \
-    --enable-service               \
-    --with-ncp-bus=uart            \
     "
 
 cppflags_config='-DOPENTHREAD_PROJECT_CORE_CONFIG_FILE=\"../tests/toranj/openthread-core-toranj-config.h\"'
@@ -117,11 +112,10 @@ case ${build_config} in
             CPPFLAGS="$cppflags_config"         \
             --enable-coverage=${coverage}       \
             --enable-ncp                        \
-            --with-ncp-bus=uart                 \
             --enable-radio-only                 \
             --with-examples=posix               \
             --disable-docs                      \
-            --disable-tests || die
+            --enable-tests=$tests || die
         make -j 8 || die
         ;;
 

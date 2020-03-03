@@ -297,6 +297,15 @@
 #define USBD_ENABLED 0
 #endif
 #endif // USB_CDC_AS_SERIAL_TRANSPORT == 1
+
+// <q> Enable power USB detection.
+
+// <i> Configure if the example supports USB port connection.
+
+#ifndef USBD_POWER_DETECTION
+#define USBD_POWER_DETECTION 1
+#endif
+
 // <o> USBD_CONFIG_IRQ_PRIORITY  - Interrupt priority
 
 // <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
@@ -345,7 +354,85 @@
 #define USBD_CONFIG_ISO_IN_ZLP 0
 #endif
 
+#define NRFX_USBD_ENABLED                       USBD_ENABLED
+#define NRFX_USBD_POWER_DETECTION               USBD_POWER_DETECTION
+#define NRFX_USBD_CONFIG_IRQ_PRIORITY           USBD_CONFIG_IRQ_PRIORITY
+#define NRFX_USBD_CONFIG_DMASCHEDULER_MODE      USBD_CONFIG_DMASCHEDULER_MODE
+#define NRFX_USBD_CONFIG_DMASCHEDULER_ISO_BOOST USBD_CONFIG_DMASCHEDULER_ISO_BOOST
+#define NRFX_USBD_CONFIG_ISO_IN_ZLP             USBD_CONFIG_ISO_IN_ZLP
+
 // </e>
+
+
+// <h> Application info used by the USB DFU.
+ 
+// <q> @def APP_NAME
+
+// <i> Application name in a human readable string.
+
+
+#ifndef APP_NAME
+#define APP_NAME "OpenThread App"
+#endif
+
+
+// <q> APP_VERSION_MAJOR
+
+// <i> Application version major version.
+
+#ifndef APP_VERSION_MAJOR
+#define APP_VERSION_MAJOR 1
+#endif
+
+
+// <q> APP_VERSION_MINOR
+
+// <i> Application version minor version.
+
+
+#ifndef APP_VERSION_MINOR
+#define APP_VERSION_MINOR 0
+#endif
+
+
+// <q> APP_VERSION_PATCH
+
+// <i> Application version patch version.
+
+
+#ifndef APP_VERSION_PATCH
+#define APP_VERSION_PATCH 0
+#endif
+
+
+// <q> @def APP_ID
+
+// <i> Application ID.
+
+
+#ifndef APP_ID
+#define APP_ID 1
+#endif
+
+
+// <q> APP_VERSION_PRERELEASE
+
+// <i> Application prerelease tag.
+
+
+#ifndef APP_VERSION_PRERELEASE
+#define APP_VERSION_PRERELEASE ""
+#endif
+
+
+// <q> APP_VERSION_METADATA
+
+// <i> Application metadata.
+
+
+#ifndef APP_VERSION_METADATA
+#define APP_VERSION_METADATA ""
+#endif
 
 // <h> app_usbd_cdc_acm - USB CDC ACM class
 
@@ -368,6 +455,52 @@
 #endif
 
 // </h>
+
+// <h> app_usbd_nrf_dfu_trigger - USB Trigger library
+
+//==========================================================
+// <q> APP_USBD_NRF_DFU_TRIGGER_ENABLED
+
+
+// <i> Enable possibility to enter the bootloader from the application via a software trigger send over USB.
+// <i> Requires configured BSP_SELF_PINRESET_PIN which is a GPIO pin connected to the reset pin.
+
+#ifndef APP_USBD_NRF_DFU_TRIGGER_ENABLED
+#define APP_USBD_NRF_DFU_TRIGGER_ENABLED 0
+#endif
+
+// <q> BSP_SELF_PINRESET_PIN
+
+
+// <i> Enable possibility to enter the bootloader from the application via a software trigger send over USB.
+// <i> Requires configured BSP_SELF_PINRESET_PIN which is a GPIO pin connected to the reset pin.
+// <i> NRF_GPIO_PIN_MAP(0,19) is a pin used on Nordic PCA10059 Dongle.
+
+#ifndef BSP_SELF_PINRESET_PIN
+#define BSP_SELF_PINRESET_PIN NRF_GPIO_PIN_MAP(0, 19)
+#endif
+
+// <q> NRF_DFU_TRIGGER_USB_USB_SHARED
+
+// <i> Flag indicating whether USB is used for other purposes in the application.
+
+#ifndef NRF_DFU_TRIGGER_USB_USB_SHARED
+#define NRF_DFU_TRIGGER_USB_USB_SHARED 1
+#endif
+
+
+// <q> NRF_DFU_TRIGGER_USB_INTERFACE_NUM
+
+// <i> The USB interface to use for the DFU Trigger library.
+// <i> According to the USB Specification, interface numbers cannot have gaps. Tailor this value to adhere to this
+// <i> limitation. Takes values between 0-255
+
+#ifndef NRF_DFU_TRIGGER_USB_INTERFACE_NUM
+#define NRF_DFU_TRIGGER_USB_INTERFACE_NUM 0
+#endif
+
+// </h>
+
 //==========================================================
 
 // <h> nrf_log - Logging
@@ -515,6 +648,266 @@
 #ifndef POWER_CONFIG_DEFAULT_DCDCENHV
 #define POWER_CONFIG_DEFAULT_DCDCENHV 0
 #endif
+
+// </e>
+
+
+// <e> NRFX_SPIS_ENABLED - nrfx_spis - SPIS peripheral driver
+//==========================================================
+#if (SPIS_AS_SERIAL_TRANSPORT == 1)
+#ifndef NRFX_SPIS_ENABLED
+#define NRFX_SPIS_ENABLED 1
+#endif
+#else  // SPIS_AS_SERIAL_TRANSPORT == 1
+#ifndef NRFX_SPIS_ENABLED
+#define NRFX_SPIS_ENABLED 0
+#endif
+#endif // SPIS_AS_SERIAL_TRANSPORT == 1
+
+// <q> NRFX_SPIS0_ENABLED  - Enable SPIS0 instance
+
+#ifndef NRFX_SPIS0_ENABLED
+#define NRFX_SPIS0_ENABLED 1
+#endif
+
+// <q> NRFX_SPIS1_ENABLED  - Enable SPIS1 instance
+
+
+#ifndef NRFX_SPIS1_ENABLED
+#define NRFX_SPIS1_ENABLED 0
+#endif
+
+// <q> NRFX_SPIS2_ENABLED  - Enable SPIS2 instance
+
+
+#ifndef NRFX_SPIS2_ENABLED
+#define NRFX_SPIS2_ENABLED 0
+#endif
+
+// <o> NRFX_SPIS_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+
+// <0=> 0 (highest)
+// <1=> 1
+// <2=> 2
+// <3=> 3
+// <4=> 4
+// <5=> 5
+// <6=> 6
+// <7=> 7
+
+#ifndef NRFX_SPIS_DEFAULT_CONFIG_IRQ_PRIORITY
+#define NRFX_SPIS_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <o> NRFX_SPIS_DEFAULT_DEF - SPIS default DEF character  <0-255>
+
+
+#ifndef NRFX_SPIS_DEFAULT_DEF
+#define NRFX_SPIS_DEFAULT_DEF 255
+#endif
+
+// <o> NRFX_SPIS_DEFAULT_ORC - SPIS default ORC character  <0-255>
+
+
+#ifndef NRFX_SPIS_DEFAULT_ORC
+#define NRFX_SPIS_DEFAULT_ORC 255
+#endif
+
+// <e> NRFX_SPIS_CONFIG_LOG_ENABLED - Enables logging in the module.
+//==========================================================
+#ifndef NRFX_SPIS_CONFIG_LOG_ENABLED
+#define NRFX_SPIS_CONFIG_LOG_ENABLED 0
+#endif
+// <o> NRFX_SPIS_CONFIG_LOG_LEVEL  - Default Severity level
+
+// <0=> Off
+// <1=> Error
+// <2=> Warning
+// <3=> Info
+// <4=> Debug
+
+#ifndef NRFX_SPIS_CONFIG_LOG_LEVEL
+#define NRFX_SPIS_CONFIG_LOG_LEVEL 3
+#endif
+
+// <o> NRFX_SPIS_CONFIG_INFO_COLOR  - ANSI escape code prefix.
+
+// <0=> Default
+// <1=> Black
+// <2=> Red
+// <3=> Green
+// <4=> Yellow
+// <5=> Blue
+// <6=> Magenta
+// <7=> Cyan
+// <8=> White
+
+#ifndef NRFX_SPIS_CONFIG_INFO_COLOR
+#define NRFX_SPIS_CONFIG_INFO_COLOR 0
+#endif
+
+// <o> NRFX_SPIS_CONFIG_DEBUG_COLOR  - ANSI escape code prefix.
+
+// <0=> Default
+// <1=> Black
+// <2=> Red
+// <3=> Green
+// <4=> Yellow
+// <5=> Blue
+// <6=> Magenta
+// <7=> Cyan
+// <8=> White
+
+#ifndef NRFX_SPIS_CONFIG_DEBUG_COLOR
+#define NRFX_SPIS_CONFIG_DEBUG_COLOR 0
+#endif
+
+// </e>
+
+// </e>
+
+// <e> NRFX_TIMER_ENABLED - nrfx_timer - TIMER periperal driver
+//==========================================================
+#ifndef NRFX_TIMER_ENABLED
+#define NRFX_TIMER_ENABLED 1
+#endif
+// <q> NRFX_TIMER0_ENABLED  - Enable TIMER0 instance
+
+
+#ifndef NRFX_TIMER0_ENABLED
+#define NRFX_TIMER0_ENABLED 1
+#endif
+
+// <q> NRFX_TIMER1_ENABLED  - Enable TIMER1 instance
+
+
+#ifndef NRFX_TIMER1_ENABLED
+#define NRFX_TIMER1_ENABLED 1
+#endif
+
+// <q> NRFX_TIMER2_ENABLED  - Enable TIMER2 instance
+
+
+#ifndef NRFX_TIMER2_ENABLED
+#define NRFX_TIMER2_ENABLED 1
+#endif
+
+// <q> NRFX_TIMER3_ENABLED  - Enable TIMER3 instance
+
+
+#ifndef NRFX_TIMER3_ENABLED
+#define NRFX_TIMER3_ENABLED 1
+#endif
+
+// <q> NRFX_TIMER4_ENABLED  - Enable TIMER4 instance
+
+
+#ifndef NRFX_TIMER4_ENABLED
+#define NRFX_TIMER4_ENABLED 1
+#endif
+
+// <o> NRFX_TIMER_DEFAULT_CONFIG_FREQUENCY  - Timer frequency if in Timer mode
+
+// <0=> 16 MHz
+// <1=> 8 MHz
+// <2=> 4 MHz
+// <3=> 2 MHz
+// <4=> 1 MHz
+// <5=> 500 kHz
+// <6=> 250 kHz
+// <7=> 125 kHz
+// <8=> 62.5 kHz
+// <9=> 31.25 kHz
+
+#ifndef NRFX_TIMER_DEFAULT_CONFIG_FREQUENCY
+#define NRFX_TIMER_DEFAULT_CONFIG_FREQUENCY 0
+#endif
+
+// <o> NRFX_TIMER_DEFAULT_CONFIG_MODE  - Timer mode or operation
+
+// <0=> Timer
+// <1=> Counter
+
+#ifndef NRFX_TIMER_DEFAULT_CONFIG_MODE
+#define NRFX_TIMER_DEFAULT_CONFIG_MODE 0
+#endif
+
+// <o> NRFX_TIMER_DEFAULT_CONFIG_BIT_WIDTH  - Timer counter bit width
+
+// <0=> 16 bit
+// <1=> 8 bit
+// <2=> 24 bit
+// <3=> 32 bit
+
+#ifndef NRFX_TIMER_DEFAULT_CONFIG_BIT_WIDTH
+#define NRFX_TIMER_DEFAULT_CONFIG_BIT_WIDTH 0
+#endif
+
+// <o> NRFX_TIMER_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+
+// <0=> 0 (highest)
+// <1=> 1
+// <2=> 2
+// <3=> 3
+// <4=> 4
+// <5=> 5
+// <6=> 6
+// <7=> 7
+
+#ifndef NRFX_TIMER_DEFAULT_CONFIG_IRQ_PRIORITY
+#define NRFX_TIMER_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <e> NRFX_TIMER_CONFIG_LOG_ENABLED - Enables logging in the module.
+//==========================================================
+#ifndef NRFX_TIMER_CONFIG_LOG_ENABLED
+#define NRFX_TIMER_CONFIG_LOG_ENABLED 0
+#endif
+// <o> NRFX_TIMER_CONFIG_LOG_LEVEL  - Default Severity level
+
+// <0=> Off
+// <1=> Error
+// <2=> Warning
+// <3=> Info
+// <4=> Debug
+
+#ifndef NRFX_TIMER_CONFIG_LOG_LEVEL
+#define NRFX_TIMER_CONFIG_LOG_LEVEL 3
+#endif
+
+// <o> NRFX_TIMER_CONFIG_INFO_COLOR  - ANSI escape code prefix.
+
+// <0=> Default
+// <1=> Black
+// <2=> Red
+// <3=> Green
+// <4=> Yellow
+// <5=> Blue
+// <6=> Magenta
+// <7=> Cyan
+// <8=> White
+
+#ifndef NRFX_TIMER_CONFIG_INFO_COLOR
+#define NRFX_TIMER_CONFIG_INFO_COLOR 0
+#endif
+
+// <o> NRFX_TIMER_CONFIG_DEBUG_COLOR  - ANSI escape code prefix.
+
+// <0=> Default
+// <1=> Black
+// <2=> Red
+// <3=> Green
+// <4=> Yellow
+// <5=> Blue
+// <6=> Magenta
+// <7=> Cyan
+// <8=> White
+
+#ifndef NRFX_TIMER_CONFIG_DEBUG_COLOR
+#define NRFX_TIMER_CONFIG_DEBUG_COLOR 0
+#endif
+
+// </e>
 
 // </e>
 

@@ -31,8 +31,9 @@
  *   This file implements common MeshCoP utility functions.
  */
 
+#include "common/locator-getters.hpp"
 #include "crypto/sha256.hpp"
-#include "mac/mac_frame.hpp"
+#include "mac/mac_types.hpp"
 #include "thread/thread_netif.hpp"
 
 namespace ot {
@@ -57,7 +58,7 @@ otError GetBorderAgentRloc(ThreadNetif &aNetif, uint16_t &aRloc)
     BorderAgentLocatorTlv *borderAgentLocator;
 
     borderAgentLocator = static_cast<BorderAgentLocatorTlv *>(
-        aNetif.GetNetworkDataLeader().GetCommissioningDataSubTlv(Tlv::kBorderAgentLocator));
+        aNetif.Get<NetworkData::Leader>().GetCommissioningDataSubTlv(Tlv::kBorderAgentLocator));
     VerifyOrExit(borderAgentLocator != NULL, error = OT_ERROR_NOT_FOUND);
 
     aRloc = borderAgentLocator->GetBorderAgentLocator();

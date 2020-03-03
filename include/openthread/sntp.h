@@ -69,7 +69,7 @@ typedef struct otSntpQuery
  * This function pointer is called when a SNTP response is received.
  *
  * @param[in]  aContext   A pointer to application-specific context.
- * @param[in]  aTime      Specifies the at the server when the response left for the client, in NTP timestamp format.
+ * @param[in]  aTime      Specifies the time at the server when the response left for the client, in UNIX time.
  * @param[in]  aResult    A result of the SNTP transaction.
  *
  * @retval  OT_ERROR_NONE              A response was received successfully and time is provided
@@ -85,7 +85,7 @@ typedef void (*otSntpResponseHandler)(void *aContext, uint64_t aTime, otError aR
 /**
  * This function sends a SNTP query.
  *
- * This function is available only if feature `OPENTHREAD_ENABLE_SNTP_CLIENT` is enabled.
+ * This function is available only if feature `OPENTHREAD_CONFIG_SNTP_CLIENT_ENABLE_CLIENT` is enabled.
  *
  * @param[in]  aInstance   A pointer to an OpenThread instance.
  * @param[in]  aQuery      A pointer to specify SNTP query parameters.

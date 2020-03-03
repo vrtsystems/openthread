@@ -41,7 +41,7 @@ static ot::Instance *sInstance;
 
 enum
 {
-    kMaxChildIp6Addresses = OPENTHREAD_CONFIG_IP_ADDRS_PER_CHILD,
+    kMaxChildIp6Addresses = OPENTHREAD_CONFIG_MLE_IP_ADDRS_PER_CHILD,
 };
 
 void VerifyChildIp6Addresses(const Child &aChild, uint8_t aAddressListLength, const Ip6::Address aAddressList[])
@@ -88,7 +88,7 @@ void VerifyChildIp6Addresses(const Child &aChild, uint8_t aAddressListLength, co
     {
         VerifyOrQuit(addressObserved[index], "Child::GetNextIp6Address() missed an entry from the expected list\n");
 
-        if (sInstance->GetThreadNetif().GetMle().IsMeshLocalAddress(aAddressList[index]))
+        if (sInstance->Get<Mle::MleRouter>().IsMeshLocalAddress(aAddressList[index]))
         {
             SuccessOrQuit(aChild.GetMeshLocalIp6Address(*sInstance, address),
                           "Child::GetMeshLocalIp6Address() failed\n");
@@ -127,7 +127,7 @@ void TestChildIp6Address(void)
     numAddresses = 0;
 
     // First addresses uses the mesh local prefix (mesh-local address).
-    addresses[numAddresses] = sInstance->GetThreadNetif().GetMle().GetMeshLocal64();
+    addresses[numAddresses] = sInstance->Get<Mle::MleRouter>().GetMeshLocal64();
     addresses[numAddresses].SetIid(meshLocalIid);
 
     numAddresses++;
@@ -143,7 +143,7 @@ void TestChildIp6Address(void)
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     printf("Child state after init");
-    memset(&child, 0, sizeof(child));
+    child.Clear();
     VerifyChildIp6Addresses(child, 0, NULL);
     printf(" -- PASS\n");
 

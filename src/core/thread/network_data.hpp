@@ -41,6 +41,7 @@
 
 #include "coap/coap.hpp"
 #include "common/locator.hpp"
+#include "common/timer.hpp"
 #include "net/udp6.hpp"
 #include "thread/lowpan.hpp"
 #include "thread/mle_router.hpp"
@@ -92,17 +93,27 @@ class NetworkData : public InstanceLocator
 public:
     enum
     {
-        kMaxSize = 255, ///< Maximum size of Thread Network Data in bytes.
+        kMaxSize = 254, ///< Maximum size of Thread Network Data in bytes.
+    };
+
+    /**
+     * This enumeration specifies the type of Network Data (local or leader).
+     *
+     */
+    enum Type
+    {
+        kTypeLocal,  ///< Local Network Data.
+        kTypeLeader, ///< Leader Network Data.
     };
 
     /**
      * This constructor initializes the object.
      *
      * @param[in]  aInstance     A reference to the OpenThread instance.
-     * @param[in]  aLocal        TRUE if this represents local network data, FALSE otherwise.
+     * @param[in]  aType         Network data type
      *
      */
-    NetworkData(Instance &aInstance, bool aLocal);
+    NetworkData(Instance &aInstance, Type aType);
 
     /**
      * This method clears the network data.
@@ -174,7 +185,7 @@ public:
      */
     otError GetNextExternalRoute(otNetworkDataIterator *aIterator, uint16_t aRloc16, otExternalRouteConfig *aConfig);
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     /**
      * This method provides the next service in the Thread Network Data.
      *
@@ -240,7 +251,7 @@ public:
      */
     bool ContainsExternalRoutes(NetworkData &aCompare, uint16_t aRloc16);
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     /**
      * This method indicates whether or not the Thread Network Data contains all of the service information
      * in @p aCompare associated with @p aRloc16.
@@ -351,7 +362,7 @@ protected:
      */
     PrefixTlv *FindPrefix(const uint8_t *aPrefix, uint8_t aPrefixLength, uint8_t *aTlvs, uint8_t aTlvsLength);
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     /**
      * This method returns a pointer to a matching Service TLV.
      *
@@ -389,11 +400,8 @@ protected:
      * @param[in]  aStart   A pointer to the beginning of the insertion.
      * @param[in]  aLength  The number of bytes to insert.
      *
-     * @retval OT_ERROR_NONE          Successfully inserted bytes.
-     * @retval OT_ERROR_NO_BUFS       Insufficient buffer space to insert bytes.
-     *
      */
-    otError Insert(uint8_t *aStart, uint8_t aLength);
+    void Insert(uint8_t *aStart, uint8_t aLength);
 
     /**
      * This method removes bytes from the Network Data.
@@ -401,10 +409,8 @@ protected:
      * @param[in]  aStart   A pointer to the beginning of the removal.
      * @param[in]  aLength  The number of bytes to remove.
      *
-     * @retval OT_ERROR_NONE    Successfully removed bytes.
-     *
      */
-    otError Remove(uint8_t *aStart, uint8_t aLength);
+    void Remove(uint8_t *aStart, uint8_t aLength);
 
     /**
      * This method strips non-stable data from the Thread Network Data.
@@ -427,7 +433,7 @@ protected:
      */
     void RemoveTemporaryData(uint8_t *aData, uint8_t &aDataLength, PrefixTlv &aPrefix);
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     /**
      * This method strips non-stable Sub-TLVs from a Service TLV.
      *
@@ -483,7 +489,7 @@ private:
         };
 
     public:
-        NetworkDataIterator(otNetworkDataIterator *aIterator)
+        explicit NetworkDataIterator(otNetworkDataIterator *aIterator)
             : mIteratorBuffer(reinterpret_cast<uint8_t *>(aIterator))
         {
         }
@@ -510,9 +516,9 @@ private:
         uint8_t *mIteratorBuffer;
     };
 
-    const bool mLocal;
+    const Type mType;
     bool       mLastAttemptWait;
-    uint32_t   mLastAttempt;
+    TimeMilli  mLastAttempt;
 };
 
 } // namespace NetworkData

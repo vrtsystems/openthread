@@ -31,18 +31,15 @@
  *   This file implements common methods for manipulating Thread Network Data.
  */
 
-#define WPP_NAME "network_data.tmh"
-
 #include "network_data.hpp"
 
-#include <openthread/platform/random.h>
-
-#include "coap/coap_header.hpp"
+#include "coap/coap_message.hpp"
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "common/instance.hpp"
+#include "common/locator-getters.hpp"
 #include "common/logging.hpp"
-#include "mac/mac_frame.hpp"
+#include "mac/mac_types.hpp"
 #include "thread/thread_netif.hpp"
 #include "thread/thread_tlvs.hpp"
 #include "thread/thread_uri_paths.hpp"
@@ -50,9 +47,9 @@
 namespace ot {
 namespace NetworkData {
 
-NetworkData::NetworkData(Instance &aInstance, bool aLocal)
+NetworkData::NetworkData(Instance &aInstance, Type aType)
     : InstanceLocator(aInstance)
-    , mLocal(aLocal)
+    , mType(aType)
     , mLastAttemptWait(false)
     , mLastAttempt(0)
 {
@@ -219,7 +216,7 @@ otError NetworkData::GetNextExternalRoute(otNetworkDataIterator *aIterator,
                     aConfig->mPreference          = hasRouteEntry->GetPreference();
                     aConfig->mStable              = hasRoute->IsStable();
                     aConfig->mRloc16              = hasRouteEntry->GetRloc();
-                    aConfig->mNextHopIsThisDevice = (hasRouteEntry->GetRloc() == GetNetif().GetMle().GetRloc16());
+                    aConfig->mNextHopIsThisDevice = (hasRouteEntry->GetRloc() == Get<Mle::MleRouter>().GetRloc16());
 
                     iterator.SaveTlvOffset(cur, mTlvs);
                     iterator.SaveSubTlvOffset(subCur, prefix->GetSubTlvs());
@@ -235,7 +232,7 @@ exit:
     return error;
 }
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
 otError NetworkData::GetNextService(otNetworkDataIterator *aIterator, otServiceConfig *aConfig)
 {
     return GetNextService(aIterator, Mac::kShortAddrBroadcast, aConfig);
@@ -439,7 +436,7 @@ exit:
     return rval;
 }
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
 bool NetworkData::ContainsServices(NetworkData &aCompare, uint16_t aRloc16)
 {
     otNetworkDataIterator outerIterator = OT_NETWORK_DATA_ITERATOR_INIT;
@@ -499,7 +496,7 @@ bool NetworkData::ContainsService(uint8_t aServiceId, uint16_t aRloc16)
 
         if (service->GetServiceID() == aServiceId)
         {
-            subCur = reinterpret_cast<NetworkDataTlv *>(reinterpret_cast<uint8_t *>(service->GetSubTlvs()));
+            subCur = service->GetSubTlvs();
             subEnd = cur->GetNext();
 
             for (; subCur < subEnd; subCur = subCur->GetNext())
@@ -533,7 +530,7 @@ void NetworkData::RemoveTemporaryData(uint8_t *aData, uint8_t &aDataLength)
     NetworkDataTlv *cur = reinterpret_cast<NetworkDataTlv *>(aData);
     NetworkDataTlv *end;
     PrefixTlv *     prefix;
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     ServiceTlv *service;
 #endif
     uint8_t  length;
@@ -553,7 +550,7 @@ void NetworkData::RemoveTemporaryData(uint8_t *aData, uint8_t &aDataLength)
         {
         case NetworkDataTlv::kTypePrefix:
         {
-            prefix = reinterpret_cast<PrefixTlv *>(cur);
+            prefix = static_cast<PrefixTlv *>(cur);
             RemoveTemporaryData(aData, aDataLength, *prefix);
 
             if (prefix->GetSubTlvsLength() == 0)
@@ -570,11 +567,11 @@ void NetworkData::RemoveTemporaryData(uint8_t *aData, uint8_t &aDataLength)
             break;
         }
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
 
         case NetworkDataTlv::kTypeService:
         {
-            service = reinterpret_cast<ServiceTlv *>(cur);
+            service = static_cast<ServiceTlv *>(cur);
             RemoveTemporaryData(aData, aDataLength, *service);
 
             if (service->GetSubTlvsLength() == 0)
@@ -708,7 +705,7 @@ void NetworkData::RemoveTemporaryData(uint8_t *aData, uint8_t &aDataLength, Pref
     }
 }
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
 void NetworkData::RemoveTemporaryData(uint8_t *aData, uint8_t &aDataLength, ServiceTlv &aService)
 {
     NetworkDataTlv *cur = aService.GetSubTlvs();
@@ -733,7 +730,7 @@ void NetworkData::RemoveTemporaryData(uint8_t *aData, uint8_t &aDataLength, Serv
             {
             case NetworkDataTlv::kTypeServer:
             {
-                server = reinterpret_cast<ServerTlv *>(cur);
+                server = static_cast<ServerTlv *>(cur);
                 server->SetServer16(Mle::Mle::GetServiceAlocFromId(aService.GetServiceID()));
                 break;
             }
@@ -773,7 +770,7 @@ BorderRouterTlv *NetworkData::FindBorderRouter(PrefixTlv &aPrefix)
 
         if (cur->GetType() == NetworkDataTlv::kTypeBorderRouter)
         {
-            ExitNow(rval = reinterpret_cast<BorderRouterTlv *>(cur));
+            ExitNow(rval = static_cast<BorderRouterTlv *>(cur));
         }
 
         cur = cur->GetNext();
@@ -795,7 +792,7 @@ BorderRouterTlv *NetworkData::FindBorderRouter(PrefixTlv &aPrefix, bool aStable)
 
         if (cur->GetType() == NetworkDataTlv::kTypeBorderRouter && cur->IsStable() == aStable)
         {
-            ExitNow(rval = reinterpret_cast<BorderRouterTlv *>(cur));
+            ExitNow(rval = static_cast<BorderRouterTlv *>(cur));
         }
 
         cur = cur->GetNext();
@@ -817,7 +814,7 @@ HasRouteTlv *NetworkData::FindHasRoute(PrefixTlv &aPrefix)
 
         if (cur->GetType() == NetworkDataTlv::kTypeHasRoute)
         {
-            ExitNow(rval = reinterpret_cast<HasRouteTlv *>(cur));
+            ExitNow(rval = static_cast<HasRouteTlv *>(cur));
         }
 
         cur = cur->GetNext();
@@ -839,7 +836,7 @@ HasRouteTlv *NetworkData::FindHasRoute(PrefixTlv &aPrefix, bool aStable)
 
         if (cur->GetType() == NetworkDataTlv::kTypeHasRoute && cur->IsStable() == aStable)
         {
-            ExitNow(rval = reinterpret_cast<HasRouteTlv *>(cur));
+            ExitNow(rval = static_cast<HasRouteTlv *>(cur));
         }
 
         cur = cur->GetNext();
@@ -861,7 +858,7 @@ ContextTlv *NetworkData::FindContext(PrefixTlv &aPrefix)
 
         if (cur->GetType() == NetworkDataTlv::kTypeContext)
         {
-            ExitNow(rval = reinterpret_cast<ContextTlv *>(cur));
+            ExitNow(rval = static_cast<ContextTlv *>(cur));
         }
 
         cur = cur->GetNext();
@@ -888,7 +885,7 @@ PrefixTlv *NetworkData::FindPrefix(const uint8_t *aPrefix, uint8_t aPrefixLength
 
         if (cur->GetType() == NetworkDataTlv::kTypePrefix)
         {
-            compare = reinterpret_cast<PrefixTlv *>(cur);
+            compare = static_cast<PrefixTlv *>(cur);
 
             if (compare->GetPrefixLength() == aPrefixLength &&
                 PrefixMatch(compare->GetPrefix(), aPrefix, aPrefixLength) >= aPrefixLength)
@@ -935,7 +932,7 @@ int8_t NetworkData::PrefixMatch(const uint8_t *a, const uint8_t *b, uint8_t aLen
     return (rval >= aLength) ? rval : -1;
 }
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
 ServiceTlv *NetworkData::FindService(uint32_t       aEnterpriseNumber,
                                      const uint8_t *aServiceData,
                                      uint8_t        aServiceDataLength)
@@ -959,7 +956,7 @@ ServiceTlv *NetworkData::FindService(uint32_t       aEnterpriseNumber,
 
         if (cur->GetType() == NetworkDataTlv::kTypeService)
         {
-            compare = reinterpret_cast<ServiceTlv *>(cur);
+            compare = static_cast<ServiceTlv *>(cur);
 
             if ((compare->GetEnterpriseNumber() == aEnterpriseNumber) &&
                 (compare->GetServiceDataLength() == aServiceDataLength) &&
@@ -979,41 +976,35 @@ exit:
 }
 #endif
 
-otError NetworkData::Insert(uint8_t *aStart, uint8_t aLength)
+void NetworkData::Insert(uint8_t *aStart, uint8_t aLength)
 {
     assert(aLength + mLength <= sizeof(mTlvs) && mTlvs <= aStart && aStart <= mTlvs + mLength);
     memmove(aStart + aLength, aStart, mLength - static_cast<size_t>(aStart - mTlvs));
     mLength += aLength;
-    return OT_ERROR_NONE;
 }
 
-otError NetworkData::Remove(uint8_t *aStart, uint8_t aLength)
+void NetworkData::Remove(uint8_t *aStart, uint8_t aLength)
 {
     assert(aLength <= mLength && mTlvs <= aStart && (aStart - mTlvs) + aLength <= mLength);
     memmove(aStart, aStart + aLength, mLength - (static_cast<size_t>(aStart - mTlvs) + aLength));
     mLength -= aLength;
-    return OT_ERROR_NONE;
 }
 
 otError NetworkData::SendServerDataNotification(uint16_t aRloc16)
 {
-    ThreadNetif &    netif = GetNetif();
-    otError          error = OT_ERROR_NONE;
-    Coap::Header     header;
-    Message *        message = NULL;
+    otError          error   = OT_ERROR_NONE;
+    Coap::Message *  message = NULL;
     Ip6::MessageInfo messageInfo;
 
-    VerifyOrExit(!mLastAttemptWait || static_cast<int32_t>(TimerMilli::GetNow() - mLastAttempt) < kDataResubmitDelay,
+    VerifyOrExit(!mLastAttemptWait || (TimerMilli::GetNow() - mLastAttempt < kDataResubmitDelay),
                  error = OT_ERROR_ALREADY);
 
-    header.Init(OT_COAP_TYPE_CONFIRMABLE, OT_COAP_CODE_POST);
-    header.SetToken(Coap::Header::kDefaultTokenLength);
-    header.AppendUriPathOptions(OT_URI_PATH_SERVER_DATA);
-    header.SetPayloadMarker();
+    VerifyOrExit((message = Get<Coap::Coap>().NewMessage()) != NULL, error = OT_ERROR_NO_BUFS);
 
-    VerifyOrExit((message = netif.GetCoap().NewMessage(header)) != NULL, error = OT_ERROR_NO_BUFS);
+    SuccessOrExit(error = message->Init(OT_COAP_TYPE_CONFIRMABLE, OT_COAP_CODE_POST, OT_URI_PATH_SERVER_DATA));
+    SuccessOrExit(error = message->SetPayloadMarker());
 
-    if (mLocal)
+    if (mType == kTypeLocal)
     {
         ThreadTlv tlv;
         tlv.SetType(ThreadTlv::kThreadNetworkData);
@@ -1027,15 +1018,15 @@ otError NetworkData::SendServerDataNotification(uint16_t aRloc16)
         ThreadRloc16Tlv rloc16Tlv;
         rloc16Tlv.Init();
         rloc16Tlv.SetRloc16(aRloc16);
-        SuccessOrExit(error = message->Append(&rloc16Tlv, sizeof(rloc16Tlv)));
+        SuccessOrExit(error = message->AppendTlv(rloc16Tlv));
     }
 
-    netif.GetMle().GetLeaderAloc(messageInfo.GetPeerAddr());
-    messageInfo.SetSockAddr(netif.GetMle().GetMeshLocal16());
+    Get<Mle::MleRouter>().GetLeaderAloc(messageInfo.GetPeerAddr());
+    messageInfo.SetSockAddr(Get<Mle::MleRouter>().GetMeshLocal16());
     messageInfo.SetPeerPort(kCoapUdpPort);
-    SuccessOrExit(error = netif.GetCoap().SendMessage(*message, messageInfo));
+    SuccessOrExit(error = Get<Coap::Coap>().SendMessage(*message, messageInfo));
 
-    if (mLocal)
+    if (mType == kTypeLocal)
     {
         mLastAttempt     = TimerMilli::GetNow();
         mLastAttemptWait = true;

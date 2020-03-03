@@ -34,9 +34,9 @@
 #ifndef POSIX_APP_HDLC_INTERFACE_HPP_
 #define POSIX_APP_HDLC_INTERFACE_HPP_
 
-#include "openthread-core-config.h"
+#include "platform-config.h"
 
-#include "hdlc.hpp"
+#include "ncp/hdlc.hpp"
 
 namespace ot {
 namespace PosixApp {
@@ -51,7 +51,17 @@ public:
     enum
     {
         kMaxFrameSize = 2048, ///< Maximum frame size (number of bytes).
+        kMaxWaitTime  = 2000, ///< Maximum wait time in Milliseconds for socket to become writable (see `SendFrame`).
     };
+
+    /**
+     * This type defines a receive frame buffer to store received (and decoded) frame(s).
+     *
+     * @note The receive frame buffer is an `Hdlc::MultiFrameBuffer` and therefore it is capable of storing multiple
+     * frames in a FIFO queue manner.
+     *
+     */
+    typedef Hdlc::MultiFrameBuffer<kMaxFrameSize> RxFrameBuffer;
 
     /**
      * This class defines the callbacks provided by `HdlcInterfac` to its owner/user.
@@ -63,11 +73,15 @@ public:
         /**
          * This callback is invoked to notify owner/user of `HdlcInterface` of a received (and decoded) frame.
          *
-         * @param[in] aFrame   A pointer to buffer containing the received frame.
-         * @param[in] aLength  The length (number of bytes) of the received frame.
+         * The newly received frame is available in `RxFrameBuffer` from `HdlcInterface::GetRxFrameBuffer()`. The
+         * user can read and process the frame. The callback is expected to either discard the new frame using
+         * `RxFrameBuffer::DiscardFrame()` or save the frame using `RxFrameBuffer::SaveFrame()` to be read and
+         * processed later.
+         *
+         * @param[in] aHdlcInterface    A reference to the `HdlcInterface` object.
          *
          */
-        void HandleReceivedFrame(const uint8_t *aFrame, uint16_t aLength);
+        void HandleReceivedFrame(HdlcInterface &aHdlcInterface);
     };
 
     /**
@@ -77,6 +91,12 @@ public:
      *
      */
     explicit HdlcInterface(Callbacks &aCallbacks);
+
+    /**
+     * This destructor deinitializes the object.
+     *
+     */
+    ~HdlcInterface(void);
 
     /**
      * This method initializes the interface to the Radio Co-processor (RCP)
@@ -102,7 +122,7 @@ public:
 
     /**
      *
-     * This method returns the socket file descriptor associate with the interface
+     * This method returns the socket file descriptor associated with the interface.
      *
      * @returns The associated socket file descriptor, or -1 if interface is not initializes.
      *
@@ -127,14 +147,33 @@ public:
     void Read(void);
 
     /**
+     * This method gets the `RxFrameBuffer`.
+     *
+     * The receive frame buffer is an `Hdlc::MultiFrameBuffer` and therefore it is capable of storing multiple
+     * frames in a FIFO queue manner. The `RxFrameBuffer` contains the decoded received frames.
+     *
+     * Wen during `Read()` the `Callbacks::HandleReceivedFrame()` is invoked, the newly received decoded frame is
+     * available in the receive frame buffer. The callback is expected to either process and then discard the frame
+     * (using `RxFrameBuffer::DiscardFrame()` method) or save the frame (using `RxFrameBuffer::SaveFrame()` so that
+     * it can be read later.
+     *
+     * @returns A reference to receive frame buffer containing newly received frame or previously saved frames.
+     *
+     */
+    RxFrameBuffer &GetRxFrameBuffer(void) { return mRxFrameBuffer; }
+
+    /**
      * This method encodes and sends a frame to Radio Co-processor (RCP) over the socket.
      *
-     * @param[in] aFrame  A pointer to buffer containing the frame to send.
-     * @param[in] aLength The length (number of bytes) in the frame
+     * This is blocking call, i.e., if the socket is not writable, this method waits for it to become writable for
+     * up to `kMaxWaitTime` interval.
+     *
+     * @param[in] aFrame     A pointer to buffer containing the frame to send.
+     * @param[in] aLength    The length (number of bytes) in the frame.
      *
      * @retval OT_ERROR_NONE     Successfully encoded and sent the frame.
      * @retval OT_ERROR_NO_BUFS  Insufficient buffer space available to encode the frame.
-     * @retval OT_ERROR_FAILED   Failed to send frame due to socket write failure.
+     * @retval OT_ERROR_FAILED   Failed to send due to socket not becoming writable within `kMaxWaitTime`.
      *
      */
     otError SendFrame(const uint8_t *aFrame, uint16_t aLength);
@@ -154,11 +193,45 @@ public:
 #endif
 
 private:
-    otError Write(const uint8_t *aFrame, uint16_t aLength);
-    void    Decode(const uint8_t *aBuffer, uint16_t aLength);
+    /**
+     * This method waits for the socket file descriptor associated with the HDLC interface to become writable within
+     * `kMaxWaitTime` interval.
+     *
+     * @retval OT_ERROR_NONE   Socket is writable.
+     * @retval OT_ERROR_FAILED Socket did not become writable within `kMaxWaitTime`.
+     *
+     */
+    otError WaitForWritable(void);
 
-    static void HandleHdlcFrame(void *aContext, uint8_t *aFrame, uint16_t aFrameLength);
-    static void HandleHdlcError(void *aContext, otError aError, uint8_t *aFrame, uint16_t aFrameLength);
+    /**
+     * This method writes a given frame to the socket.
+     *
+     * This is blocking call, i.e., if the socket is not writable, this method waits for it to become writable for
+     * up to `kMaxWaitTime` interval.
+     *
+     * @param[in] aFrame  A pointer to buffer containing the frame to write.
+     * @param[in] aLength The length (number of bytes) in the frame.
+     *
+     * @retval OT_ERROR_NONE    Frame was written successfully.
+     * @retval OT_ERROR_FAILED  Failed to write due to socket not becoming writable within `kMaxWaitTime`.
+     *
+     */
+    otError Write(const uint8_t *aFrame, uint16_t aLength);
+
+    /**
+     * This method performs HDLC decoding on received data.
+     *
+     * If a full HDLC frame is decoded while reading data, this method invokes the `HandleReceivedFrame()` (on the
+     * `aCallback` object from constructor) to pass the received frame to be processed.
+     *
+     * @param[in] aBuffer  A pointer to buffer containing data.
+     * @param[in] aLength  The length (number of bytes) in the buffer.
+     *
+     */
+    void Decode(const uint8_t *aBuffer, uint16_t aLength);
+
+    static void HandleHdlcFrame(void *aContext, otError aError);
+    void        HandleHdlcFrame(otError aError);
 
     static int OpenFile(const char *aFile, const char *aConfig);
 #if OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE
@@ -168,8 +241,8 @@ private:
     Callbacks &   mCallbacks;
     int           mSockFd;
     bool          mIsDecoding;
+    RxFrameBuffer mRxFrameBuffer;
     Hdlc::Decoder mHdlcDecoder;
-    uint8_t       mDecoderBuffer[kMaxFrameSize];
 };
 
 } // namespace PosixApp

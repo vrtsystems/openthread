@@ -98,6 +98,18 @@ bool otLinkRawGetPromiscuous(otInstance *aInstance);
 otError otLinkRawSetPromiscuous(otInstance *aInstance, bool aEnable);
 
 /**
+ * Set the Short Address for address filtering.
+ *
+ * @param[in] aInstance      A pointer to an OpenThread instance.
+ * @param[in] aShortAddress  The IEEE 802.15.4 Short Address.
+ *
+ * @retval OT_ERROR_NONE             If successful.
+ * @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.
+ *
+ */
+otError otLinkRawSetShortAddress(otInstance *aInstance, uint16_t aShortAddress);
+
+/**
  * Transition the radio from Receive to Sleep.
  * Turn off the radio.
  *
@@ -119,7 +131,7 @@ otError otLinkRawSleep(otInstance *aInstance);
  *                          OT_ERROR_ABORT when reception was aborted and a frame was not received.
  *
  */
-typedef void(OTCALL *otLinkRawReceiveDone)(otInstance *aInstance, otRadioFrame *aFrame, otError aError);
+typedef void (*otLinkRawReceiveDone)(otInstance *aInstance, otRadioFrame *aFrame, otError aError);
 
 /**
  * Transitioning the radio from Sleep to Receive.
@@ -233,10 +245,10 @@ otError otLinkRawEnergyScan(otInstance *            aInstance,
                             otLinkRawEnergyScanDone aCallback);
 
 /**
- * Enable/Disable source match for AutoPend.
+ * Enable/Disable source match for frame pending.
  *
  * @param[in]  aInstance    A pointer to an OpenThread instance.
- * @param[in]  aEnable      Enable/disable source match for automatical pending.
+ * @param[in]  aEnable      Enable/disable source match for frame pending.
  *
  * @retval OT_ERROR_NONE             If successful.
  * @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.
@@ -255,7 +267,7 @@ otError otLinkRawSrcMatchEnable(otInstance *aInstance, bool aEnable);
  * @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.
  *
  */
-otError otLinkRawSrcMatchAddShortEntry(otInstance *aInstance, const uint16_t aShortAddress);
+otError otLinkRawSrcMatchAddShortEntry(otInstance *aInstance, uint16_t aShortAddress);
 
 /**
  * Adding extended address to the source match table.
@@ -281,7 +293,7 @@ otError otLinkRawSrcMatchAddExtEntry(otInstance *aInstance, const otExtAddress *
  * @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.
  *
  */
-otError otLinkRawSrcMatchClearShortEntry(otInstance *aInstance, const uint16_t aShortAddress);
+otError otLinkRawSrcMatchClearShortEntry(otInstance *aInstance, uint16_t aShortAddress);
 
 /**
  * Removing extended address to the source match table of the radio.

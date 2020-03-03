@@ -36,6 +36,7 @@
 #define __APPLE_USE_RFC_3542
 #endif
 
+#include "openthread-core-config.h"
 #include "platform-posix.h"
 
 #include <arpa/inet.h>
@@ -51,6 +52,8 @@
 #include <openthread/platform/udp.h>
 
 #include "common/code_utils.hpp"
+
+#if OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE
 
 static uint32_t sPlatNetifIndex = 0;
 
@@ -91,7 +94,7 @@ static otError transmitPacket(int aFd, uint8_t *aPayload, uint16_t aLength, cons
     peerAddr.sin6_family = AF_INET6;
     memcpy(&peerAddr.sin6_addr, &aMessageInfo.mPeerAddr, sizeof(peerAddr.sin6_addr));
 
-    if (IsLinkLocal(peerAddr.sin6_addr) && aMessageInfo.mInterfaceId == OT_NETIF_INTERFACE_ID_THREAD)
+    if (IsLinkLocal(peerAddr.sin6_addr) && !aMessageInfo.mIsHostInterface)
     {
         // sin6_scope_id only works for link local destinations
         peerAddr.sin6_scope_id = sPlatNetifIndex;
@@ -113,11 +116,13 @@ static otError transmitPacket(int aFd, uint8_t *aPayload, uint16_t aLength, cons
     cmsg = CMSG_FIRSTHDR(&msg);
 
     {
+        int hopLimit = (aMessageInfo.mHopLimit ? aMessageInfo.mHopLimit : -1);
+
         cmsg->cmsg_level = IPPROTO_IPV6;
         cmsg->cmsg_type  = IPV6_HOPLIMIT;
         cmsg->cmsg_len   = CMSG_LEN(sizeof(int));
 
-        *reinterpret_cast<int *>(CMSG_DATA(cmsg)) = (aMessageInfo.mHopLimit ? aMessageInfo.mHopLimit : -1);
+        memcpy(CMSG_DATA(cmsg), &hopLimit, sizeof(int));
 
         cmsg = CMSG_NXTHDR(&msg, cmsg);
         controlLength += CMSG_SPACE(sizeof(int));
@@ -126,15 +131,16 @@ static otError transmitPacket(int aFd, uint8_t *aPayload, uint16_t aLength, cons
     if (!IsMulticast(reinterpret_cast<const struct in6_addr &>(aMessageInfo.mSockAddr)) &&
         memcmp(&aMessageInfo.mSockAddr, &in6addr_any, sizeof(aMessageInfo.mSockAddr)))
     {
-        struct in6_pktinfo &pktinfo = *reinterpret_cast<struct in6_pktinfo *>(CMSG_DATA(cmsg));
+        struct in6_pktinfo pktinfo;
 
         cmsg->cmsg_level = IPPROTO_IPV6;
         cmsg->cmsg_type  = IPV6_PKTINFO;
         cmsg->cmsg_len   = CMSG_LEN(sizeof(pktinfo));
 
-        pktinfo.ipi6_ifindex = (aMessageInfo.mInterfaceId == OT_NETIF_INTERFACE_ID_THREAD ? sPlatNetifIndex : 0);
+        pktinfo.ipi6_ifindex = aMessageInfo.mIsHostInterface ? 0 : sPlatNetifIndex;
 
         memcpy(&pktinfo.ipi6_addr, &aMessageInfo.mSockAddr, sizeof(pktinfo.ipi6_addr));
+        memcpy(CMSG_DATA(cmsg), &pktinfo, sizeof(pktinfo));
 
         controlLength += CMSG_SPACE(sizeof(pktinfo));
         cmsg = CMSG_NXTHDR(&msg, cmsg);
@@ -182,18 +188,19 @@ static otError receivePacket(int aFd, uint8_t *aPayload, uint16_t &aLength, otMe
         {
             if (cmsg->cmsg_type == IPV6_HOPLIMIT)
             {
-                int hoplimit           = *reinterpret_cast<int *>(CMSG_DATA(cmsg));
+                int hoplimit;
+
+                memcpy(&hoplimit, CMSG_DATA(cmsg), sizeof(hoplimit));
                 aMessageInfo.mHopLimit = static_cast<uint8_t>(hoplimit);
             }
             else if (cmsg->cmsg_type == IPV6_PKTINFO)
             {
-                struct in6_pktinfo *pktinfo;
+                struct in6_pktinfo pktinfo;
 
-                pktinfo = reinterpret_cast<in6_pktinfo *>(CMSG_DATA(cmsg));
+                memcpy(&pktinfo, CMSG_DATA(cmsg), sizeof(pktinfo));
 
-                aMessageInfo.mInterfaceId =
-                    (pktinfo->ipi6_ifindex == sPlatNetifIndex ? static_cast<int8_t>(OT_NETIF_INTERFACE_ID_THREAD) : 0);
-                memcpy(&aMessageInfo.mSockAddr, &pktinfo->ipi6_addr, sizeof(aMessageInfo.mSockAddr));
+                aMessageInfo.mIsHostInterface = (pktinfo.ipi6_ifindex != sPlatNetifIndex);
+                memcpy(&aMessageInfo.mSockAddr, &pktinfo.ipi6_addr, sizeof(aMessageInfo.mSockAddr));
             }
         }
     }
@@ -212,8 +219,8 @@ otError otPlatUdpSocket(otUdpSocket *aUdpSocket)
 
     assert(aUdpSocket->mHandle == NULL);
 
-    fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-    VerifyOrExit(fd > 0, error = OT_ERROR_FAILED);
+    fd = SocketWithCloseExec(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+    VerifyOrExit(fd >= 0, error = OT_ERROR_FAILED);
 
     aUdpSocket->mHandle = FdToHandle(fd);
 
@@ -379,10 +386,14 @@ exit:
     return;
 }
 
-void platformUdpInit(void)
+void platformUdpInit(const char *aIfName)
 {
-    const char *platformNetif = getenv("PLATFORM_NETIF");
-    sPlatNetifIndex           = if_nametoindex(platformNetif);
+    if (aIfName == NULL)
+    {
+        DieNow(OT_EXIT_INVALID_ARGUMENTS);
+    }
+
+    sPlatNetifIndex = if_nametoindex(aIfName);
 
     if (sPlatNetifIndex == 0)
     {
@@ -438,3 +449,5 @@ void platformUdpProcess(otInstance *aInstance, const fd_set *aReadFdSet)
 exit:
     return;
 }
+
+#endif // #if OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE

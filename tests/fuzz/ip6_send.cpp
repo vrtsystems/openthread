@@ -26,18 +26,20 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MAX_ITERATIONS 100
+
 #include <stddef.h>
 
 #include <openthread/instance.h>
 #include <openthread/ip6.h>
 #include <openthread/link.h>
 #include <openthread/message.h>
+#include <openthread/tasklet.h>
 #include <openthread/thread.h>
 #include <openthread/thread_ftd.h>
 
+#include "fuzzer_platform.h"
 #include "common/code_utils.hpp"
-
-extern "C" void FuzzerPlatformInit(void);
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
@@ -70,6 +72,18 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     error = otIp6Send(instance, message);
 
     message = NULL;
+
+    VerifyOrExit(!FuzzerPlatformResetWasRequested());
+
+    for (int i = 0; i < MAX_ITERATIONS; i++)
+    {
+        while (otTaskletsArePending(instance))
+        {
+            otTaskletsProcess(instance);
+        }
+
+        FuzzerPlatformProcess(instance);
+    }
 
 exit:
 

@@ -42,8 +42,18 @@
 #include "common/instance.hpp"
 #include "common/new.hpp"
 #include "net/ip6.hpp"
+#include "utils/static_assert.hpp"
 
-#if OPENTHREAD_ENABLE_NCP_SPI
+#if OPENTHREAD_CONFIG_NCP_SPI_ENABLE
+
+#if OPENTHREAD_CONFIG_DIAG_ENABLE
+OT_STATIC_ASSERT(OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE <=
+                     OPENTHREAD_CONFIG_NCP_SPI_BUFFER_SIZE - ot::Ncp::NcpBase::kSpinelCmdHeaderSize -
+                         ot::Ncp::NcpBase::kSpinelPropIdSize - ot::Ncp::SpiFrame::kHeaderSize,
+                 "diag output should be smaller than NCP SPI tx buffer");
+OT_STATIC_ASSERT(OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE <= OPENTHREAD_CONFIG_NCP_SPI_BUFFER_SIZE,
+                 "diag command line should be smaller than NCP SPI rx buffer");
+#endif
 
 namespace ot {
 namespace Ncp {
@@ -65,7 +75,7 @@ extern "C" void otNcpInit(otInstance *aInstance)
     }
 }
 
-#endif // OPENTHREAD_ENABLE_SPINEL_VENDOR_SUPPORT == 0
+#endif // OPENTHREAD_ENABLE_NCP_VENDOR_HOOK == 0
 
 NcpSpi::NcpSpi(Instance *aInstance)
     : NcpBase(aInstance)
@@ -369,4 +379,4 @@ void NcpSpi::HandleRxFrame(void)
 } // namespace Ncp
 } // namespace ot
 
-#endif // OPENTHREAD_ENABLE_NCP_SPI
+#endif // OPENTHREAD_CONFIG_NCP_SPI_ENABLE

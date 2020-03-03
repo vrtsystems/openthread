@@ -120,7 +120,7 @@ public:
      */
     otError RemoveHasRoutePrefix(const uint8_t *aPrefix, uint8_t aPrefixLength);
 
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     /**
      * This method adds a Service entry to the Thread Network local data.
      *
@@ -166,18 +166,18 @@ public:
     otError SendServerDataNotification(void);
 
 private:
-    otError UpdateRloc(void);
-    otError UpdateRloc(PrefixTlv &aPrefix);
-    otError UpdateRloc(HasRouteTlv &aHasRoute);
-    otError UpdateRloc(BorderRouterTlv &aBorderRouter);
-#if OPENTHREAD_ENABLE_SERVICE
-    otError UpdateRloc(ServiceTlv &aService);
-    otError UpdateRloc(ServerTlv &aService);
+    void UpdateRloc(void);
+    void UpdateRloc(PrefixTlv &aPrefix);
+    void UpdateRloc(HasRouteTlv &aHasRoute);
+    void UpdateRloc(BorderRouterTlv &aBorderRouter);
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
+    void UpdateRloc(ServiceTlv &aService);
+    void UpdateRloc(ServerTlv &aServer);
 #endif
 
     bool IsOnMeshPrefixConsistent(void);
     bool IsExternalRouteConsistent(void);
-#if OPENTHREAD_ENABLE_SERVICE
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     bool IsServiceConsistent(void);
 #endif
 

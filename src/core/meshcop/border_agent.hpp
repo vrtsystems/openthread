@@ -62,7 +62,8 @@ public:
     /**
      * This method starts the Border Agent service.
      *
-     * @retval OT_ERROR_NONE  Successfully started the Border Agent service.
+     * @retval OT_ERROR_NONE    Successfully started the Border Agent service.
+     * @retval OT_ERROR_ALREADY Already started.
      *
      */
     otError Start(void);
@@ -78,7 +79,7 @@ public:
     /**
      * This method gets the state of the Border Agent service.
      *
-     * @returns The state of the the Border Agent service.
+     * @returns The state of the Border Agent service.
      *
      */
     otBorderAgentState GetState(void) const { return mState; }
@@ -88,18 +89,13 @@ private:
     {
         static_cast<BorderAgent *>(aContext)->HandleConnected(aConnected);
     }
-    void    HandleConnected(bool aConnected);
-    otError StartCoaps(void);
+    void HandleConnected(bool aConnected);
 
     template <Coap::Resource BorderAgent::*aResource>
-    static void HandleRequest(void *               aContext,
-                              otCoapHeader *       aHeader,
-                              otMessage *          aMessage,
-                              const otMessageInfo *aMessageInfo)
+    static void HandleRequest(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
     {
         static_cast<BorderAgent *>(aContext)->ForwardToLeader(
-            *static_cast<Coap::Header *>(aHeader), *static_cast<Message *>(aMessage),
-            *static_cast<const Ip6::MessageInfo *>(aMessageInfo),
+            *static_cast<Coap::Message *>(aMessage), *static_cast<const Ip6::MessageInfo *>(aMessageInfo),
             (static_cast<BorderAgent *>(aContext)->*aResource).GetUriPath(), false, false);
     }
 
@@ -107,23 +103,20 @@ private:
     void        HandleTimeout(void);
 
     static void HandleCoapResponse(void *               aContext,
-                                   otCoapHeader *       aHeader,
                                    otMessage *          aMessage,
                                    const otMessageInfo *aMessageInfo,
                                    otError              aResult);
 
-    void    SendErrorMessage(const Coap::Header &aHeader);
-    otError ForwardToLeader(const Coap::Header &    aHeader,
-                            const Message &         aMessage,
-                            const Ip6::MessageInfo &aMessageInfo,
-                            const char *            aPath,
-                            bool                    aPetition,
-                            bool                    aSeparate);
-    otError ForwardToCommissioner(const Coap::Header &aHeader, const Message &aMessage);
-    void    HandleKeepAlive(const Coap::Header &aHeader, const Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
-    void    HandleRelayTransmit(const Coap::Header &aHeader, const Message &aMessage);
-    void    HandleRelayReceive(const Coap::Header &aHeader, const Message &aMessage);
-    void    HandleProxyTransmit(const Coap::Header &aHeader, const Message &aMessage);
+    otError     ForwardToLeader(const Coap::Message &   aMessage,
+                                const Ip6::MessageInfo &aMessageInfo,
+                                const char *            aPath,
+                                bool                    aPetition,
+                                bool                    aSeparate);
+    otError     ForwardToCommissioner(Coap::Message &aForwardMessage, const Message &aMessage);
+    void        HandleKeepAlive(const Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    void        HandleRelayTransmit(const Coap::Message &aMessage);
+    void        HandleRelayReceive(const Coap::Message &aMessage);
+    void        HandleProxyTransmit(const Coap::Message &aMessage);
     static bool HandleUdpReceive(void *aContext, const otMessage *aMessage, const otMessageInfo *aMessageInfo)
     {
         return static_cast<BorderAgent *>(aContext)->HandleUdpReceive(
@@ -135,9 +128,8 @@ private:
 
     enum
     {
-        kBorderAgentUdpPort = 49191,     ///< UDP port of border agent service.
-        kKeepAliveTimeout   = 50 * 1000, ///< Timeout to reject a commissioner.
-        kRestartDelay       = 1 * 1000,  ///< Delay to restart border agent service.
+        kKeepAliveTimeout = 50 * 1000, ///< Timeout to reject a commissioner.
+        kRestartDelay     = 1 * 1000,  ///< Delay to restart border agent service.
     };
 
     Ip6::MessageInfo mMessageInfo;

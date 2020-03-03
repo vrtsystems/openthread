@@ -36,8 +36,8 @@
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "common/instance.hpp"
+#include "common/locator-getters.hpp"
 #include "common/message.hpp"
-#include "common/owner-locator.hpp"
 #include "net/ip6.hpp"
 
 namespace ot {
@@ -80,26 +80,26 @@ const otNetifMulticastAddress Netif::kLinkLocalAllRoutersMulticastAddress = {
     {{{0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02}}},
     &Netif::kRealmLocalAllRoutersMulticastAddress};
 
-Netif::Netif(Instance &aInstance, int8_t aInterfaceId)
+Netif::Netif(Instance &aInstance)
     : InstanceLocator(aInstance)
     , mUnicastAddresses(NULL)
     , mMulticastAddresses(NULL)
-    , mInterfaceId(aInterfaceId)
     , mMulticastPromiscuous(false)
     , mNext(NULL)
     , mAddressCallback(NULL)
     , mAddressCallbackContext(NULL)
 {
-    for (size_t i = 0; i < OT_ARRAY_LENGTH(mExtUnicastAddresses); i++)
+    for (NetifUnicastAddress *entry = &mExtUnicastAddresses[0]; entry < OT_ARRAY_END(mExtUnicastAddresses); entry++)
     {
         // To mark the address as unused/available, set the `mNext` to point back to itself.
-        mExtUnicastAddresses[i].mNext = &mExtUnicastAddresses[i];
+        entry->mNext = entry;
     }
 
-    for (size_t i = 0; i < OT_ARRAY_LENGTH(mExtMulticastAddresses); i++)
+    for (NetifMulticastAddress *entry = &mExtMulticastAddresses[0]; entry < OT_ARRAY_END(mExtMulticastAddresses);
+         entry++)
     {
         // To mark the address as unused/available, set the `mNext` to point back to itself.
-        mExtMulticastAddresses[i].mNext = &mExtMulticastAddresses[i];
+        entry->mNext = entry;
     }
 }
 
@@ -135,7 +135,7 @@ void Netif::SubscribeAllNodesMulticast(void)
         }
     }
 
-    GetNotifier().Signal(OT_CHANGED_IP6_MULTICAST_SUBSRCRIBED);
+    Get<Notifier>().Signal(OT_CHANGED_IP6_MULTICAST_SUBSCRIBED);
 }
 
 void Netif::UnsubscribeAllNodesMulticast(void)
@@ -153,7 +153,7 @@ void Netif::UnsubscribeAllNodesMulticast(void)
         }
     }
 
-    GetNotifier().Signal(OT_CHANGED_IP6_MULTICAST_UNSUBSRCRIBED);
+    Get<Notifier>().Signal(OT_CHANGED_IP6_MULTICAST_UNSUBSCRIBED);
 }
 
 otError Netif::SubscribeAllRoutersMulticast(void)
@@ -191,7 +191,7 @@ otError Netif::SubscribeAllRoutersMulticast(void)
         }
     }
 
-    GetNotifier().Signal(OT_CHANGED_IP6_MULTICAST_SUBSRCRIBED);
+    Get<Notifier>().Signal(OT_CHANGED_IP6_MULTICAST_SUBSCRIBED);
 
 exit:
     return error;
@@ -232,7 +232,7 @@ exit:
             }
         }
 
-        GetNotifier().Signal(OT_CHANGED_IP6_MULTICAST_UNSUBSRCRIBED);
+        Get<Notifier>().Signal(OT_CHANGED_IP6_MULTICAST_UNSUBSCRIBED);
     }
 
     return error;
@@ -258,7 +258,7 @@ otError Netif::SubscribeMulticast(NetifMulticastAddress &aAddress)
         mAddressCallback(&aAddress.mAddress, kMulticastPrefixLength, true, mAddressCallbackContext);
     }
 
-    GetNotifier().Signal(OT_CHANGED_IP6_MULTICAST_SUBSRCRIBED);
+    Get<Notifier>().Signal(OT_CHANGED_IP6_MULTICAST_SUBSCRIBED);
 
 exit:
     return error;
@@ -296,29 +296,28 @@ exit:
             mAddressCallback(&aAddress.mAddress, kMulticastPrefixLength, false, mAddressCallbackContext);
         }
 
-        GetNotifier().Signal(OT_CHANGED_IP6_MULTICAST_UNSUBSRCRIBED);
+        Get<Notifier>().Signal(OT_CHANGED_IP6_MULTICAST_UNSUBSCRIBED);
     }
 
     return error;
 }
 
-otError Netif::GetNextExternalMulticast(uint8_t &aIterator, Address &aAddress)
+otError Netif::GetNextExternalMulticast(uint8_t &aIterator, Address &aAddress) const
 {
-    otError                error = OT_ERROR_NOT_FOUND;
-    size_t                 num   = OT_ARRAY_LENGTH(mExtMulticastAddresses);
-    NetifMulticastAddress *entry;
+    otError error = OT_ERROR_NOT_FOUND;
+    size_t  num   = OT_ARRAY_LENGTH(mExtMulticastAddresses);
 
     VerifyOrExit(aIterator < num);
 
     // Find an available entry in the `mExtMulticastAddresses` array.
     for (uint8_t i = aIterator; i < num; i++)
     {
-        entry = &mExtMulticastAddresses[i];
+        const NetifMulticastAddress &entry = mExtMulticastAddresses[i];
 
         // In an unused/available entry, `mNext` points back to the entry itself.
-        if (entry->mNext != entry)
+        if (entry.mNext != &entry)
         {
-            aAddress  = entry->GetAddress();
+            aAddress  = entry.GetAddress();
             aIterator = i + 1;
             ExitNow(error = OT_ERROR_NONE);
         }
@@ -332,7 +331,8 @@ otError Netif::SubscribeExternalMulticast(const Address &aAddress)
 {
     otError                error = OT_ERROR_NONE;
     NetifMulticastAddress *entry;
-    size_t                 num = OT_ARRAY_LENGTH(mExtMulticastAddresses);
+
+    VerifyOrExit(mMulticastAddresses != NULL, error = OT_ERROR_INVALID_STATE);
 
     if (IsMulticastSubscribed(aAddress))
     {
@@ -340,7 +340,7 @@ otError Netif::SubscribeExternalMulticast(const Address &aAddress)
     }
 
     // Find an available entry in the `mExtMulticastAddresses` array.
-    for (entry = &mExtMulticastAddresses[0]; num > 0; num--, entry++)
+    for (entry = &mExtMulticastAddresses[0]; entry < OT_ARRAY_END(mExtMulticastAddresses); entry++)
     {
         // In an unused/available entry, `mNext` points back to the entry itself.
         if (entry->mNext == entry)
@@ -349,13 +349,13 @@ otError Netif::SubscribeExternalMulticast(const Address &aAddress)
         }
     }
 
-    VerifyOrExit(num > 0, error = OT_ERROR_NO_BUFS);
+    VerifyOrExit(entry < OT_ARRAY_END(mExtMulticastAddresses), error = OT_ERROR_NO_BUFS);
 
     // Copy the address into the available entry and add it to linked-list.
     entry->mAddress     = aAddress;
     entry->mNext        = mMulticastAddresses;
     mMulticastAddresses = entry;
-    GetNotifier().Signal(OT_CHANGED_IP6_MULTICAST_SUBSRCRIBED);
+    Get<Notifier>().Signal(OT_CHANGED_IP6_MULTICAST_SUBSCRIBED);
 
 exit:
     return error;
@@ -366,13 +366,12 @@ otError Netif::UnsubscribeExternalMulticast(const Address &aAddress)
     otError                error = OT_ERROR_NONE;
     NetifMulticastAddress *entry;
     NetifMulticastAddress *last = NULL;
-    size_t                 num  = OT_ARRAY_LENGTH(mExtMulticastAddresses);
 
     for (entry = mMulticastAddresses; entry; entry = entry->GetNext())
     {
         if (entry->GetAddress() == aAddress)
         {
-            VerifyOrExit((entry >= &mExtMulticastAddresses[0]) && (entry < &mExtMulticastAddresses[num]),
+            VerifyOrExit((entry >= &mExtMulticastAddresses[0]) && (entry < OT_ARRAY_END(mExtMulticastAddresses)),
                          error = OT_ERROR_INVALID_ARGS);
 
             if (last)
@@ -395,7 +394,7 @@ otError Netif::UnsubscribeExternalMulticast(const Address &aAddress)
     // To mark the address entry as unused/available, set the `mNext` pointer back to the entry itself.
     entry->mNext = entry;
 
-    GetNotifier().Signal(OT_CHANGED_IP6_MULTICAST_UNSUBSRCRIBED);
+    Get<Notifier>().Signal(OT_CHANGED_IP6_MULTICAST_UNSUBSCRIBED);
 
 exit:
     return error;
@@ -403,9 +402,8 @@ exit:
 
 void Netif::UnsubscribeAllExternalMulticastAddresses(void)
 {
-    size_t num = OT_ARRAY_LENGTH(mExtMulticastAddresses);
-
-    for (NetifMulticastAddress *entry = &mExtMulticastAddresses[0]; num > 0; num--, entry++)
+    for (NetifMulticastAddress *entry = &mExtMulticastAddresses[0]; entry < OT_ARRAY_END(mExtMulticastAddresses);
+         entry++)
     {
         // In unused entries, the `mNext` points back to the entry itself.
         if (entry->mNext != entry)
@@ -441,7 +439,7 @@ otError Netif::AddUnicastAddress(NetifUnicastAddress &aAddress)
         mAddressCallback(&aAddress.mAddress, aAddress.mPrefixLength, true, mAddressCallbackContext);
     }
 
-    GetNotifier().Signal(aAddress.mRloc ? OT_CHANGED_THREAD_RLOC_ADDED : OT_CHANGED_IP6_ADDRESS_ADDED);
+    Get<Notifier>().Signal(aAddress.mRloc ? OT_CHANGED_THREAD_RLOC_ADDED : OT_CHANGED_IP6_ADDRESS_ADDED);
 
 exit:
     return error;
@@ -479,7 +477,7 @@ exit:
             mAddressCallback(&aAddress.mAddress, aAddress.mPrefixLength, false, mAddressCallbackContext);
         }
 
-        GetNotifier().Signal(aAddress.mRloc ? OT_CHANGED_THREAD_RLOC_REMOVED : OT_CHANGED_IP6_ADDRESS_REMOVED);
+        Get<Notifier>().Signal(aAddress.mRloc ? OT_CHANGED_THREAD_RLOC_REMOVED : OT_CHANGED_IP6_ADDRESS_REMOVED);
     }
 
     return error;
@@ -489,7 +487,6 @@ otError Netif::AddExternalUnicastAddress(const NetifUnicastAddress &aAddress)
 {
     otError              error = OT_ERROR_NONE;
     NetifUnicastAddress *entry;
-    size_t               num = OT_ARRAY_LENGTH(mExtUnicastAddresses);
 
     VerifyOrExit(!aAddress.GetAddress().IsLinkLocal(), error = OT_ERROR_INVALID_ARGS);
 
@@ -497,7 +494,7 @@ otError Netif::AddExternalUnicastAddress(const NetifUnicastAddress &aAddress)
     {
         if (entry->GetAddress() == aAddress.GetAddress())
         {
-            VerifyOrExit((entry >= &mExtUnicastAddresses[0]) && (entry < &mExtUnicastAddresses[num]),
+            VerifyOrExit((entry >= &mExtUnicastAddresses[0]) && (entry < OT_ARRAY_END(mExtUnicastAddresses)),
                          error = OT_ERROR_INVALID_ARGS);
 
             entry->mPrefixLength = aAddress.mPrefixLength;
@@ -508,7 +505,7 @@ otError Netif::AddExternalUnicastAddress(const NetifUnicastAddress &aAddress)
     }
 
     // Find an available entry in the `mExtUnicastAddresses` array.
-    for (entry = &mExtUnicastAddresses[0]; num > 0; num--, entry++)
+    for (entry = &mExtUnicastAddresses[0]; entry < OT_ARRAY_END(mExtUnicastAddresses); entry++)
     {
         // In an unused/available entry, `mNext` points back to the entry itself.
         if (entry->mNext == entry)
@@ -517,14 +514,14 @@ otError Netif::AddExternalUnicastAddress(const NetifUnicastAddress &aAddress)
         }
     }
 
-    VerifyOrExit(num > 0, error = OT_ERROR_NO_BUFS);
+    VerifyOrExit(entry < OT_ARRAY_END(mExtUnicastAddresses), error = OT_ERROR_NO_BUFS);
 
     // Copy the new address into the available entry and insert it in linked-list.
     *entry            = aAddress;
     entry->mNext      = mUnicastAddresses;
     mUnicastAddresses = entry;
 
-    GetNotifier().Signal(OT_CHANGED_IP6_ADDRESS_ADDED);
+    Get<Notifier>().Signal(OT_CHANGED_IP6_ADDRESS_ADDED);
 
 exit:
     return error;
@@ -535,13 +532,12 @@ otError Netif::RemoveExternalUnicastAddress(const Address &aAddress)
     otError              error = OT_ERROR_NONE;
     NetifUnicastAddress *entry;
     NetifUnicastAddress *last = NULL;
-    size_t               num  = OT_ARRAY_LENGTH(mExtUnicastAddresses);
 
     for (entry = mUnicastAddresses; entry; entry = entry->GetNext())
     {
         if (entry->GetAddress() == aAddress)
         {
-            VerifyOrExit((entry >= &mExtUnicastAddresses[0]) && (entry < &mExtUnicastAddresses[num]),
+            VerifyOrExit((entry >= &mExtUnicastAddresses[0]) && (entry < OT_ARRAY_END(mExtUnicastAddresses)),
                          error = OT_ERROR_INVALID_ARGS);
 
             if (last)
@@ -564,7 +560,7 @@ otError Netif::RemoveExternalUnicastAddress(const Address &aAddress)
     // To mark the address entry as unused/available, set the `mNext` pointer back to the entry itself.
     entry->mNext = entry;
 
-    GetNotifier().Signal(OT_CHANGED_IP6_ADDRESS_REMOVED);
+    Get<Notifier>().Signal(OT_CHANGED_IP6_ADDRESS_REMOVED);
 
 exit:
     return error;
@@ -572,9 +568,7 @@ exit:
 
 void Netif::RemoveAllExternalUnicastAddresses(void)
 {
-    size_t num = OT_ARRAY_LENGTH(mExtUnicastAddresses);
-
-    for (NetifUnicastAddress *entry = &mExtUnicastAddresses[0]; num > 0; num--, entry++)
+    for (NetifUnicastAddress *entry = &mExtUnicastAddresses[0]; entry < OT_ARRAY_END(mExtUnicastAddresses); entry++)
     {
         // In unused entries, the `mNext` points back to the entry itself.
         if (entry->mNext != entry)
