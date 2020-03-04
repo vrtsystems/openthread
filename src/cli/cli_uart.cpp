@@ -111,16 +111,6 @@ extern "C" void otCliUartInit(otInstance *aInstance)
     Server::sServer = new (&sCliUartRaw) Uart(instance);
 }
 
-extern "C" bool otCliUartGetLineEchoEnabled()
-{
-    return static_cast<Uart *>(Server::sServer)->GetLineEchoEnabled();
-}
-
-extern "C" void otCliUartEnableLineEcho(bool aEnable)
-{
-    static_cast<Uart *>(Server::sServer)->EnableLineEcho(aEnable);
-}
-
 Uart::Uart(Instance *aInstance)
     : Server(aInstance)
 {
