@@ -144,7 +144,7 @@ When building an external application with OpenThread libraries and CryptoCell 3
   - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libmbedtls_tls_vanilla.a`
   - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libmbedtls_x509_vanilla.a`
   - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libmbedtls_base_vanilla.a`
-  - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libnrf_cc310_platform_0.9.1.a`
+  - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libnrf_cc310_platform_0.9.2.a`
 - Include directories:
   - `third_party/NordicSemiconductor/libraries/nrf_security/mbedtls_platform_config`
   - `third_party/NordicSemiconductor/libraries/nrf_security/include`
@@ -209,7 +209,7 @@ When building an external application that uses RTOS with OpenThread libraries a
   - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libmbedtls_tls_vanilla.a`
   - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libmbedtls_x509_vanilla.a`
   - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libmbedtls_base_vanilla.a`
-  - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libnrf_cc310_platform_0.9.1.a`
+  - `third_party/NordicSemiconductor/libraries/nrf_security/lib/libnrf_cc310_platform_0.9.2.a`
 - Include directories:
   - `third_party/NordicSemiconductor/libraries/nrf_security/mbedtls_platform_config`
   - `third_party/NordicSemiconductor/libraries/nrf_security/include`
@@ -531,7 +531,7 @@ The following toolchains have been used for testing and verification:
 
 # Nordic Semiconductor's nRF5 SDK for Thread and Zigbee
 
-Use [nRF5 Software Development Kit (SDK) for Thread and Zigbee][nRF5-SDK-Thread-Zigbee] when developing Thread products with Nordic Semiconductor's advanced nRF52840 or nRF52811 SoCs.
+Use [nRF5 Software Development Kit (SDK) for Thread and Zigbee][nRF5-SDK-Thread-Zigbee] when developing Thread products with Nordic Semiconductor's advanced nRF52840, nRF52833 or nRF52811 SoCs.
 
 The <i>nRF5 SDK for Thread and Zigbee</i> includes:
  - a pre-built OpenThread stack for the Nordic nRF52840 and nRF52811 SoCs,

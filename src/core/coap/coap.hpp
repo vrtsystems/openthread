@@ -35,6 +35,7 @@
 
 #include "coap/coap_message.hpp"
 #include "common/debug.hpp"
+#include "common/linked_list.hpp"
 #include "common/locator.hpp"
 #include "common/message.hpp"
 #include "common/timer.hpp"
@@ -102,6 +103,14 @@ public:
     }
 
     /**
+     * This method validates whether the CoAP transmission parameters are valid.
+     *
+     * @returns Whether the parameters are valid.
+     *
+     */
+    bool IsValid(void) const;
+
+    /**
      * This static method returns default CoAP tx parameters.
      *
      * @returns The default tx parameters.
@@ -112,17 +121,17 @@ public:
 private:
     enum
     {
-        kDefaultAckTimeout                 = OPENTHREAD_CONFIG_COAP_ACK_TIMEOUT_MILLIS,
-        kDefaultAckRandomFactorNumerator   = OPENTHREAD_CONFIG_COAP_ACK_RANDOM_FACTOR_NUMERATOR,
-        kDefaultAckRandomFactorDenominator = OPENTHREAD_CONFIG_COAP_ACK_RANDOM_FACTOR_DENOMINATOR,
-        kDefaultMaxRetransmit              = OPENTHREAD_CONFIG_COAP_MAX_RETRANSMIT,
+        kDefaultAckTimeout                 = 2000, // in millisecond
+        kDefaultAckRandomFactorNumerator   = 3,
+        kDefaultAckRandomFactorDenominator = 2,
+        kDefaultMaxRetransmit              = 4,
         kDefaultMaxLatency                 = 100000, // in millisecond
     };
 
     uint32_t CalculateInitialRetransmissionTimeout(void) const;
     uint32_t CalculateExchangeLifetime(void) const;
     uint32_t CalculateMaxTransmitWait(void) const;
-    uint32_t CalculateSpan(uint32_t aMaxRetx) const;
+    uint32_t CalculateSpan(uint8_t aMaxRetx) const;
 
     static const otCoapTxParameters kDefaultTxParameters;
 };
@@ -131,7 +140,7 @@ private:
  * This class implements CoAP resource handling.
  *
  */
-class Resource : public otCoapResource
+class Resource : public otCoapResource, public LinkedListEntry<Resource>
 {
     friend class CoapBase;
 
@@ -155,14 +164,6 @@ public:
         mContext = aContext;
         mNext    = NULL;
     }
-
-    /**
-     * This method returns a pointer to the next resource.
-     *
-     * @returns A pointer to the next resource.
-     *
-     */
-    Resource *GetNext(void) const { return static_cast<Resource *>(mNext); }
 
     /**
      * This method returns a pointer to the URI path.
@@ -585,7 +586,7 @@ private:
     uint16_t          mMessageId;
     TimerMilliContext mRetransmissionTimer;
 
-    Resource *mResources;
+    LinkedList<Resource> mResources;
 
     void *         mContext;
     Interceptor    mInterceptor;

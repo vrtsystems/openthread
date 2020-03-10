@@ -603,6 +603,19 @@ public:
     bool IsAttached(void) const;
 
     /**
+     * This method indicates whether device is currently attaching or not.
+     *
+     * Note that an already attached device may also be in attaching state. Examples of this include a leader/router
+     * trying to attach to a better partition, or a child trying to find a better parent (when feature
+     * `OPENTHREAD_CONFIG_PARENT_SEARCH_ENABLE` is enabled).
+     *
+     * @retval TRUE   Device is currently trying to attach.
+     * @retval FALSE  Device is not in middle of attach process.
+     *
+     */
+    bool IsAttaching(void) const { return (mAttachState != kAttachStateIdle); }
+
+    /**
      * This method returns the current Thread interface state.
      *
      * @returns The current Thread interface state.
@@ -734,23 +747,20 @@ public:
     }
 
     /**
-     * This method returns a pointer to the parent when operating in End Device mode.
+     * This method gets the parent when operating in End Device mode.
      *
-     * @returns A pointer to the parent.
+     * @returns A reference to the parent.
      *
      */
-    Router *GetParent(void);
+    Router &GetParent(void) { return mParent; }
 
     /**
-     * This method returns a pointer to the parent candidate or parent.
+     * This method get the parent candidate.
      *
-     * This method is useful when sending IEEE 802.15.4 Data Request frames while attempting to attach to a new parent.
-     *
-     * If attempting to attach to a new parent, this method returns the parent candidate.
-     * If not attempting to attach, this method returns the parent.
+     * The parent candidate is valid when attempting to attach to a new parent.
      *
      */
-    Router *GetParentCandidate(void);
+    Router &GetParentCandidate(void) { return mParentCandidate; }
 
     /**
      * This method indicates whether or not an IPv6 address is an RLOC.
@@ -861,10 +871,9 @@ public:
      */
     otError GetCommissionerAloc(Ip6::Address &aAddress, uint16_t aSessionId) const
     {
-        return GetAlocAddress(aAddress, GetCommissionerAloc16FromId(aSessionId));
+        return GetAlocAddress(aAddress, CommissionerAloc16FromId(aSessionId));
     }
 
-#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     /**
      * This method retrieves the Service ALOC for given Service ID.
      *
@@ -876,7 +885,6 @@ public:
      *
      */
     otError GetServiceAloc(uint8_t aServiceId, Ip6::Address &aAddress) const;
-#endif
 
     /**
      * This method adds Leader's ALOC to its Thread interface.
@@ -908,24 +916,24 @@ public:
     otError GetLeaderData(otLeaderData &aLeaderData);
 
     /**
-     * This method returns the Child ID portion of an RLOC16.
+     * This method derives the Child ID from a given RLOC16.
      *
      * @param[in]  aRloc16  The RLOC16 value.
      *
      * @returns The Child ID portion of an RLOC16.
      *
      */
-    static uint16_t GetChildId(uint16_t aRloc16) { return aRloc16 & kMaxChildId; }
+    static uint16_t ChildIdFromRloc16(uint16_t aRloc16) { return aRloc16 & kMaxChildId; }
 
     /**
-     * This method returns the Router ID portion of an RLOC16.
+     * This method derives the Router ID portion from a given RLOC16.
      *
      * @param[in]  aRloc16  The RLOC16 value.
      *
      * @returns The Router ID portion of an RLOC16.
      *
      */
-    static uint8_t GetRouterId(uint16_t aRloc16) { return aRloc16 >> kRouterIdOffset; }
+    static uint8_t RouterIdFromRloc16(uint16_t aRloc16) { return aRloc16 >> kRouterIdOffset; }
 
     /**
      * This method returns whether the two RLOC16 have the same Router ID.
@@ -938,7 +946,7 @@ public:
      */
     static bool RouterIdMatch(uint16_t aRloc16A, uint16_t aRloc16B)
     {
-        return ((aRloc16A >> kRouterIdOffset) == (aRloc16B >> kRouterIdOffset));
+        return RouterIdFromRloc16(aRloc16A) == RouterIdFromRloc16(aRloc16B);
     }
 
     /**
@@ -949,10 +957,7 @@ public:
      * @returns The Service ID corresponding to given ALOC16.
      *
      */
-    static uint8_t GetServiceIdFromAloc(uint16_t aAloc16)
-    {
-        return static_cast<uint8_t>(aAloc16 - kAloc16ServiceStart);
-    }
+    static uint8_t ServiceIdFromAloc(uint16_t aAloc16) { return static_cast<uint8_t>(aAloc16 - kAloc16ServiceStart); }
 
     /**
      * This method returns the Service Aloc corresponding to a Service ID.
@@ -962,7 +967,7 @@ public:
      * @returns The Service ALOC16 corresponding to given ID.
      *
      */
-    static uint16_t GetServiceAlocFromId(uint8_t aServiceId)
+    static uint16_t ServiceAlocFromId(uint8_t aServiceId)
     {
         return static_cast<uint16_t>(aServiceId + kAloc16ServiceStart);
     }
@@ -975,20 +980,23 @@ public:
      * @returns The Commissioner ALOC16 corresponding to given ID.
      *
      */
-    static uint16_t GetCommissionerAloc16FromId(uint16_t aSessionId)
+    static uint16_t CommissionerAloc16FromId(uint16_t aSessionId)
     {
         return static_cast<uint16_t>((aSessionId & kAloc16CommissionerMask) + kAloc16CommissionerStart);
     }
 
     /**
-     * This method returns the RLOC16 of a given Router ID.
+     * This method derives RLOC16 from a given Router ID.
      *
      * @param[in]  aRouterId  The Router ID value.
      *
-     * @returns The RLOC16 of the given Router ID.
+     * @returns The RLOC16 corresponding to the given Router ID.
      *
      */
-    static uint16_t GetRloc16(uint8_t aRouterId) { return static_cast<uint16_t>(aRouterId << kRouterIdOffset); }
+    static uint16_t Rloc16FromRouterId(uint8_t aRouterId)
+    {
+        return static_cast<uint16_t>(aRouterId << kRouterIdOffset);
+    }
 
     /**
      * This method indicates whether or not @p aRloc16 refers to an active router.
@@ -999,16 +1007,7 @@ public:
      * @retval FALSE  If @p aRloc16 does not refer to an active router.
      *
      */
-    static bool IsActiveRouter(uint16_t aRloc16) { return GetChildId(aRloc16) == 0; }
-
-    /**
-     * This method fills the NetworkDataTlv.
-     *
-     * @param[out] aTlv         The NetworkDataTlv.
-     * @param[in]  aStableOnly  TRUE to append stable data, FALSE otherwise.
-     *
-     */
-    void FillNetworkDataTlv(NetworkDataTlv &aTlv, bool aStableOnly);
+    static bool IsActiveRouter(uint16_t aRloc16) { return ChildIdFromRloc16(aRloc16) == 0; }
 
     /**
      * This method returns a reference to the send queue.
@@ -1108,6 +1107,60 @@ protected:
     };
 
     /**
+     * This type represents a Challenge (or Response) data.
+     *
+     */
+    struct Challenge
+    {
+        uint8_t mBuffer[kMaxChallengeSize]; ///< Buffer containing the challenge/response byte sequence.
+        uint8_t mLength;                    ///< Challenge length (in bytes).
+
+        /**
+         * This method generates a cryptographically secure random sequence to populate the challenge data.
+         *
+         */
+        void GenerateRandom(void);
+
+        /**
+         * This method indicates whether the Challenge matches a given buffer.
+         *
+         * @param[in] aBuffer   A pointer to a buffer to compare with the Challenge.
+         * @param[in] aLength   Length of @p aBuffer (in bytes).
+         *
+         * @retval TRUE  If the Challenge matches the given buffer.
+         * @retval FALSE If the Challenge does not match the given buffer.
+         *
+         */
+        bool Matches(const uint8_t *aBuffer, uint8_t aLength) const;
+
+        /**
+         * This method indicates whether two Challenge data byte sequences are equal or not.
+         *
+         * @param[in] aOther   Another Challenge data to compare.
+         *
+         * @retval TRUE  If the two Challenges match.
+         * @retval FALSE If the two Challenges do not match.
+         *
+         */
+        bool operator==(const Challenge &aOther) const { return Matches(aOther.mBuffer, aOther.mLength); }
+    };
+
+    /**
+     * This type represents list of requested TLVs in a TLV Request TLV.
+     *
+     */
+    struct RequestedTlvs
+    {
+        enum
+        {
+            kMaxNumTlvs = 16, ///< Maximum number of TLVs in request array.
+        };
+
+        uint8_t mTlvs[kMaxNumTlvs]; ///< Array of requested TLVs.
+        uint8_t mNumTlvs;           ///< Number of TLVs in the array.
+    };
+
+    /**
      * This method allocates a new message buffer for preparing an MLE message.
      *
      * @returns A pointer to the message or NULL if insufficient message buffers are available.
@@ -1192,17 +1245,54 @@ protected:
     otError AppendChallenge(Message &aMessage, const uint8_t *aChallenge, uint8_t aChallengeLength);
 
     /**
+     * This method appends a Challenge TLV to a message.
+     *
+     * @param[in]  aMessage          A reference to the message.
+     * @param[in]  aChallenge        A reference to the Challenge data.
+     *
+     * @retval OT_ERROR_NONE     Successfully appended the Challenge TLV.
+     * @retval OT_ERROR_NO_BUFS  Insufficient buffers available to append the Challenge TLV.
+     *
+     */
+    otError AppendChallenge(Message &aMessage, const Challenge &aChallenge);
+
+    /**
+     * This method reads Challenge TLV from a message.
+     *
+     * @param[in]  aMessage          A reference to the message.
+     * @param[out] aChallenge        A reference to the Challenge data where to output the read value.
+     *
+     * @retval OT_ERROR_NONE       Successfully read the Challenge TLV.
+     * @retval OT_ERROR_NOT_FOUND  Challenge TLV was not found in the message.
+     * @retval OT_ERROR_PARSE      Challenge TLV was found but could not be parsed.
+     *
+     */
+    otError ReadChallenge(const Message &aMessage, Challenge &aChallenge);
+
+    /**
      * This method appends a Response TLV to a message.
      *
      * @param[in]  aMessage         A reference to the message.
-     * @param[in]  aResponse        A pointer to the Response value.
-     * @param[in]  aResponseLength  The length of the Response value in bytes.
+     * @param[in]  aResponse        A reference to the Response data.
      *
      * @retval OT_ERROR_NONE     Successfully appended the Response TLV.
      * @retval OT_ERROR_NO_BUFS  Insufficient buffers available to append the Response TLV.
      *
      */
-    otError AppendResponse(Message &aMessage, const uint8_t *aResponse, uint8_t aResponseLength);
+    otError AppendResponse(Message &aMessage, const Challenge &aResponse);
+
+    /**
+     * This method reads Response TLV from a message.
+     *
+     * @param[in]  aMessage         A reference to the message.
+     * @param[out] aResponse        A reference to the Response data where to output the read value.
+     *
+     * @retval OT_ERROR_NONE       Successfully read the Response TLV.
+     * @retval OT_ERROR_NOT_FOUND  Response TLV was not found in the message.
+     * @retval OT_ERROR_PARSE      Response TLV was found but could not be parsed.
+     *
+     */
+    otError ReadResponse(const Message &aMessage, Challenge &aResponse);
 
     /**
      * This method appends a Link Frame Counter TLV to a message.
@@ -1262,6 +1352,19 @@ protected:
      *
      */
     otError AppendTlvRequest(Message &aMessage, const uint8_t *aTlvs, uint8_t aTlvsLength);
+
+    /**
+     * This method reads TLV Request TLV from a message.
+     *
+     * @param[in]  aMessage         A reference to the message.
+     * @param[out] aRequestedTlvs   A reference to output the read list of requested TLVs.
+     *
+     * @retval OT_ERROR_NONE       Successfully read the TLV.
+     * @retval OT_ERROR_NOT_FOUND  TLV was not found in the message.
+     * @retval OT_ERROR_PARSE      TLV was found but could not be parsed.
+     *
+     */
+    otError ReadTlvRequest(const Message &aMessage, RequestedTlvs &aRequestedTlvs);
 
     /**
      * This method appends a Leader Data TLV to a message.
@@ -1488,13 +1591,13 @@ protected:
      *
      * @param[in]  aTlvs         A pointer to requested TLV types.
      * @param[in]  aNumTlvs      The number of TLV types in @p aTlvs.
-     * @param[in]  aChallenge    The Challenge TLV for the response.
+     * @param[in]  aChallenge    The Challenge for the response.
      *
      * @retval OT_ERROR_NONE     Successfully generated an MLE Child Update Response message.
      * @retval OT_ERROR_NO_BUFS  Insufficient buffers to generate the MLE Child Update Response message.
      *
      */
-    otError SendChildUpdateResponse(const uint8_t *aTlvs, uint8_t aNumTlvs, const ChallengeTlv &aChallenge);
+    otError SendChildUpdateResponse(const uint8_t *aTlvs, uint8_t aNumTlvs, const Challenge &aChallenge);
 
     /**
      * This method submits an MLE message to the UDP socket.
@@ -1683,6 +1786,7 @@ private:
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
     void        HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
     void        ScheduleMessageTransmissionTimer(void);
+    otError     ReadChallengeOrResponse(const Message &aMessage, uint8_t aTlvType, Challenge &aBuffer);
 
     otError HandleAdvertisement(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo, Neighbor *aNeighbor);
     otError HandleChildIdResponse(const Message &         aMessage,
@@ -1712,8 +1816,12 @@ private:
     otError  SendAnnounce(uint8_t aChannel, bool aOrphanAnnounce, const Ip6::Address &aDestination);
     uint32_t Reattach(void);
 
-    bool IsBetterParent(uint16_t aRloc16, uint8_t aLinkQuality, uint8_t aLinkMargin, ConnectivityTlv &aConnectivityTlv);
-    void ResetParentCandidate(void);
+    bool IsBetterParent(uint16_t               aRloc16,
+                        uint8_t                aLinkQuality,
+                        uint8_t                aLinkMargin,
+                        const ConnectivityTlv &aConnectivityTlv,
+                        uint8_t                aVersion);
+    bool IsNetworkDataNewer(const LeaderDataTlv &aLeaderData);
 
     otError GetAlocAddress(Ip6::Address &aAddress, uint16_t aAloc16) const;
 #if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
@@ -1737,22 +1845,15 @@ private:
 
     MessageQueue mDelayedResponses;
 
-    struct
-    {
-        uint8_t mChallenge[ChallengeTlv::kMaxSize];
-        uint8_t mChallengeLength;
-    } mChildIdRequest;
-
-    struct
-    {
-        uint8_t mChallenge[ChallengeTlv::kMaxSize];
-    } mParentRequest;
+    Challenge mParentRequestChallenge;
 
     AttachMode mParentRequestMode;
     int8_t     mParentPriority;
     uint8_t    mParentLinkQuality3;
     uint8_t    mParentLinkQuality2;
     uint8_t    mParentLinkQuality1;
+    uint16_t   mParentSedBufferSize;
+    uint8_t    mParentSedDatagramCount;
 
     uint8_t                 mChildUpdateAttempts;
     ChildUpdateRequestState mChildUpdateRequestState;
@@ -1766,7 +1867,8 @@ private:
     bool          mReceivedResponseFromParent;
     LeaderDataTlv mParentLeaderData;
 
-    Router mParentCandidate;
+    Router    mParentCandidate;
+    Challenge mParentCandidateChallenge;
 
     Ip6::UdpSocket mSocket;
     uint32_t       mTimeout;

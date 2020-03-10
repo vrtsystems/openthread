@@ -36,8 +36,8 @@
 #define PLATFORM_CONFIG_H_
 
 #include "nrf.h"
+#include "nrf_drv_clock.h"
 #include "nrf_peripherals.h"
-#include "drivers/clock/nrf_drv_clock.h"
 #include "hal/nrf_radio.h"
 #include "hal/nrf_uart.h"
 
@@ -137,7 +137,7 @@
  *
  */
 #ifndef UART_RX_BUFFER_SIZE
-#define UART_RX_BUFFER_SIZE 256
+#define UART_RX_BUFFER_SIZE 512
 #endif
 
 /**

@@ -1168,7 +1168,7 @@
  *
  * Uncomment to enable the smaller implementation of SHA256.
  */
-#define MBEDTLS_SHA256_SMALLER
+/* #undef MBEDTLS_SHA256_SMALLER */
 
 /**
  * \def MBEDTLS_SSL_ALL_ALERT_MESSAGES
@@ -2489,7 +2489,7 @@
  *
  * Uncomment to enable generic public key write functions.
  */
-/* #undef MBEDTLS_PK_WRITE_C */
+#define MBEDTLS_PK_WRITE_C
 
 /**
  * \def MBEDTLS_PKCS5_C

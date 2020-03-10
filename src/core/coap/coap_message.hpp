@@ -36,8 +36,6 @@
 
 #include "openthread-core-config.h"
 
-#include "utils/wrap_string.h"
-
 #include <openthread/coap.h>
 
 #include "common/code_utils.hpp"
@@ -610,10 +608,12 @@ private:
      */
     struct HelpData
     {
-        Header       mHeader;
-        uint16_t     mOptionLast;
-        uint16_t     mHeaderOffset; ///< The byte offset for the CoAP Header
-        uint16_t     mHeaderLength;
+        void Clear(void) { memset(this, 0, sizeof(*this)); }
+
+        Header   mHeader;
+        uint16_t mOptionLast;
+        uint16_t mHeaderOffset; ///< The byte offset for the CoAP Header
+        uint16_t mHeaderLength;
     };
 
     const HelpData &GetHelpData(void) const
@@ -621,7 +621,7 @@ private:
         OT_STATIC_ASSERT(sizeof(mBuffer.mHead.mInfo) + sizeof(HelpData) + kHelpDataAlignment <= sizeof(mBuffer),
                          "Insufficient buffer size for CoAP processing!");
 
-        return *static_cast<const HelpData *>(otALIGN(mBuffer.mHead.mData, kHelpDataAlignment));
+        return *static_cast<const HelpData *>(OT_ALIGN(mBuffer.mHead.mData, kHelpDataAlignment));
     }
 
     HelpData &GetHelpData(void) { return const_cast<HelpData &>(static_cast<const Message *>(this)->GetHelpData()); }
@@ -650,7 +650,7 @@ public:
      * @returns A pointer to the first matching option. If no option matching @p aOption is seen, NULL pointer is
      *          returned.
      */
-    const otCoapOption *GetFirstOptionMatching(otCoapOptionType aOption);
+    const otCoapOption *GetFirstOptionMatching(uint16_t aOption);
 
     /**
      * This method returns a pointer to the first option.
@@ -670,7 +670,7 @@ public:
      * @returns A pointer to the next matching option (relative to current iterator position). If no option matching @p
      *          aOption is seen, NULL pointer is returned.
      */
-    const otCoapOption *GetNextOptionMatching(otCoapOptionType aOption);
+    const otCoapOption *GetNextOptionMatching(uint16_t aOption);
 
     /**
      * This method returns a pointer to the next option.

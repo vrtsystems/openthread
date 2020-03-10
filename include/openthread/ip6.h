@@ -52,9 +52,10 @@ extern "C" {
  *
  */
 
-#define OT_IP6_PREFIX_SIZE 8   ///< Size of an IPv6 prefix (bytes)
-#define OT_IP6_IID_SIZE 8      ///< Size of an IPv6 Interface Identifier (bytes)
-#define OT_IP6_ADDRESS_SIZE 16 ///< Size of an IPv6 address (bytes)
+#define OT_IP6_PREFIX_SIZE 8                           ///< Size of an IPv6 prefix (bytes)
+#define OT_IP6_PREFIX_BITSIZE (OT_IP6_PREFIX_SIZE * 8) ///< Size of an IPv6 prefix (bits)
+#define OT_IP6_IID_SIZE 8                              ///< Size of an IPv6 Interface Identifier (bytes)
+#define OT_IP6_ADDRESS_SIZE 16                         ///< Size of an IPv6 address (bytes)
 
 /**
  * @struct otIp6Address
@@ -139,13 +140,16 @@ typedef struct otSockAddr
  */
 typedef struct otMessageInfo
 {
-    otIp6Address mSockAddr;            ///< The local IPv6 address.
-    otIp6Address mPeerAddr;            ///< The peer IPv6 address.
-    uint16_t     mSockPort;            ///< The local transport-layer port.
-    uint16_t     mPeerPort;            ///< The peer transport-layer port.
-    const void * mLinkInfo;            ///< A pointer to link-specific information.
-    uint8_t      mHopLimit;            ///< The IPv6 hop limit.
-    bool         mIsHostInterface : 1; ///< TRUE if packets sent/received via host interface, FALSE otherwise.
+    otIp6Address mSockAddr;      ///< The local IPv6 address.
+    otIp6Address mPeerAddr;      ///< The peer IPv6 address.
+    uint16_t     mSockPort;      ///< The local transport-layer port.
+    uint16_t     mPeerPort;      ///< The peer transport-layer port.
+    const void * mLinkInfo;      ///< A pointer to link-specific information.
+    uint8_t      mHopLimit;      ///< The IPv6 Hop Limit value. Only applies if `mAllowZeroHopLimit` is FALSE.
+                                 ///< If `0`, IPv6 Hop Limit is default value `OPENTHREAD_CONFIG_IP6_HOP_LIMIT_DEFAULT`.
+                                 ///< Otherwise, specifies the IPv6 Hop Limit.
+    bool mIsHostInterface : 1;   ///< TRUE if packets sent/received via host interface, FALSE otherwise.
+    bool mAllowZeroHopLimit : 1; ///< TRUE to allow IPv6 Hop Limit 0 in `mHopLimit`, FALSE otherwise.
 } otMessageInfo;
 
 /**

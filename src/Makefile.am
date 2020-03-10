@@ -33,6 +33,7 @@ include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 DIST_SUBDIRS                            = \
     core                                  \
     cli                                   \
+    lib                                   \
     ncp                                   \
     posix                                 \
     $(NULL)
@@ -41,6 +42,7 @@ DIST_SUBDIRS                            = \
 
 SUBDIRS                                 = \
     core                                  \
+    lib                                   \
     $(NULL)
 
 if OPENTHREAD_ENABLE_CLI
@@ -62,6 +64,7 @@ PRETTY_SUBDIRS                          = \
     core                                  \
     ncp                                   \
     posix                                 \
+    lib                                   \
     $(NULL)
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

@@ -28,8 +28,6 @@
 
 #include "dns_client.hpp"
 
-#include "utils/wrap_string.h"
-
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "common/instance.hpp"
@@ -382,7 +380,7 @@ exit:
 
 void Client::FinalizeDnsTransaction(Message &            aQuery,
                                     const QueryMetadata &aQueryMetadata,
-                                    otIp6Address *       aAddress,
+                                    const otIp6Address * aAddress,
                                     uint32_t             aTtl,
                                     otError              aResult)
 {

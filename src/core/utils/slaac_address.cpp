@@ -33,8 +33,6 @@
 
 #include "slaac_address.hpp"
 
-#include "utils/wrap_string.h"
-
 #include "common/code_utils.hpp"
 #include "common/instance.hpp"
 #include "common/locator-getters.hpp"
@@ -142,10 +140,10 @@ exit:
 
 void Slaac::Update(UpdateMode aMode)
 {
-    otNetworkDataIterator     iterator;
-    otBorderRouterConfig      config;
-    Ip6::NetifUnicastAddress *slaacAddr;
-    bool                      found;
+    NetworkData::Iterator           iterator;
+    NetworkData::OnMeshPrefixConfig config;
+    Ip6::NetifUnicastAddress *      slaacAddr;
+    bool                            found;
 
     if (aMode & kModeRemove)
     {
@@ -163,9 +161,9 @@ void Slaac::Update(UpdateMode aMode)
 
             if (mEnabled)
             {
-                iterator = OT_NETWORK_DATA_ITERATOR_INIT;
+                iterator = NetworkData::kIteratorInit;
 
-                while (Get<NetworkData::Leader>().GetNextOnMeshPrefix(&iterator, &config) == OT_ERROR_NONE)
+                while (Get<NetworkData::Leader>().GetNextOnMeshPrefix(iterator, config) == OT_ERROR_NONE)
                 {
                     otIp6Prefix &prefix = config.mPrefix;
 
@@ -192,9 +190,9 @@ void Slaac::Update(UpdateMode aMode)
     {
         // Generate and add SLAAC addresses for any newly added on-mesh prefixes.
 
-        iterator = OT_NETWORK_DATA_ITERATOR_INIT;
+        iterator = NetworkData::kIteratorInit;
 
-        while (Get<NetworkData::Leader>().GetNextOnMeshPrefix(&iterator, &config) == OT_ERROR_NONE)
+        while (Get<NetworkData::Leader>().GetNextOnMeshPrefix(iterator, config) == OT_ERROR_NONE)
         {
             otIp6Prefix &prefix = config.mPrefix;
 
@@ -227,7 +225,7 @@ void Slaac::Update(UpdateMode aMode)
                         continue;
                     }
 
-                    memset(slaacAddr, 0, sizeof(*slaacAddr));
+                    slaacAddr->Clear();
                     memcpy(&slaacAddr->mAddress, &prefix.mPrefix, BitVectorBytes(prefix.mLength));
 
                     slaacAddr->mPrefixLength = prefix.mLength;

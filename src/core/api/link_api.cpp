@@ -42,9 +42,6 @@
 
 using namespace ot;
 
-static void HandleActiveScanResult(Instance &aInstance, Mac::RxFrame *aFrame);
-static void HandleEnergyScanResult(Instance &aInstance, otEnergyScanResult *aResult);
-
 uint8_t otLinkGetChannel(otInstance *aInstance)
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
@@ -315,6 +312,38 @@ int8_t otLinkConvertLinkQualityToRss(otInstance *aInstance, uint8_t aLinkQuality
 
 #endif // OPENTHREAD_CONFIG_MAC_FILTER_ENABLE
 
+#if OPENTHREAD_CONFIG_MAC_RETRY_SUCCESS_HISTOGRAM_ENABLE
+const uint32_t *otLinkGetTxDirectRetrySuccessHistogram(otInstance *aInstance, uint8_t *aNumberOfEntries)
+{
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    return instance.Get<Mac::Mac>().GetDirectRetrySuccessHistogram(*aNumberOfEntries);
+}
+
+const uint32_t *otLinkGetTxIndirectRetrySuccessHistogram(otInstance *aInstance, uint8_t *aNumberOfEntries)
+{
+    const uint32_t *histogram = NULL;
+
+#if OPENTHREAD_FTD
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    histogram = instance.Get<Mac::Mac>().GetIndirectRetrySuccessHistogram(*aNumberOfEntries);
+#else
+    OT_UNUSED_VARIABLE(aInstance);
+    *aNumberOfEntries = 0;
+#endif
+
+    return histogram;
+}
+
+void otLinkResetTxRetrySuccessHistogram(otInstance *aInstance)
+{
+    Instance &instance = *static_cast<Instance *>(aInstance);
+
+    instance.Get<Mac::Mac>().ResetRetrySuccessHistogram();
+}
+#endif // OPENTHREAD_CONFIG_MAC_RETRY_SUCCESS_HISTOGRAM_ENABLE
+
 void otLinkSetPcapCallback(otInstance *aInstance, otLinkPcapCallback aPcapCallback, void *aCallbackContext)
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
@@ -386,8 +415,7 @@ otError otLinkActiveScan(otInstance *             aInstance,
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    instance.RegisterActiveScanCallback(aCallback, aCallbackContext);
-    return instance.Get<Mac::Mac>().ActiveScan(aScanChannels, aScanDuration, &HandleActiveScanResult);
+    return instance.Get<Mac::Mac>().ActiveScan(aScanChannels, aScanDuration, aCallback, aCallbackContext);
 }
 
 bool otLinkIsActiveScanInProgress(otInstance *aInstance)
@@ -395,21 +423,6 @@ bool otLinkIsActiveScanInProgress(otInstance *aInstance)
     Instance &instance = *static_cast<Instance *>(aInstance);
 
     return instance.Get<Mac::Mac>().IsActiveScanInProgress();
-}
-
-void HandleActiveScanResult(Instance &aInstance, Mac::RxFrame *aFrame)
-{
-    if (aFrame == NULL)
-    {
-        aInstance.InvokeActiveScanCallback(NULL);
-    }
-    else
-    {
-        otActiveScanResult result;
-
-        aInstance.Get<Mac::Mac>().ConvertBeaconToActiveScanResult(aFrame, result);
-        aInstance.InvokeActiveScanCallback(&result);
-    }
 }
 
 otError otLinkEnergyScan(otInstance *             aInstance,
@@ -420,13 +433,7 @@ otError otLinkEnergyScan(otInstance *             aInstance,
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    instance.RegisterEnergyScanCallback(aCallback, aCallbackContext);
-    return instance.Get<Mac::Mac>().EnergyScan(aScanChannels, aScanDuration, &HandleEnergyScanResult);
-}
-
-void HandleEnergyScanResult(Instance &aInstance, otEnergyScanResult *aResult)
-{
-    aInstance.InvokeEnergyScanCallback(aResult);
+    return instance.Get<Mac::Mac>().EnergyScan(aScanChannels, aScanDuration, aCallback, aCallbackContext);
 }
 
 bool otLinkIsEnergyScanInProgress(otInstance *aInstance)

@@ -51,7 +51,7 @@ CoapBase::CoapBase(Instance &aInstance, Sender aSender)
     , mPendingRequests()
     , mMessageId(Random::NonCrypto::GetUint16())
     , mRetransmissionTimer(aInstance, &Coap::HandleRetransmissionTimer, this)
-    , mResources(NULL)
+    , mResources()
     , mContext(NULL)
     , mInterceptor(NULL)
     , mResponsesQueue(aInstance)
@@ -92,40 +92,13 @@ void CoapBase::ClearRequests(const Ip6::Address *aAddress)
 
 otError CoapBase::AddResource(Resource &aResource)
 {
-    otError error = OT_ERROR_NONE;
-
-    for (Resource *cur = mResources; cur; cur = cur->GetNext())
-    {
-        VerifyOrExit(cur != &aResource, error = OT_ERROR_ALREADY);
-    }
-
-    aResource.mNext = mResources;
-    mResources      = &aResource;
-
-exit:
-    return error;
+    return mResources.Add(aResource);
 }
 
 void CoapBase::RemoveResource(Resource &aResource)
 {
-    if (mResources == &aResource)
-    {
-        mResources = aResource.GetNext();
-    }
-    else
-    {
-        for (Resource *cur = mResources; cur; cur = cur->GetNext())
-        {
-            if (cur->mNext == &aResource)
-            {
-                cur->mNext = aResource.mNext;
-                ExitNow();
-            }
-        }
-    }
-
-exit:
-    aResource.mNext = NULL;
+    mResources.Remove(aResource);
+    aResource.SetNext(NULL);
 }
 
 void CoapBase::SetDefaultHandler(RequestHandler aHandler, void *aContext)
@@ -753,7 +726,7 @@ void CoapBase::ProcessReceivedRequest(Message &aMessage, const Ip6::MessageInfo 
 
     curUriPath[0] = '\0';
 
-    for (const Resource *resource = mResources; resource; resource = resource->GetNext())
+    for (const Resource *resource = mResources.GetHead(); resource; resource = resource->GetNext())
     {
         if (strcmp(resource->mUriPath, uriPath) == 0)
         {
@@ -773,7 +746,7 @@ exit:
 
     if (error != OT_ERROR_NONE)
     {
-        otLogInfoCoapErr(error, "Failed to process request");
+        otLogInfoCoap("Failed to process request: %s", otThreadErrorToString(error));
 
         if (error == OT_ERROR_NOT_FOUND && !aMessageInfo.GetSockAddr().IsMulticast())
         {
@@ -989,6 +962,33 @@ uint32_t ResponsesQueue::ResponseMetadata::GetRemainingTime(void) const
     return (mDequeueTime > now) ? mDequeueTime - now : 0;
 }
 
+/// Return product of @p aValueA and @p aValueB if no overflow otherwise 0.
+static uint32_t Multiply(uint32_t aValueA, uint32_t aValueB)
+{
+    uint32_t result = aValueA * aValueB;
+
+    return (result / aValueA == aValueB) ? result : 0;
+}
+
+bool TxParameters::IsValid(void) const
+{
+    bool rval = false;
+
+    if (mAckRandomFactorNumerator >= mAckRandomFactorDenominator && mAckTimeout >= OT_COAP_MIN_ACK_TIMEOUT &&
+        mMaxRetransmit <= OT_COAP_MAX_RETRANSMIT)
+    {
+        // Calulate exchange lifetime step by step and verify no overflow.
+        uint32_t tmp = Multiply(mAckTimeout, (1U << (mMaxRetransmit + 1)) - 1);
+
+        tmp /= mAckRandomFactorDenominator;
+        tmp = Multiply(tmp, mAckRandomFactorNumerator);
+
+        rval = (tmp != 0 && (tmp + mAckTimeout + 2 * kDefaultMaxLatency) > tmp);
+    }
+
+    return rval;
+}
+
 uint32_t TxParameters::CalculateInitialRetransmissionTimeout(void) const
 {
     return Random::NonCrypto::GetUint32InRange(
@@ -1006,10 +1006,10 @@ uint32_t TxParameters::CalculateMaxTransmitWait(void) const
     return CalculateSpan(mMaxRetransmit + 1);
 }
 
-uint32_t TxParameters::CalculateSpan(uint32_t aMaxRetx) const
+uint32_t TxParameters::CalculateSpan(uint8_t aMaxRetx) const
 {
-    return static_cast<uint32_t>(mAckTimeout * ((1ULL << aMaxRetx) - 1) * mAckRandomFactorNumerator /
-                                 mAckRandomFactorDenominator);
+    return static_cast<uint32_t>(mAckTimeout * ((1U << aMaxRetx) - 1) / mAckRandomFactorDenominator *
+                                 mAckRandomFactorNumerator);
 }
 
 const otCoapTxParameters TxParameters::kDefaultTxParameters = {

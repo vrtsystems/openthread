@@ -36,8 +36,6 @@
 
 #include "openthread-core-config.h"
 
-#include "utils/wrap_string.h"
-
 #include "thread/child_table.hpp"
 #include "thread/mle.hpp"
 #include "thread/mle_tlvs.hpp"
@@ -60,7 +58,7 @@ public:
     {
     }
 
-    bool IsRouterRoleEnabled(void) const { return false; }
+    bool IsRouterEligible(void) const { return false; }
 
     bool IsSingleton(void) const { return false; }
 
@@ -139,7 +137,7 @@ private:
     {
         return OT_ERROR_DROP;
     }
-    otError HandleAdvertisement(const Message &, const Ip6::MessageInfo &) { return OT_ERROR_DROP; }
+    otError HandleAdvertisement(const Message &, const Ip6::MessageInfo &, Neighbor *) { return OT_ERROR_DROP; }
     otError HandleParentRequest(const Message &, const Ip6::MessageInfo &) { return OT_ERROR_DROP; }
     otError HandleChildIdRequest(const Message &, const Ip6::MessageInfo &, uint32_t) { return OT_ERROR_DROP; }
     otError HandleChildUpdateRequest(const Message &, const Ip6::MessageInfo &, uint32_t) { return OT_ERROR_DROP; }

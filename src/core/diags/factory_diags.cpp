@@ -44,7 +44,18 @@
 #include "common/locator-getters.hpp"
 #include "radio/radio.hpp"
 #include "utils/parse_cmdline.hpp"
-#include "utils/wrap_string.h"
+
+OT_TOOL_WEAK
+otError otPlatDiagProcess(otInstance *aInstance, int argc, char *argv[], char *aOutput, size_t aOutputMaxLen)
+{
+    OT_UNUSED_VARIABLE(argc);
+    OT_UNUSED_VARIABLE(argv);
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(aOutput);
+    OT_UNUSED_VARIABLE(aOutputMaxLen);
+
+    return OT_ERROR_NOT_IMPLEMENTED;
+}
 
 namespace ot {
 namespace FactoryDiags {
@@ -64,7 +75,7 @@ Diags::Diags(Instance &aInstance)
 {
 }
 
-void Diags::ProcessChannel(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessChannel(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     otError error = OT_ERROR_NONE;
     long    value;
@@ -78,9 +89,10 @@ void Diags::ProcessChannel(int aArgCount, char *aArgVector[], char *aOutput, siz
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
-void Diags::ProcessPower(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessPower(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     otError error = OT_ERROR_NONE;
     long    value;
@@ -93,9 +105,10 @@ void Diags::ProcessPower(int aArgCount, char *aArgVector[], char *aOutput, size_
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
-void Diags::ProcessStart(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessStart(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aArgCount);
     OT_UNUSED_VARIABLE(aArgVector);
@@ -103,9 +116,11 @@ void Diags::ProcessStart(int aArgCount, char *aArgVector[], char *aOutput, size_
     OT_UNUSED_VARIABLE(aOutputMaxLen);
 
     otPlatDiagModeSet(true);
+
+    return OT_ERROR_NONE;
 }
 
-void Diags::ProcessStop(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessStop(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aArgCount);
     OT_UNUSED_VARIABLE(aArgVector);
@@ -113,6 +128,8 @@ void Diags::ProcessStop(int aArgCount, char *aArgVector[], char *aOutput, size_t
     OT_UNUSED_VARIABLE(aOutputMaxLen);
 
     otPlatDiagModeSet(false);
+
+    return OT_ERROR_NONE;
 }
 
 extern "C" void otPlatDiagAlarmFired(otInstance *aInstance)
@@ -138,13 +155,13 @@ Diags::Diags(Instance &aInstance)
     , mTxLen(0)
     , mRepeatActive(false)
 {
-    memset(&mStats, 0, sizeof(mStats));
+    mStats.Clear();
 
     otPlatDiagChannelSet(mChannel);
     otPlatDiagTxPowerSet(mTxPower);
 }
 
-void Diags::ProcessChannel(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessChannel(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     otError error = OT_ERROR_NONE;
 
@@ -170,9 +187,10 @@ void Diags::ProcessChannel(int aArgCount, char *aArgVector[], char *aOutput, siz
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
-void Diags::ProcessPower(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessPower(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     otError error = OT_ERROR_NONE;
 
@@ -197,9 +215,10 @@ void Diags::ProcessPower(int aArgCount, char *aArgVector[], char *aOutput, size_
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
-void Diags::ProcessRepeat(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessRepeat(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     otError error = OT_ERROR_NONE;
 
@@ -234,9 +253,10 @@ void Diags::ProcessRepeat(int aArgCount, char *aArgVector[], char *aOutput, size
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
-void Diags::ProcessSend(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessSend(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     otError error = OT_ERROR_NONE;
     long    value;
@@ -257,9 +277,10 @@ void Diags::ProcessSend(int aArgCount, char *aArgVector[], char *aOutput, size_t
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
-void Diags::ProcessStart(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessStart(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aArgCount);
     OT_UNUSED_VARIABLE(aArgVector);
@@ -272,14 +293,15 @@ void Diags::ProcessStart(int aArgCount, char *aArgVector[], char *aOutput, size_
     SuccessOrExit(error = Get<Radio>().Receive(mChannel));
     SuccessOrExit(error = Get<Radio>().SetTransmitPower(mTxPower));
     otPlatDiagModeSet(true);
-    memset(&mStats, 0, sizeof(mStats));
+    mStats.Clear();
     snprintf(aOutput, aOutputMaxLen, "start diagnostics mode\r\nstatus 0x%02x\r\n", error);
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
-void Diags::ProcessStats(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessStats(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     otError error = OT_ERROR_NONE;
 
@@ -287,7 +309,7 @@ void Diags::ProcessStats(int aArgCount, char *aArgVector[], char *aOutput, size_
 
     if ((aArgCount == 1) && (strcmp(aArgVector[0], "clear") == 0))
     {
-        memset(&mStats, 0, sizeof(mStats));
+        mStats.Clear();
         snprintf(aOutput, aOutputMaxLen, "stats cleared\r\n");
     }
     else
@@ -304,9 +326,10 @@ void Diags::ProcessStats(int aArgCount, char *aArgVector[], char *aOutput, size_
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
-void Diags::ProcessStop(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessStop(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aArgCount);
     OT_UNUSED_VARIABLE(aArgVector);
@@ -330,6 +353,7 @@ void Diags::ProcessStop(int aArgCount, char *aArgVector[], char *aOutput, size_t
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
 void Diags::TransmitPacket(void)
@@ -345,7 +369,7 @@ void Diags::TransmitPacket(void)
     Get<Radio>().Transmit(*static_cast<Mac::TxFrame *>(mTxPacket));
 }
 
-void Diags::ProcessRadio(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessRadio(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
     otError error = OT_ERROR_INVALID_ARGS;
 
@@ -367,9 +391,39 @@ void Diags::ProcessRadio(int aArgCount, char *aArgVector[], char *aOutput, size_
         snprintf(aOutput, aOutputMaxLen, "set radio from sleep to receive on channel %d\r\nstatus 0x%02x\r\n", mChannel,
                  error);
     }
+    else if (strcmp(aArgVector[0], "state") == 0)
+    {
+        otRadioState state = Get<Radio>().GetState();
+
+        error = OT_ERROR_NONE;
+
+        switch (state)
+        {
+        case OT_RADIO_STATE_DISABLED:
+            snprintf(aOutput, aOutputMaxLen, "disabled\r\n");
+            break;
+
+        case OT_RADIO_STATE_SLEEP:
+            snprintf(aOutput, aOutputMaxLen, "sleep\r\n");
+            break;
+
+        case OT_RADIO_STATE_RECEIVE:
+            snprintf(aOutput, aOutputMaxLen, "receive\r\n");
+            break;
+
+        case OT_RADIO_STATE_TRANSMIT:
+            snprintf(aOutput, aOutputMaxLen, "transmit\r\n");
+            break;
+
+        default:
+            snprintf(aOutput, aOutputMaxLen, "invalid\r\n");
+            break;
+        }
+    }
 
 exit:
     AppendErrorResult(error, aOutput, aOutputMaxLen);
+    return error;
 }
 
 extern "C" void otPlatDiagAlarmFired(otInstance *aInstance)
@@ -423,13 +477,18 @@ void Diags::TransmitDone(otError aError)
         if (mTxPackets > 1)
         {
             mTxPackets--;
-            TransmitPacket();
+        }
+        else
+        {
+            ExitNow();
         }
     }
-    else
-    {
-        TransmitPacket();
-    }
+
+    VerifyOrExit(!mRepeatActive);
+    TransmitPacket();
+
+exit:
+    return;
 }
 
 #endif // OPENTHREAD_RADIO
@@ -462,7 +521,7 @@ void Diags::ProcessLine(const char *aString, char *aOutput, size_t aOutputMaxLen
     char *  argVector[kMaxArgs];
     uint8_t argCount = 0;
 
-    VerifyOrExit(strnlen(aString, kMaxCommandBuffer) < kMaxCommandBuffer, error = OT_ERROR_NO_BUFS);
+    VerifyOrExit(StringLength(aString, kMaxCommandBuffer) < kMaxCommandBuffer, error = OT_ERROR_NO_BUFS);
 
     strcpy(buffer, aString);
     error = ot::Utils::CmdLineParser::ParseCmd(buffer, argCount, argVector, kMaxArgs);
@@ -490,8 +549,10 @@ exit:
     }
 }
 
-void Diags::ProcessCmd(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError Diags::ProcessCmd(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
 {
+    otError error = OT_ERROR_NONE;
+
     if (aArgCount == 0)
     {
         snprintf(aOutput, aOutputMaxLen, "diagnostics mode is %s\r\n", otPlatDiagModeGet() ? "enabled" : "disabled");
@@ -502,17 +563,23 @@ void Diags::ProcessCmd(int aArgCount, char *aArgVector[], char *aOutput, size_t 
     {
         if (strcmp(aArgVector[0], sCommands[i].mName) == 0)
         {
-            (this->*sCommands[i].mCommand)(aArgCount - 1, (aArgCount > 1) ? &aArgVector[1] : NULL, aOutput,
-                                           aOutputMaxLen);
+            error = (this->*sCommands[i].mCommand)(aArgCount - 1, (aArgCount > 1) ? &aArgVector[1] : NULL, aOutput,
+                                                   aOutputMaxLen);
             ExitNow();
         }
     }
 
     // more platform specific features will be processed under platform layer
-    otPlatDiagProcess(&GetInstance(), aArgCount, aArgVector, aOutput, aOutputMaxLen);
+    error = otPlatDiagProcess(&GetInstance(), aArgCount, aArgVector, aOutput, aOutputMaxLen);
 
 exit:
-    return;
+    // Add more platform specific diagnostics features here.
+    if (error == OT_ERROR_NOT_IMPLEMENTED && aArgCount > 1)
+    {
+        snprintf(aOutput, aOutputMaxLen, "diag feature '%s' is not supported\r\n", aArgVector[0]);
+    }
+
+    return error;
 }
 
 bool Diags::IsEnabled(void)

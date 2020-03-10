@@ -29,7 +29,6 @@
 
 #include "common/logging.hpp"
 #include "meshcop/commissioner.hpp"
-#include "utils/wrap_string.h"
 
 #include "test_platform.h"
 #include "test_util.h"
@@ -82,7 +81,6 @@ void TestMaximumPassphrase(void)
     testFreeInstance(instance);
 }
 
-#ifdef ENABLE_TEST_MAIN
 int main(void)
 {
     TestMinimumPassphrase();
@@ -90,16 +88,13 @@ int main(void)
     printf("All tests passed\n");
     return 0;
 }
-#endif
 
 #else // #if OPENTHREAD_CONFIG_COMMISSIONER_ENABLE
 
-#ifdef ENABLE_TEST_MAIN
 int main(void)
 {
     printf("Commissioenr role disabled\n");
     return 0;
 }
-#endif
 
 #endif // #if OPENTHREAD_CONFIG_COMMISSIONER_ENABLE

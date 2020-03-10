@@ -49,6 +49,7 @@ DHCP6_CLIENT                         ?= 1
 DHCP6_SERVER                         ?= 1
 DIAGNOSTIC                           ?= 1
 DNS_CLIENT                           ?= 1
+DYNAMIC_LOG_LEVEL                    ?= 1
 ECDSA                                ?= 1
 IP6_FRAGM                            ?= 1
 JAM_DETECTION                        ?= 1
@@ -100,6 +101,12 @@ endif
 
 ifneq ($(READLINE),)
 configure_OPTIONS              += --with-readline=$(READLINE)
+endif
+
+ifeq ($(RCP_SPI),1)
+COMMONCFLAGS                   += -DOPENTHREAD_POSIX_RCP_SPI_ENABLE=1
+else
+COMMONCFLAGS                   += -DOPENTHREAD_POSIX_RCP_UART_ENABLE=1
 endif
 
 ifeq ($(VIRTUAL_TIME),1)

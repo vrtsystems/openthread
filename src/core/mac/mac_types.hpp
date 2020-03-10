@@ -37,8 +37,7 @@
 #include "openthread-core-config.h"
 
 #include <stdint.h>
-
-#include "utils/wrap_string.h"
+#include <string.h>
 
 #include <openthread/link.h>
 
@@ -109,6 +108,20 @@ public:
         kNormalByteOrder,  // Copy address bytes in normal order (as provided in array buffer).
         kReverseByteOrder, // Copy address bytes in reverse byte order.
     };
+
+    /**
+     * This method clears the Extended Address (sets all bytes to zero).
+     *
+     */
+    void Clear(void) { Fill(0); }
+
+    /**
+     * This method fills all bytes of address with a given byte value.
+     *
+     * @param[in] aByte A byte value to fill address with.
+     *
+     */
+    void Fill(uint8_t aByte) { memset(this, aByte, sizeof(*this)); }
 
     /**
      * This method generates a random IEEE 802.15.4 Extended Address.
@@ -446,6 +459,12 @@ public:
      *
      */
     typedef String<kInfoStringSize> InfoString;
+
+    /**
+     * This method clears the Extended PAN Identifier (sets all bytes to zero).
+     *
+     */
+    void Clear(void) { memset(this, 0, sizeof(*this)); }
 
     /**
      * This method evaluates whether or not the Extended PAN Identifiers match.

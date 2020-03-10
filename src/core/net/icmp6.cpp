@@ -33,8 +33,6 @@
 
 #include "icmp6.hpp"
 
-#include "utils/wrap_string.h"
-
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "common/instance.hpp"
@@ -50,7 +48,7 @@ namespace Ip6 {
 
 Icmp::Icmp(Instance &aInstance)
     : InstanceLocator(aInstance)
-    , mHandlers(NULL)
+    , mHandlers()
     , mEchoSequence(1)
     , mEchoMode(OT_ICMP6_ECHO_HANDLER_ALL)
 {
@@ -63,21 +61,7 @@ Message *Icmp::NewMessage(uint16_t aReserved)
 
 otError Icmp::RegisterHandler(IcmpHandler &aHandler)
 {
-    otError error = OT_ERROR_NONE;
-
-    for (IcmpHandler *cur = mHandlers; cur; cur = cur->GetNext())
-    {
-        if (cur == &aHandler)
-        {
-            ExitNow(error = OT_ERROR_ALREADY);
-        }
-    }
-
-    aHandler.mNext = mHandlers;
-    mHandlers      = &aHandler;
-
-exit:
-    return error;
+    return mHandlers.Add(aHandler);
 }
 
 otError Icmp::SendEchoRequest(Message &aMessage, const MessageInfo &aMessageInfo, uint16_t aIdentifier)
@@ -163,7 +147,7 @@ otError Icmp::HandleMessage(Message &aMessage, MessageInfo &aMessageInfo)
 
     aMessage.MoveOffset(sizeof(icmp6Header));
 
-    for (IcmpHandler *handler = mHandlers; handler; handler = handler->GetNext())
+    for (IcmpHandler *handler = mHandlers.GetHead(); handler; handler = handler->GetNext())
     {
         handler->HandleReceiveMessage(aMessage, aMessageInfo, icmp6Header);
     }

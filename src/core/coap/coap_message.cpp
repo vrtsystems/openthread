@@ -45,7 +45,7 @@ namespace Coap {
 
 void Message::Init(void)
 {
-    memset(&GetHelpData(), 0, sizeof(GetHelpData()));
+    GetHelpData().Clear();
     SetVersion(kVersion1);
     SetOffset(0);
     GetHelpData().mHeaderLength = kMinHeaderLength;
@@ -250,7 +250,7 @@ otError Message::ParseHeader(void)
            sizeof(GetHelpData()) +
                static_cast<size_t>((reinterpret_cast<uint8_t *>(&GetHelpData()) - mBuffer.mHead.mData)));
 
-    memset(&GetHelpData(), 0, sizeof(GetHelpData()));
+    GetHelpData().Clear();
 
     GetHelpData().mHeaderOffset = GetOffset();
     Read(GetHelpData().mHeaderOffset, sizeof(GetHelpData().mHeader), &GetHelpData().mHeader);
@@ -432,7 +432,7 @@ exit:
     return err;
 }
 
-const otCoapOption *OptionIterator::GetFirstOptionMatching(otCoapOptionType aOption)
+const otCoapOption *OptionIterator::GetFirstOptionMatching(uint16_t aOption)
 {
     const otCoapOption *rval = NULL;
 
@@ -466,7 +466,7 @@ const otCoapOption *OptionIterator::GetFirstOption(void)
     return option;
 }
 
-const otCoapOption *OptionIterator::GetNextOptionMatching(otCoapOptionType aOption)
+const otCoapOption *OptionIterator::GetNextOptionMatching(uint16_t aOption)
 {
     const otCoapOption *rval = NULL;
 

@@ -193,6 +193,10 @@ private:
     {
         kMaxArgs          = 32,
         kMaxAutoAddresses = 8,
+
+        kDefaultPingInterval = 1000, // (in mses)
+        kDefaultPingLength   = 8,    // (in bytes)
+        kDefaultPingCount    = 1,
     };
 
     otError ParsePingInterval(const char *aString, uint32_t &aInterval);
@@ -272,8 +276,8 @@ private:
 #if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     void ProcessNetworkDataRegister(int argc, char *argv[]);
 #endif
-#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     void ProcessNetworkDataShow(int argc, char *argv[]);
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     void ProcessService(int argc, char *argv[]);
 #endif
 #if OPENTHREAD_FTD || OPENTHREAD_CONFIG_TMF_NETWORK_DIAG_MTD_ENABLE
@@ -314,7 +318,7 @@ private:
 #if OPENTHREAD_FTD
     void ProcessRouter(int argc, char *argv[]);
     void ProcessRouterDowngradeThreshold(int argc, char *argv[]);
-    void ProcessRouterRole(int argc, char *argv[]);
+    void ProcessRouterEligible(int argc, char *argv[]);
     void ProcessRouterSelectionJitter(int argc, char *argv[]);
     void ProcessRouterUpgradeThreshold(int argc, char *argv[]);
 #endif
@@ -350,25 +354,25 @@ private:
     static void HandleDiagnosticGetResponse(otMessage *aMessage, const otMessageInfo *aMessageInfo, void *aContext);
 
 #if OPENTHREAD_CONFIG_DNS_CLIENT_ENABLE
-    static void HandleDnsResponse(void *        aContext,
-                                  const char *  aHostname,
-                                  otIp6Address *aAddress,
-                                  uint32_t      aTtl,
-                                  otError       aResult);
+    static void HandleDnsResponse(void *              aContext,
+                                  const char *        aHostname,
+                                  const otIp6Address *aAddress,
+                                  uint32_t            aTtl,
+                                  otError             aResult);
 #endif
 
 #if OPENTHREAD_CONFIG_SNTP_CLIENT_ENABLE
     static void HandleSntpResponse(void *aContext, uint64_t aTime, otError aResult);
 #endif
 
-    void HandleIcmpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageInfo, const otIcmp6Header &aIcmpHeader);
-    void HandlePingTimer();
+    void HandleIcmpReceive(otMessage *aMessage, const otMessageInfo *aMessageInfo, const otIcmp6Header *aIcmpHeader);
+    void SendPing(void);
     void HandleActiveScanResult(otActiveScanResult *aResult);
     void HandleEnergyScanResult(otEnergyScanResult *aResult);
     void HandleLinkPcapReceive(const otRadioFrame *aFrame, bool aIsTx);
     void HandleDiagnosticGetResponse(Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 #if OPENTHREAD_CONFIG_DNS_CLIENT_ENABLE
-    void HandleDnsResponse(const char *aHostname, Ip6::Address &aAddress, uint32_t aTtl, otError aResult);
+    void HandleDnsResponse(const char *aHostname, const Ip6::Address *aAddress, uint32_t aTtl, otError aResult);
 #endif
 #if OPENTHREAD_CONFIG_SNTP_CLIENT_ENABLE
     void HandleSntpResponse(uint64_t aTime, otError aResult);
@@ -379,10 +383,13 @@ private:
     const otCliCommand *        mUserCommands;
     uint8_t                     mUserCommandsLength;
     Server *                    mServer;
-    Ip6::MessageInfo            mMessageInfo;
-    uint16_t                    mLength;
-    uint16_t                    mCount;
-    uint32_t                    mInterval;
+    uint16_t                    mPingLength;
+    uint16_t                    mPingCount;
+    uint32_t                    mPingInterval;
+    uint8_t                     mPingHopLimit;
+    bool                        mPingAllowZeroHopLimit;
+    uint16_t                    mPingIdentifier;
+    otIp6Address                mPingDestAddress;
     TimerMilli                  mPingTimer;
     otIcmp6Handler              mIcmpHandler;
 #if OPENTHREAD_CONFIG_DNS_CLIENT_ENABLE

@@ -36,8 +36,6 @@
 
 #include "openthread-core-config.h"
 
-#include "utils/wrap_string.h"
-
 #include <openthread/thread_ftd.h>
 
 #include "coap/coap.hpp"
@@ -86,24 +84,27 @@ public:
     explicit MleRouter(Instance &aInstance);
 
     /**
-     * This method indicates whether or not the Router Role is enabled.
+     * This method indicates whether or not the device is router-eligible.
      *
-     * @retval true   If the Router Role is enabled.
-     * @retval false  If the Router Role is not enabled.
+     * @retval true   If device is router-eligible.
+     * @retval false  If device is not router-eligible.
      *
      */
-    bool IsRouterRoleEnabled(void) const;
+    bool IsRouterEligible(void) const;
 
     /**
-     * This method sets whether or not the Router Role is enabled.
+     * This method sets whether or not the device is router-eligible.
      *
-     * If @p aEnable is false and the device is currently operating as a router, this call will cause the device to
+     * If @p aEligible is false and the device is currently operating as a router, this call will cause the device to
      * detach and attempt to reattach as a child.
      *
-     * @param[in]  aEnabled  TRUE to enable the Router Role, FALSE otherwise.
+     * @param[in]  aEligible  TRUE to configure device router-eligible, FALSE otherwise.
+     *
+     * @retval OT_ERROR_NONE         Successfully set the router-eligible configuration.
+     * @retval OT_ERROR_NOT_CAPABLE  The device is not capable of becoming a router.
      *
      */
-    void SetRouterRoleEnabled(bool aEnabled);
+    otError SetRouterEligible(bool aEligible);
 
     /**
      * This method indicates whether a node is the only router on the network.
@@ -688,7 +689,7 @@ private:
                                        const Ip6::MessageInfo &aMessageInfo,
                                        uint32_t                aKeySequence,
                                        Neighbor *              aNeighbor);
-    otError HandleAdvertisement(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    otError HandleAdvertisement(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo, Neighbor *);
     otError HandleParentRequest(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
     otError HandleChildIdRequest(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo, uint32_t aKeySequence);
     otError HandleChildUpdateRequest(const Message &         aMessage,
@@ -715,16 +716,16 @@ private:
     otError SendAdvertisement(void);
     otError SendLinkAccept(const Ip6::MessageInfo &aMessageInfo,
                            Neighbor *              aNeighbor,
-                           const TlvRequestTlv &   aTlvRequest,
-                           const ChallengeTlv &    aChallenge);
-    void    SendParentResponse(Child *aChild, const ChallengeTlv &aChallenge, bool aRoutersOnlyRequest);
+                           const RequestedTlvs &   aRequestedTlvs,
+                           const Challenge &       aChallenge);
+    void    SendParentResponse(Child *aChild, const Challenge &aChallenge, bool aRoutersOnlyRequest);
     otError SendChildIdResponse(Child &aChild);
     otError SendChildUpdateRequest(Child &aChild);
     void    SendChildUpdateResponse(Child *                 aChild,
                                     const Ip6::MessageInfo &aMessageInfo,
                                     const uint8_t *         aTlvs,
                                     uint8_t                 aTlvsLength,
-                                    const ChallengeTlv &    aChallenge);
+                                    const Challenge &       aChallenge);
     otError SendDataResponse(const Ip6::Address &aDestination,
                              const uint8_t *     aTlvs,
                              uint8_t             aTlvsLength,
@@ -776,15 +777,16 @@ private:
 
     otNeighborTableCallback mNeighborTableChangedCallback;
 
-    uint8_t  mChallengeTimeout;
-    uint8_t  mChallenge[8];
+    uint8_t   mChallengeTimeout;
+    Challenge mChallenge;
+
     uint16_t mNextChildId;
     uint8_t  mNetworkIdTimeout;
     uint8_t  mRouterUpgradeThreshold;
     uint8_t  mRouterDowngradeThreshold;
     uint8_t  mLeaderWeight;
     uint32_t mFixedLeaderPartitionId; ///< only for certification testing
-    bool     mRouterRoleEnabled : 1;
+    bool     mRouterEligible : 1;
     bool     mAddressSolicitPending : 1;
 
     uint8_t mRouterId;

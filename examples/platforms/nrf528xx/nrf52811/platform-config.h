@@ -36,8 +36,8 @@
 #define PLATFORM_CONFIG_H_
 
 #include "nrf.h"
+#include "nrf_drv_clock.h"
 #include "nrf_peripherals.h"
-#include "drivers/clock/nrf_drv_clock.h"
 #include "hal/nrf_radio.h"
 #include "hal/nrf_uart.h"
 
@@ -382,43 +382,6 @@
  */
 #ifndef NRF_802154_ACK_TIMEOUT_ENABLED
 #define NRF_802154_ACK_TIMEOUT_ENABLED 1
-#endif
-
-/**
- * @def NRF_802154_SWI_EGU_INSTANCE
- *
- * SWI EGU instance used by the driver to synchronize PPIs and for requests and notifications if
- * SWI is in use.
- *
- * @note This option is used by the core module regardless of the driver configuration.
- *
- */
-#ifndef NRF_802154_SWI_EGU_INSTANCE
-#define NRF_802154_SWI_EGU_INSTANCE NRF_EGU0
-#endif
-
-/**
- * @def NRF_802154_SWI_IRQ_HANDLER
- *
- * SWI EGU IRQ handler used by the driver for requests and notifications if SWI is in use.
- *
- * @note This option is used when the driver uses SWI to process requests and notifications.
- *
- */
-#ifndef NRF_802154_SWI_IRQ_HANDLER
-#define NRF_802154_SWI_IRQ_HANDLER SWI0_EGU0_IRQHandler
-#endif
-
-/**
- * @def NRF_802154_SWI_IRQN
- *
- * SWI EGU IRQ number used by the driver for requests and notifications if SWI is in use.
- *
- * @note This option is used when the driver uses SWI to process requests and notifications.
- *
- */
-#ifndef NRF_802154_SWI_IRQN
-#define NRF_802154_SWI_IRQN SWI0_EGU0_IRQn
 #endif
 
 /*******************************************************************************
