@@ -142,6 +142,7 @@ typedef enum otCoapOptionType
     OT_COAP_OPTION_LOCATION_QUERY = 20, ///< Location-Query
     OT_COAP_OPTION_BLOCK2         = 23, ///< Block2 (RFC7959)
     OT_COAP_OPTION_BLOCK1         = 27, ///< Block1 (RFC7959)
+    OT_COAP_OPTION_SIZE2          = 28, ///< Size2 (RFC7959)
     OT_COAP_OPTION_PROXY_URI      = 35, ///< Proxy-Uri
     OT_COAP_OPTION_PROXY_SCHEME   = 39, ///< Proxy-Scheme
     OT_COAP_OPTION_SIZE1          = 60, ///< Size1
