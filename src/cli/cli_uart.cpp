@@ -130,7 +130,7 @@ Uart::Uart(Instance *aInstance)
     mSendLength     = 0;
     mEnableLineEcho = true;
 
-    otPlatUartEnable();
+    IgnoreError(otPlatUartEnable());
 }
 
 extern "C" void otPlatUartReceived(const uint8_t *aBuf, uint16_t aBufLength)
@@ -171,7 +171,7 @@ void Uart::ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength)
             if (mRxLength > 0)
             {
                 mRxBuffer[mRxLength] = '\0';
-                ProcessCommand();
+                IgnoreError(ProcessCommand());
             }
 
             Output(sCommandPrompt, sizeof(sCommandPrompt));
@@ -335,7 +335,7 @@ void Uart::Send(void)
         /* duplicate the output to the debug uart */
         otPlatDebugUart_write_bytes(reinterpret_cast<uint8_t *>(mTxBuffer + mTxHead), mSendLength);
 #endif
-        otPlatUartSend(reinterpret_cast<uint8_t *>(mTxBuffer + mTxHead), mSendLength);
+        IgnoreError(otPlatUartSend(reinterpret_cast<uint8_t *>(mTxBuffer + mTxHead), mSendLength));
     }
 
 exit:
