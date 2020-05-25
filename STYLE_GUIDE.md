@@ -75,6 +75,8 @@
   - The symbol used for the guard should be the file name, converted to all uppercase, with any spaces (“ “) or dots (“.”) converted to underscores (“_”).
 - Function and Method Prototypes
   - All void functions or methods shall explicitly declare and specify the void type keyword.
+- Unused parameters
+  - All unused parameters shall be declared as such using the `OT_UNUSED_VARIABLE` macro at the top of a function or method before all local variable declarations.
 
 ### C
 
@@ -127,8 +129,7 @@
 - Names shall not give any idea of type, such as is done with System Hungarian notation.
 - Case
   - C preprocessor symbols should be all uppercase.
-  - All OpenThread names in the C language shall be in *snake case*.
-  - All OpenThread class, namespace, structure, method, function, enumeration, and type names in the C++ language shall be in *upper camel case*.  Exception: the top level OpenThread namespace 'ot'.
+  - All OpenThread class, namespace, structure, method, function, enumeration, and type names in the C/C++ language shall be in *upper camel case*.  Exception: the top level OpenThread namespace 'ot'.
   - All OpenThread instantiated names of instances of classes, namespaces, structures, methods, functions, enumerations, and types as well as method and function parameters in the C++ language shall be in *lower camel case*.
 - Symbol Qualification
   - All OpenThread C public data types and free functions should have `ot` prepended to their name.
@@ -176,7 +177,7 @@
 
 ## Standards
 
-- OpenThread uses and enforces both Python 2 and Python 3.  Support for Python 2 is a result of the fact that some current Linux distributions and Macs are still using 2.x as default.
+- OpenThread uses and enforces Python 3.
 
 ## Conventions and Best Practices
 
@@ -184,4 +185,4 @@
 
 ## Format and Style
 
-- All code should adhere to [PEP 8](https://www.python.org/dev/peps/pep-0008/).
+- All code should adhere to [Google Python Style Guide](http://google.github.io/styleguide/pyguide.html).

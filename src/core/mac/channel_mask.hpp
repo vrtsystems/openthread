@@ -36,9 +36,12 @@
 
 #include "openthread-core-config.h"
 
+#include <limits.h>
 #include <openthread/platform/radio.h>
 
 #include "common/string.hpp"
+#include "radio/radio.hpp"
+#include "utils/static_assert.hpp"
 
 namespace ot {
 namespace Mac {
@@ -89,7 +92,7 @@ public:
      * @param[in]  aMask   A channel mask (as a `uint32_t` bit-vector mask with bit 0 (lsb) -> channel 0, and so on).
      *
      */
-    ChannelMask(uint32_t aMask)
+    explicit ChannelMask(uint32_t aMask)
         : mMask(aMask)
     {
     }
@@ -140,7 +143,10 @@ public:
      * @returns TRUE if the channel @p aChannel is included in the mask, FALSE otherwise.
      *
      */
-    bool ContainsChannel(uint8_t aChannel) const { return ((1U << aChannel) & mMask) != 0; }
+    bool ContainsChannel(uint8_t aChannel) const
+    {
+        return (aChannel < sizeof(mMask) * CHAR_BIT) ? ((1UL << aChannel) & mMask) != 0 : false;
+    }
 
     /**
      * This method adds a channel to the channel mask.
@@ -148,7 +154,13 @@ public:
      * @param[in]  aChannel  A channel
      *
      */
-    void AddChannel(uint8_t aChannel) { mMask |= (1U << aChannel); }
+    void AddChannel(uint8_t aChannel)
+    {
+        if (aChannel < sizeof(mMask) * CHAR_BIT)
+        {
+            mMask |= (1UL << aChannel);
+        }
+    }
 
     /**
      * This method removes a channel from the channel mask.
@@ -156,7 +168,13 @@ public:
      * @param[in]  aChannel  A channel
      *
      */
-    void RemoveChannel(uint8_t aChannel) { mMask &= ~(1U << aChannel); }
+    void RemoveChannel(uint8_t aChannel)
+    {
+        if (aChannel < sizeof(mMask) * CHAR_BIT)
+        {
+            mMask &= ~(1UL << aChannel);
+        }
+    }
 
     /**
      * This method updates the channel mask by intersecting it with another mask.
@@ -191,6 +209,14 @@ public:
     otError GetNextChannel(uint8_t &aChannel) const;
 
     /**
+     * This method randomly chooses a channel from the channel mask.
+     *
+     * @returns A randomly chosen channel from the given mask, or `kChannelIteratorFirst` if the mask is empty.
+     *
+     */
+    uint8_t ChooseRandomChannel(void) const;
+
+    /**
      * This method overloads `==` operator to indicate whether two masks are equal.
      *
      * @param[in] aAnother   A reference to another mask to compare with the current one.
@@ -208,7 +234,7 @@ public:
      * @returns TRUE if the two masks are different, FALSE otherwise.
      *
      */
-    bool operator!=(const ChannelMask &aAnother) const { return (mMask != aAnother.mMask); }
+    bool operator!=(const ChannelMask &aAnother) const { return !(*this == aAnother); }
 
     /**
      * This method converts the channel mask into a human-readable string.
@@ -226,10 +252,8 @@ public:
     InfoString ToString(void) const;
 
 private:
-#if (OT_RADIO_CHANNEL_MIN >= 32) || (OT_RADIO_CHANNEL_MAX >= 32)
-#error `OT_RADIO_CHANNEL_MAX` or `OT_RADIO_CHANNEL_MIN` are larger than 32. `ChannelMask` uses 32 bit mask.
-#endif
-
+    OT_STATIC_ASSERT((Radio::kChannelMin < 32) && (Radio::kChannelMax < 32),
+                     "The channel number is larger than 32. `ChannelMask` uses 32 bit mask.");
     uint32_t mMask;
 };
 

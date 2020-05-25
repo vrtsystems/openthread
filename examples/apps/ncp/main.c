@@ -36,7 +36,7 @@
 
 #include "openthread-system.h"
 
-#if OPENTHREAD_EXAMPLES_POSIX
+#if OPENTHREAD_EXAMPLES_SIMULATION
 #include <setjmp.h>
 #include <unistd.h>
 
@@ -45,7 +45,11 @@ jmp_buf gResetJump;
 void __gcov_flush();
 #endif
 
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+#ifndef OPENTHREAD_ENABLE_COVERAGE
+#define OPENTHREAD_ENABLE_COVERAGE 0
+#endif
+
+#if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
 void *otPlatCAlloc(size_t aNum, size_t aSize)
 {
     return calloc(aNum, aSize);
@@ -59,14 +63,14 @@ void otPlatFree(void *aPtr)
 
 void otTaskletsSignalPending(otInstance *aInstance)
 {
-    (void)aInstance;
+    OT_UNUSED_VARIABLE(aInstance);
 }
 
 int main(int argc, char *argv[])
 {
     otInstance *instance;
 
-#if OPENTHREAD_EXAMPLES_POSIX
+#if OPENTHREAD_EXAMPLES_SIMULATION
     if (setjmp(gResetJump))
     {
         alarm(0);
@@ -77,7 +81,7 @@ int main(int argc, char *argv[])
     }
 #endif
 
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+#if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
     size_t   otInstanceBufferLength = 0;
     uint8_t *otInstanceBuffer       = NULL;
 #endif
@@ -86,7 +90,7 @@ pseudo_reset:
 
     otSysInit(argc, argv);
 
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+#if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
     // Call to query the buffer size
     (void)otInstanceInit(NULL, &otInstanceBufferLength);
 
@@ -103,10 +107,6 @@ pseudo_reset:
 
     otNcpInit(instance);
 
-#if OPENTHREAD_ENABLE_DIAG
-    otDiagInit(instance);
-#endif
-
     while (!otSysPseudoResetWasRequested())
     {
         otTaskletsProcess(instance);
@@ -114,7 +114,7 @@ pseudo_reset:
     }
 
     otInstanceFinalize(instance);
-#if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
+#if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
     free(otInstanceBuffer);
 #endif
 

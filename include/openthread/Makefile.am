@@ -54,17 +54,16 @@ openthread_headers                      = \
     coap_secure.h                         \
     coap.h                                \
     commissioner.h                        \
-    config.h                              \
     crypto.h                              \
     border_agent.h                        \
     border_router.h                       \
     dataset.h                             \
     dataset_ftd.h                         \
     diag.h                                \
-    dhcp6_client.h                        \
-    dhcp6_server.h                        \
     dns.h                                 \
+    entropy.h                             \
     error.h                               \
+    heap.h                                \
     icmp6.h                               \
     instance.h                            \
     ip6.h                                 \
@@ -77,6 +76,8 @@ openthread_headers                      = \
     ncp.h                                 \
     netdata.h                             \
     network_time.h                        \
+    random_crypto.h                       \
+    random_noncrypto.h                    \
     server.h                              \
     sntp.h                                \
     tasklet.h                             \
@@ -89,6 +90,10 @@ openthreaddir = $(includedir)/openthread
 dist_openthread_HEADERS = $(openthread_headers)
 
 include_HEADERS                         = \
+    $(NULL)
+
+noinst_HEADERS                          = \
+    config.h                              \
     $(NULL)
 
 install-headers: install-includeHEADERS

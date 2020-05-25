@@ -30,81 +30,67 @@ include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
 lib_LIBRARIES                             = libopenthread-posix.a
 
-libopenthread_posix_a_CPPFLAGS            = \
-    -I$(top_srcdir)/include                 \
-    -I$(top_srcdir)/src/core                \
-    -I$(top_srcdir)/src/ncp                 \
-    -I$(top_srcdir)/src/posix/platform      \
-    -D_GNU_SOURCE                           \
-    $(OPENTHREAD_TARGET_DEFINES)            \
+libopenthread_posix_a_CPPFLAGS                                = \
+    -I$(top_srcdir)/include                                     \
+    -I$(top_srcdir)/src                                         \
+    -I$(top_srcdir)/src/core                                    \
+    -I$(top_srcdir)/src/posix/platform                          \
+    -I$(top_srcdir)/src/posix/platform/include                  \
+    -D_GNU_SOURCE                                               \
+    -DOPENTHREAD_FTD=1                                          \
+    -DOPENTHREAD_MTD=0                                          \
+    -DOPENTHREAD_RADIO=0                                        \
     $(NULL)
 
 libopenthread_posix_a_SOURCES             = \
-    alarm.c                                 \
-    frame_queue.cpp                         \
+    alarm.cpp                               \
+    entropy.cpp                             \
     hdlc_interface.cpp                      \
-    logging.c                               \
-    misc.c                                  \
+    logging.cpp                             \
+    misc.cpp                                \
+    netif.cpp                               \
     radio_spinel.cpp                        \
-    random.c                                \
     settings.cpp                            \
-    spi-stubs.c                             \
-    sim.c                                   \
-    system.c                                \
-    uart.c                                  \
-    $(NULL)
-
-INC_NCP_SOURCES                           = \
-    inc_spinel.c                            \
-    inc_hdlc.cpp                            \
-    $(NULL)
-
-nodist_libopenthread_posix_a_SOURCES      = \
-    $(INC_NCP_SOURCES)                      \
-    $(NULL)
-
-inc_%: ../../ncp/%
-	echo '#include "$<"' > $@
-
-if OPENTHREAD_ENABLE_PLATFORM_UDP
-libopenthread_posix_a_SOURCES            += \
+    spi_interface.cpp                       \
+    system.cpp                              \
+    uart.cpp                                \
     udp.cpp                                 \
+    virtual_time.cpp                        \
     $(NULL)
-endif
 
 noinst_HEADERS                            = \
-    frame_queue.hpp                         \
-    openthread-system.h                     \
-    platform-posix.h                        \
     hdlc_interface.hpp                      \
+    openthread-posix-config.h               \
+    platform-posix.h                        \
     radio_spinel.hpp                        \
+    spinel_interface.hpp                    \
     $(NULL)
+
+openthread_HEADERS                        = \
+    include/openthread/openthread-system.h  \
+    $(NULL)
+
+openthreaddir = $(includedir)/openthread
+dist_openthread_HEADERS = $(openthread_headers)
 
 PRETTY_FILES                              = \
     $(libopenthread_posix_a_SOURCES)        \
     $(noinst_HEADERS)                       \
+    $(openthread_HEADERS)                   \
     $(NULL)
 
 if OPENTHREAD_BUILD_COVERAGE
 CLEANFILES                                = $(wildcard *.gcda *.gcno)
 endif # OPENTHREAD_BUILD_COVERAGE
 
-check_PROGRAMS = test-frame-queue test-settings
+check_PROGRAMS = test-settings
 
-test_frame_queue_CPPFLAGS                 = \
-    -I$(top_srcdir)/include                 \
-    -I$(top_srcdir)/src/core                \
-    -DSELF_TEST                             \
-    $(NULL)
-
-test_frame_queue_SOURCES                  = \
-    frame_queue.cpp                         \
-    $(NULL)
-
-test_settings_CPPFLAGS                    = \
-    -I$(top_srcdir)/include                 \
-    -I$(top_srcdir)/src/core                \
-    -DSELF_TEST                             \
+test_settings_CPPFLAGS                                        = \
+    -I$(top_srcdir)/include                                     \
+    -I$(top_srcdir)/src/core                                    \
+    -I$(top_srcdir)/src/posix/platform/include                  \
+    -DOPENTHREAD_CONFIG_LOG_PLATFORM=0                          \
+    -DSELF_TEST                                                 \
     $(NULL)
 
 test_settings_SOURCES                     = \
@@ -112,7 +98,6 @@ test_settings_SOURCES                     = \
     $(NULL)
 
 TESTS                                     = \
-    test-frame-queue                        \
     test-settings                           \
     $(NULL)
 

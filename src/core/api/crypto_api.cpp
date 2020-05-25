@@ -37,6 +37,7 @@
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
+#include "common/locator-getters.hpp"
 #include "crypto/aes_ccm.hpp"
 #include "crypto/ecdsa.hpp"
 #include "crypto/hmac_sha256.hpp"
@@ -76,7 +77,7 @@ void otCryptoAesCcm(const uint8_t *aKey,
 
     assert((aKey != NULL) && (aNonce != NULL) && (aPlainText != NULL) && (aCipherText != NULL) && (aTag != NULL));
 
-    SuccessOrExit(aesCcm.SetKey(aKey, aKeyLength));
+    aesCcm.SetKey(aKey, aKeyLength);
     SuccessOrExit(aesCcm.Init(aHeaderLength, aLength, aTagLength, aNonce, aNonceLength));
 
     if (aHeaderLength != 0)
@@ -94,7 +95,7 @@ exit:
     return;
 }
 
-#if OPENTHREAD_ENABLE_ECDSA
+#if OPENTHREAD_CONFIG_ECDSA_ENABLE
 
 otError otCryptoEcdsaSign(uint8_t *      aOutput,
                           uint16_t *     aOutputLength,
@@ -106,4 +107,4 @@ otError otCryptoEcdsaSign(uint8_t *      aOutput,
     return Ecdsa::Sign(aOutput, aOutputLength, aInputHash, aInputHashLength, aPrivateKey, aPrivateKeyLength);
 }
 
-#endif // OPENTHREAD_ENABLE_ECDSA
+#endif // OPENTHREAD_CONFIG_ECDSA_ENABLE

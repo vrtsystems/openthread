@@ -32,17 +32,17 @@
  *
  */
 
+#include "settings.h"
+
 #include <assert.h>
 #include <stddef.h>
 #include <stdlib.h>
-
-#include <openthread-core-config.h>
+#include <string.h>
 
 #include <openthread/instance.h>
 #include <openthread/platform/settings.h>
 
 #include "utils/code_utils.h"
-#include "utils/wrap_string.h"
 
 #include "flash.h"
 
@@ -67,35 +67,11 @@ struct settingsBlock
     uint16_t reserved;
 } OT_TOOL_PACKED_END;
 
-/**
- * @def SETTINGS_CONFIG_BASE_ADDRESS
- *
- * The base address of settings.
- *
- */
-#ifndef SETTINGS_CONFIG_BASE_ADDRESS
-#define SETTINGS_CONFIG_BASE_ADDRESS 0x39000
-#endif // SETTINGS_CONFIG_BASE_ADDRESS
+#if (SETTINGS_CONFIG_PAGE_NUM <= 1)
+#error "Invalid value for `SETTINGS_CONFIG_PAGE_NUM` (should be >= 2)"
+#endif
 
-/**
- * @def SETTINGS_CONFIG_PAGE_SIZE
- *
- * The page size of settings.
- *
- */
-#ifndef SETTINGS_CONFIG_PAGE_SIZE
-#define SETTINGS_CONFIG_PAGE_SIZE 0x800
-#endif // SETTINGS_CONFIG_PAGE_SIZE
-
-/**
- * @def SETTINGS_CONFIG_PAGE_NUM
- *
- * The page number of settings.
- *
- */
-#ifndef SETTINGS_CONFIG_PAGE_NUM
-#define SETTINGS_CONFIG_PAGE_NUM 2
-#endif // SETTINGS_CONFIG_PAGE_NUM
+#if !OPENTHREAD_SETTINGS_RAM
 
 static uint32_t sSettingsBaseAddress;
 static uint32_t sSettingsUsedSize;
@@ -113,8 +89,7 @@ static void setSettingsFlag(uint32_t aBase, uint32_t aFlag)
 static void initSettings(uint32_t aBase, uint32_t aFlag)
 {
     uint32_t address      = aBase;
-    uint32_t settingsSize = SETTINGS_CONFIG_PAGE_NUM > 1 ? SETTINGS_CONFIG_PAGE_SIZE * SETTINGS_CONFIG_PAGE_NUM / 2
-                                                         : SETTINGS_CONFIG_PAGE_SIZE;
+    uint32_t settingsSize = SETTINGS_CONFIG_PAGE_SIZE * SETTINGS_CONFIG_PAGE_NUM / 2;
 
     while (address < (aBase + settingsSize))
     {
@@ -128,15 +103,12 @@ static void initSettings(uint32_t aBase, uint32_t aFlag)
 
 static uint32_t swapSettingsBlock(otInstance *aInstance)
 {
+    OT_UNUSED_VARIABLE(aInstance);
+
     uint32_t oldBase      = sSettingsBaseAddress;
     uint32_t swapAddress  = oldBase;
     uint32_t usedSize     = sSettingsUsedSize;
-    uint8_t  pageNum      = SETTINGS_CONFIG_PAGE_NUM;
-    uint32_t settingsSize = pageNum > 1 ? SETTINGS_CONFIG_PAGE_SIZE * pageNum / 2 : SETTINGS_CONFIG_PAGE_SIZE;
-
-    (void)aInstance;
-
-    otEXPECT(pageNum > 1);
+    uint32_t settingsSize = SETTINGS_CONFIG_PAGE_SIZE * SETTINGS_CONFIG_PAGE_NUM / 2;
 
     sSettingsBaseAddress =
         (swapAddress == SETTINGS_CONFIG_BASE_ADDRESS) ? (swapAddress + settingsSize) : SETTINGS_CONFIG_BASE_ADDRESS;
@@ -198,7 +170,6 @@ static uint32_t swapSettingsBlock(otInstance *aInstance)
     setSettingsFlag(sSettingsBaseAddress, (uint32_t)OT_SETTINGS_IN_USE);
     setSettingsFlag(oldBase, (uint32_t)OT_SETTINGS_NOT_USED);
 
-exit:
     return settingsSize - sSettingsUsedSize;
 }
 
@@ -215,8 +186,7 @@ static otError addSetting(otInstance *   aInstance,
         struct settingsBlock block;
         uint8_t              data[OT_SETTINGS_BLOCK_DATA_SIZE];
     } OT_TOOL_PACKED_END addBlock;
-    uint32_t settingsSize = SETTINGS_CONFIG_PAGE_NUM > 1 ? SETTINGS_CONFIG_PAGE_SIZE * SETTINGS_CONFIG_PAGE_NUM / 2
-                                                         : SETTINGS_CONFIG_PAGE_SIZE;
+    uint32_t             settingsSize = SETTINGS_CONFIG_PAGE_SIZE * SETTINGS_CONFIG_PAGE_NUM / 2;
 
     addBlock.block.flag = 0xff;
     addBlock.block.key  = aKey;
@@ -257,11 +227,10 @@ exit:
 // settings API
 void otPlatSettingsInit(otInstance *aInstance)
 {
-    uint8_t  index;
-    uint32_t settingsSize = SETTINGS_CONFIG_PAGE_NUM > 1 ? SETTINGS_CONFIG_PAGE_SIZE * SETTINGS_CONFIG_PAGE_NUM / 2
-                                                         : SETTINGS_CONFIG_PAGE_SIZE;
+    OT_UNUSED_VARIABLE(aInstance);
 
-    (void)aInstance;
+    uint8_t  index;
+    uint32_t settingsSize = SETTINGS_CONFIG_PAGE_SIZE * SETTINGS_CONFIG_PAGE_NUM / 2;
 
     sSettingsBaseAddress = SETTINGS_CONFIG_BASE_ADDRESS;
 
@@ -304,32 +273,19 @@ void otPlatSettingsInit(otInstance *aInstance)
     }
 }
 
-otError otPlatSettingsBeginChange(otInstance *aInstance)
+void otPlatSettingsDeinit(otInstance *aInstance)
 {
-    (void)aInstance;
-    return OT_ERROR_NONE;
-}
-
-otError otPlatSettingsCommitChange(otInstance *aInstance)
-{
-    (void)aInstance;
-    return OT_ERROR_NONE;
-}
-
-otError otPlatSettingsAbandonChange(otInstance *aInstance)
-{
-    (void)aInstance;
-    return OT_ERROR_NONE;
+    OT_UNUSED_VARIABLE(aInstance);
 }
 
 otError otPlatSettingsGet(otInstance *aInstance, uint16_t aKey, int aIndex, uint8_t *aValue, uint16_t *aValueLength)
 {
+    OT_UNUSED_VARIABLE(aInstance);
+
     otError  error       = OT_ERROR_NOT_FOUND;
     uint32_t address     = sSettingsBaseAddress + OT_SETTINGS_FLAG_SIZE;
     uint16_t valueLength = 0;
     int      index       = 0;
-
-    (void)aInstance;
 
     while (address < (sSettingsBaseAddress + sSettingsUsedSize))
     {
@@ -397,11 +353,11 @@ otError otPlatSettingsAdd(otInstance *aInstance, uint16_t aKey, const uint8_t *a
 
 otError otPlatSettingsDelete(otInstance *aInstance, uint16_t aKey, int aIndex)
 {
+    OT_UNUSED_VARIABLE(aInstance);
+
     otError  error   = OT_ERROR_NOT_FOUND;
     uint32_t address = sSettingsBaseAddress + OT_SETTINGS_FLAG_SIZE;
     int      index   = 0;
-
-    (void)aInstance;
 
     while (address < (sSettingsBaseAddress + sSettingsUsedSize))
     {
@@ -446,3 +402,5 @@ void otPlatSettingsWipe(otInstance *aInstance)
     initSettings(sSettingsBaseAddress, (uint32_t)OT_SETTINGS_IN_USE);
     otPlatSettingsInit(aInstance);
 }
+
+#endif /* OPENTHREAD_SETTINGS_RAM */

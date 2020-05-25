@@ -36,10 +36,10 @@
 
 #include "openthread-core-config.h"
 
-#include "utils/wrap_stdint.h"
+#include <stdint.h>
 
 #include "common/string.hpp"
-#include "mac/mac_frame.hpp"
+#include "mac/mac_types.hpp"
 
 namespace ot {
 namespace Ip6 {
@@ -127,15 +127,6 @@ public:
     bool IsLoopback(void) const;
 
     /**
-     * This method indicates whether or not the IPv6 address scope is Interface-Local.
-     *
-     * @retval TRUE   If the IPv6 address scope is Interface-Local.
-     * @retval FALSE  If the IPv6 address scope is not Interface-Local.
-     *
-     */
-    bool IsInterfaceLocal(void) const;
-
-    /**
      * This method indicates whether or not the IPv6 address scope is Link-Local.
      *
      * @retval TRUE   If the IPv6 address scope is Link-Local.
@@ -151,7 +142,7 @@ public:
      * @retval FALSE  If the IPv6 address scope is not a multicast address.
      *
      */
-    bool IsMulticast(void) const;
+    bool IsMulticast(void) const { return mFields.m8[0] == 0xff; }
 
     /**
      * This method indicates whether or not the IPv6 address is a link-local multicast address.
@@ -244,6 +235,15 @@ public:
     bool IsAnycastRoutingLocator(void) const;
 
     /**
+     * This method indicates whether or not the IPv6 address is an Anycast Service Locator.
+     *
+     * @retval TRUE   If the IPv6 address is an Anycast Service Locator.
+     * @retval FALSE  If the IPv6 address is not an Anycast Service Locator.
+     *
+     */
+    bool IsAnycastServiceLocator(void) const;
+
+    /**
      * This method indicates whether or not the IPv6 address is Subnet-Router Anycast (RFC 4291),
      *
      * @retval TRUE   If the IPv6 address is a Subnet-Router Anycast address.
@@ -276,7 +276,7 @@ public:
      * @returns A pointer to the Interface Identifier.
      *
      */
-    const uint8_t *GetIid(void) const;
+    const uint8_t *GetIid(void) const { return mFields.m8 + kInterfaceIdentifierOffset; }
 
     /**
      * This method returns a pointer to the Interface Identifier.
@@ -284,7 +284,7 @@ public:
      * @returns A pointer to the Interface Identifier.
      *
      */
-    uint8_t *GetIid(void);
+    uint8_t *GetIid(void) { return mFields.m8 + kInterfaceIdentifierOffset; }
 
     /**
      * This method sets the Interface Identifier.
@@ -334,7 +334,7 @@ public:
      * @returns The number of IPv6 prefix bits that match.
      *
      */
-    uint8_t PrefixMatch(const Address &aOther) const;
+    uint8_t PrefixMatch(const otIp6Address &aOther) const;
 
     /**
      * This method evaluates whether or not the IPv6 addresses match.
@@ -356,7 +356,7 @@ public:
      * @retval FALSE  If the IPv6 addresses do not differ.
      *
      */
-    bool operator!=(const Address &aOther) const;
+    bool operator!=(const Address &aOther) const { return !(*this == aOther); }
 
     /**
      * This method converts an IPv6 address string to binary.
@@ -393,6 +393,7 @@ private:
     enum
     {
         kInterfaceIdentifierOffset = 8, ///< Interface Identifier offset in bytes.
+        kIp4AddressSize            = 4  ///< Size of the IPv4 address.
     };
 } OT_TOOL_PACKED_END;
 
@@ -404,4 +405,4 @@ private:
 } // namespace Ip6
 } // namespace ot
 
-#endif // NET_IP6_ADDRESS_HPP_
+#endif // IP6_ADDRESS_HPP_

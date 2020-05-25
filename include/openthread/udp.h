@@ -74,6 +74,43 @@ typedef struct otUdpReceiver
 } otUdpReceiver;
 
 /**
+ * This function adds a UDP receiver.
+ *
+ * @param[in]   aInstance       A pointer to an OpenThread instance.
+ * @param[in]   aUdpReceiver    A pointer to the UDP receiver.
+ *
+ * @retval  OT_ERROR_NONE       The receiver is successfully added.
+ * @retval  OT_ERROR_ALREADY    The UDP receiver was already added.
+ *
+ */
+otError otUdpAddReceiver(otInstance *aInstance, otUdpReceiver *aUdpReceiver);
+
+/**
+ * This function removes a UDP receiver.
+ *
+ * @param[in]   aInstance       A pointer to an OpenThread instance.
+ * @param[in]   aUdpReceiver    A pointer to the UDP receiver.
+ *
+ * @retval  OT_ERROR_NONE       The receiver is successfully removed.
+ * @retval  OT_ERROR_NOT_FOUND  The UDP receiver was not added.
+ *
+ */
+otError otUdpRemoveReceiver(otInstance *aInstance, otUdpReceiver *aUdpReceiver);
+
+/**
+ * This function sends a UDP message without socket.
+ *
+ * @param[in]  aInstance     A pointer to an OpenThread instance.
+ * @param[in]  aMessage      A pointer to a message without UDP header.
+ * @param[in]  aMessageInfo  A pointer to a message info associated with @p aMessage.
+ *
+ * @retval OT_ERROR_NONE     Successfully enqueued the message into an output interface.
+ * @retval OT_ERROR_NO_BUFS  Insufficient available buffer to add the IPv6 headers.
+ *
+ */
+otError otUdpSendDatagram(otInstance *aInstance, otMessage *aMessage, otMessageInfo *aMessageInfo);
+
+/**
  * This callback allows OpenThread to inform the application of a received UDP message.
  *
  */
@@ -104,7 +141,7 @@ typedef struct otUdpSocket
  *
  * @returns A pointer to the message buffer or NULL if no message buffers are available or parameters are invalid.
  *
- * @sa otFreeMessage
+ * @sa otMessageFree
  *
  */
 otMessage *otUdpNewMessage(otInstance *aInstance, const otMessageSettings *aSettings);
@@ -117,8 +154,8 @@ otMessage *otUdpNewMessage(otInstance *aInstance, const otMessageSettings *aSett
  * @param[in]  aCallback  A pointer to the application callback function.
  * @param[in]  aContext   A pointer to application-specific context.
  *
- * @retval OT_ERROR_NONE         Successfully opened the socket.
- * @retval OT_ERROR_INVALID_ARGS  Given socket structure was already opened.
+ * @retval OT_ERROR_NONE    Successfully opened the socket.
+ * @retval OT_ERROR_FAILED  Failed to open the socket.
  *
  * @sa otUdpNewMessage
  * @sa otUdpClose
@@ -214,7 +251,8 @@ otError otUdpSend(otUdpSocket *aSocket, otMessage *aMessage, const otMessageInfo
  * @brief
  *   This module includes functions for UDP forward feature.
  *
- *   The functions in this module are available when udp-forward feature (`OPENTHREAD_ENABLE_UDP_FORWARD`) is enabled.
+ *   The functions in this module are available when udp-forward feature (`OPENTHREAD_CONFIG_UDP_FORWARD_ENABLE`) is
+ *   enabled.
  *
  * @{
  *
@@ -237,7 +275,7 @@ typedef void (*otUdpForwarder)(otMessage *   aMessage,
                                void *        aContext);
 
 /**
- * Set UDP forward callback to deliever UDP packets to host.
+ * Set UDP forward callback to deliver UDP packets to host.
  *
  * @param[in]  aInstance            A pointer to an OpenThread instance.
  * @param[in]  aForwarder           A pointer to a function called to forward UDP packet to host.

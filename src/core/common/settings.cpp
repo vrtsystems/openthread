@@ -31,8 +31,6 @@
  *   This file includes definitions for non-volatile storage of settings.
  */
 
-#define WPP_NAME "settings.tmh"
-
 #include "settings.hpp"
 
 #include <openthread/platform/settings.h>
@@ -45,32 +43,38 @@
 
 namespace ot {
 
+// LCOV_EXCL_START
+
 #if (OPENTHREAD_CONFIG_LOG_UTIL != 0)
 #if (OPENTHREAD_CONFIG_LOG_LEVEL >= OT_LOG_LEVEL_INFO)
 
 void SettingsBase::LogNetworkInfo(const char *aAction, const NetworkInfo &aNetworkInfo) const
 {
-    otLogInfoCore("Non-volatile: %s NetworkInfo {rloc:0x%04x, extaddr:%s, role:%s, mode:0x%02x, keyseq:0x%x, ...",
-                  aAction, aNetworkInfo.mRloc16, aNetworkInfo.mExtAddress.ToString().AsCString(),
-                  Mle::Mle::RoleToString(static_cast<otDeviceRole>(aNetworkInfo.mRole)), aNetworkInfo.mDeviceMode,
-                  aNetworkInfo.mKeySequence);
+    otLogInfoCore(
+        "Non-volatile: %s NetworkInfo {rloc:0x%04x, extaddr:%s, role:%s, mode:0x%02x, version:%hu, keyseq:0x%x, ...",
+        aAction, aNetworkInfo.GetRloc16(), aNetworkInfo.GetExtAddress().ToString().AsCString(),
+        Mle::Mle::RoleToString(static_cast<otDeviceRole>(aNetworkInfo.GetRole())), aNetworkInfo.GetDeviceMode(),
+        aNetworkInfo.GetVersion(), aNetworkInfo.GetKeySequence());
 
-    otLogInfoCore("Non-volatile: ... pid:0x%x, mlecntr:0x%x, maccntr:0x%x, mliid:%02x%02x%02x%02x%02x%02x%02x%02x}",
-                  aNetworkInfo.mPreviousPartitionId, aNetworkInfo.mMleFrameCounter, aNetworkInfo.mMacFrameCounter,
-                  aNetworkInfo.mMlIid[0], aNetworkInfo.mMlIid[1], aNetworkInfo.mMlIid[2], aNetworkInfo.mMlIid[3],
-                  aNetworkInfo.mMlIid[4], aNetworkInfo.mMlIid[5], aNetworkInfo.mMlIid[6], aNetworkInfo.mMlIid[7]);
+    otLogInfoCore(
+        "Non-volatile: ... pid:0x%x, mlecntr:0x%x, maccntr:0x%x, mliid:%02x%02x%02x%02x%02x%02x%02x%02x}",
+        aNetworkInfo.GetPreviousPartitionId(), aNetworkInfo.GetMleFrameCounter(), aNetworkInfo.GetMacFrameCounter(),
+        aNetworkInfo.GetMeshLocalIid()[0], aNetworkInfo.GetMeshLocalIid()[1], aNetworkInfo.GetMeshLocalIid()[2],
+        aNetworkInfo.GetMeshLocalIid()[3], aNetworkInfo.GetMeshLocalIid()[4], aNetworkInfo.GetMeshLocalIid()[5],
+        aNetworkInfo.GetMeshLocalIid()[6], aNetworkInfo.GetMeshLocalIid()[7]);
 }
 
 void SettingsBase::LogParentInfo(const char *aAction, const ParentInfo &aParentInfo) const
 {
-    otLogInfoCore("Non-volatile: %s ParentInfo {extaddr:%s}", aAction, aParentInfo.mExtAddress.ToString().AsCString());
+    otLogInfoCore("Non-volatile: %s ParentInfo {extaddr:%s, version:%hu}", aAction,
+                  aParentInfo.GetExtAddress().ToString().AsCString(), aParentInfo.GetVersion());
 }
 
 void SettingsBase::LogChildInfo(const char *aAction, const ChildInfo &aChildInfo) const
 {
-    otLogInfoCore("Non-volatile: %s ChildInfo {rloc:0x%04x, extaddr:%s, timeout:%u, mode:0x%02x}", aAction,
-                  aChildInfo.mRloc16, aChildInfo.mExtAddress.ToString().AsCString(), aChildInfo.mTimeout,
-                  aChildInfo.mMode);
+    otLogInfoCore("Non-volatile: %s ChildInfo {rloc:0x%04x, extaddr:%s, timeout:%u, mode:0x%02x, version:%hu}", aAction,
+                  aChildInfo.GetRloc16(), aChildInfo.GetExtAddress().ToString().AsCString(), aChildInfo.GetTimeout(),
+                  aChildInfo.GetMode(), aChildInfo.GetVersion());
 }
 
 #endif // #if (OPENTHREAD_CONFIG_LOG_LEVEL >= OT_LOG_LEVEL_INFO)
@@ -88,9 +92,16 @@ void SettingsBase::LogFailure(otError error, const char *aText, bool aIsDelete) 
 #endif // #if (OPENTHREAD_CONFIG_LOG_LEVEL >= OT_LOG_LEVEL_WARN)
 #endif // #if (OPENTHREAD_CONFIG_LOG_UTIL != 0)
 
+// LCOV_EXCL_STOP
+
 void Settings::Init(void)
 {
     otPlatSettingsInit(&GetInstance());
+}
+
+void Settings::Deinit(void)
+{
+    otPlatSettingsDeinit(&GetInstance());
 }
 
 void Settings::Wipe(void)
@@ -109,11 +120,12 @@ otError Settings::SaveOperationalDataset(bool aIsActive, const MeshCoP::Dataset 
 
 otError Settings::ReadOperationalDataset(bool aIsActive, MeshCoP::Dataset &aDataset) const
 {
-    otError  error = OT_ERROR_NONE;
-    uint16_t length;
+    otError  error  = OT_ERROR_NONE;
+    uint16_t length = MeshCoP::Dataset::kMaxSize;
 
-    SuccessOrExit(error = Read(aIsActive ? kKeyActiveDataset : kKeyPendingDataset, aDataset.GetBytes(),
-                               MeshCoP::Dataset::kMaxSize, length));
+    SuccessOrExit(error = Read(aIsActive ? kKeyActiveDataset : kKeyPendingDataset, aDataset.GetBytes(), length));
+    VerifyOrExit(length <= MeshCoP::Dataset::kMaxSize, error = OT_ERROR_NOT_FOUND);
+
     aDataset.SetSize(length);
 
 exit:
@@ -131,9 +143,11 @@ otError Settings::DeleteOperationalDataset(bool aIsActive)
 
 otError Settings::ReadNetworkInfo(NetworkInfo &aNetworkInfo) const
 {
-    otError error;
+    otError  error;
+    uint16_t length = sizeof(NetworkInfo);
 
-    SuccessOrExit(error = ReadFixedSize(kKeyNetworkInfo, &aNetworkInfo, sizeof(NetworkInfo)));
+    aNetworkInfo.Init();
+    SuccessOrExit(error = Read(kKeyNetworkInfo, &aNetworkInfo, length));
     LogNetworkInfo("Read", aNetworkInfo);
 
 exit:
@@ -142,7 +156,16 @@ exit:
 
 otError Settings::SaveNetworkInfo(const NetworkInfo &aNetworkInfo)
 {
-    otError error;
+    otError     error = OT_ERROR_NONE;
+    NetworkInfo prevNetworkInfo;
+    uint16_t    length = sizeof(prevNetworkInfo);
+
+    if ((Read(kKeyNetworkInfo, &prevNetworkInfo, length) == OT_ERROR_NONE) && (length == sizeof(NetworkInfo)) &&
+        (memcmp(&prevNetworkInfo, &aNetworkInfo, sizeof(NetworkInfo)) == 0))
+    {
+        LogNetworkInfo("Re-saved", aNetworkInfo);
+        ExitNow();
+    }
 
     SuccessOrExit(error = Save(kKeyNetworkInfo, &aNetworkInfo, sizeof(NetworkInfo)));
     LogNetworkInfo("Saved", aNetworkInfo);
@@ -166,9 +189,11 @@ exit:
 
 otError Settings::ReadParentInfo(ParentInfo &aParentInfo) const
 {
-    otError error;
+    otError  error;
+    uint16_t length = sizeof(ParentInfo);
 
-    SuccessOrExit(error = ReadFixedSize(kKeyParentInfo, &aParentInfo, sizeof(ParentInfo)));
+    aParentInfo.Init();
+    SuccessOrExit(error = Read(kKeyParentInfo, &aParentInfo, length));
     LogParentInfo("Read", aParentInfo);
 
 exit:
@@ -177,7 +202,16 @@ exit:
 
 otError Settings::SaveParentInfo(const ParentInfo &aParentInfo)
 {
-    otError error;
+    otError    error = OT_ERROR_NONE;
+    ParentInfo prevParentInfo;
+    uint16_t   length = sizeof(ParentInfo);
+
+    if ((Read(kKeyParentInfo, &prevParentInfo, length) == OT_ERROR_NONE) && (length == sizeof(ParentInfo)) &&
+        (memcmp(&prevParentInfo, &aParentInfo, sizeof(ParentInfo)) == 0))
+    {
+        LogParentInfo("Re-saved", aParentInfo);
+        ExitNow();
+    }
 
     SuccessOrExit(error = Save(kKeyParentInfo, &aParentInfo, sizeof(ParentInfo)));
     LogParentInfo("Saved", aParentInfo);
@@ -262,50 +296,36 @@ exit:
 
 void Settings::ChildInfoIterator::Read(void)
 {
-    uint16_t size = sizeof(ChildInfo);
+    uint16_t length = sizeof(ChildInfo);
     otError  error;
 
+    mChildInfo.Init();
     SuccessOrExit(error = otPlatSettingsGet(&GetInstance(), kKeyChildInfo, mIndex,
-                                            reinterpret_cast<uint8_t *>(&mChildInfo), &size));
-    VerifyOrExit(size >= sizeof(ChildInfo), error = OT_ERROR_NOT_FOUND);
+                                            reinterpret_cast<uint8_t *>(&mChildInfo), &length));
     LogChildInfo("Read", mChildInfo);
 
 exit:
     mIsDone = (error != OT_ERROR_NONE);
 }
 
-otError Settings::ReadFixedSize(Key aKey, void *aBuffer, uint16_t aExpectedSize) const
+otError Settings::Read(Key aKey, void *aBuffer, uint16_t &aSize) const
 {
-    uint16_t size = aExpectedSize;
-    otError  error;
+    otError error;
 
-    SuccessOrExit(error = otPlatSettingsGet(&GetInstance(), aKey, 0, reinterpret_cast<uint8_t *>(aBuffer), &size));
-    VerifyOrExit(size >= aExpectedSize, error = OT_ERROR_NOT_FOUND);
+    SuccessOrExit(error = otPlatSettingsGet(&GetInstance(), aKey, 0, reinterpret_cast<uint8_t *>(aBuffer), &aSize));
 
 exit:
     return error;
 }
 
-otError Settings::Read(Key aKey, void *aBuffer, uint16_t aMaxBufferSize, uint16_t &aReadSize) const
+otError Settings::Save(Key aKey, const void *aValue, uint16_t aSize)
 {
-    uint16_t size = aMaxBufferSize;
-    otError  error;
-
-    SuccessOrExit(error = otPlatSettingsGet(&GetInstance(), aKey, 0, reinterpret_cast<uint8_t *>(aBuffer), &size));
-    aReadSize = (size <= aMaxBufferSize) ? size : aMaxBufferSize;
-
-exit:
-    return error;
+    return otPlatSettingsSet(&GetInstance(), aKey, reinterpret_cast<const uint8_t *>(aValue), aSize);
 }
 
-otError Settings::Save(Key aKey, const void *aBuffer, uint16_t aSize)
+otError Settings::Add(Key aKey, const void *aValue, uint16_t aSize)
 {
-    return otPlatSettingsSet(&GetInstance(), aKey, reinterpret_cast<const uint8_t *>(aBuffer), aSize);
-}
-
-otError Settings::Add(Key aKey, const void *aBuffer, uint16_t aSize)
-{
-    return otPlatSettingsAdd(&GetInstance(), aKey, reinterpret_cast<const uint8_t *>(aBuffer), aSize);
+    return otPlatSettingsAdd(&GetInstance(), aKey, reinterpret_cast<const uint8_t *>(aValue), aSize);
 }
 
 otError Settings::Delete(Key aKey)

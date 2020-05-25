@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 #  Copyright (c) 2018, The OpenThread Authors.
 #  All rights reserved.
@@ -29,26 +29,72 @@
 
 import binascii
 import bisect
-import cmd
 import os
 import socket
 import struct
-import sys
 import traceback
 import time
 
 import io
 import config
+import mesh_cop
 import message
 import pcap
+
 
 def dbg_print(*args):
     if False:
         print(args)
 
-class RealTime:
+
+class BaseSimulator(object):
 
     def __init__(self):
+        self._nodes = {}
+        self.commissioning_messages = {}
+        self._payload_parse_factory = mesh_cop.MeshCopCommandFactory(
+            mesh_cop.create_default_mesh_cop_tlv_factories())
+        self._mesh_cop_msg_set = mesh_cop.create_mesh_cop_message_type_set()
+
+    def __del__(self):
+        self._nodes = None
+
+    def add_node(self, node):
+        self._nodes[node.nodeid] = node
+        self.commissioning_messages[node.nodeid] = []
+
+    def set_lowpan_context(self, cid, prefix):
+        raise NotImplementedError
+
+    def get_messages_sent_by(self, nodeid):
+        raise NotImplementedError
+
+    def go(self, duration, nodeid=None):
+        raise NotImplementedError
+
+    def stop(self):
+        raise NotImplementedError
+
+    def read_cert_messages_in_commissioning_log(self, nodeids):
+        for nodeid in nodeids:
+            node = self._nodes[nodeid]
+            if not node:
+                continue
+            for (
+                    direction,
+                    type,
+                    payload,
+            ) in node.read_cert_messages_in_commissioning_log():
+                if direction == b'send':
+                    msg = self._payload_parse_factory.parse(
+                        type.decode("utf-8"), io.BytesIO(payload))
+                    self.commissioning_messages[nodeid].append(msg)
+
+
+class RealTime(BaseSimulator):
+
+    def __init__(self):
+        super(RealTime, self).__init__()
         self._sniffer = config.create_default_thread_sniffer()
         self._sniffer.start()
 
@@ -56,7 +102,13 @@ class RealTime:
         self._sniffer.set_lowpan_context(cid, prefix)
 
     def get_messages_sent_by(self, nodeid):
-        return self._sniffer.get_messages_sent_by(nodeid)
+        messages = self._sniffer.get_messages_sent_by(nodeid).messages
+        ret = message.MessagesSet(messages, self.commissioning_messages[nodeid])
+        self.commissioning_messages[nodeid] = []
+        return ret
+
+    def now(self):
+        return time.time()
 
     def go(self, duration, nodeid=None):
         time.sleep(duration)
@@ -64,11 +116,12 @@ class RealTime:
     def stop(self):
         pass
 
-class VirtualTime:
 
-    OT_SIM_EVENT_ALARM_FIRED    = 0
+class VirtualTime(BaseSimulator):
+
+    OT_SIM_EVENT_ALARM_FIRED = 0
     OT_SIM_EVENT_RADIO_RECEIVED = 1
-    OT_SIM_EVENT_UART_WRITE     = 2
+    OT_SIM_EVENT_UART_WRITE = 2
     OT_SIM_EVENT_RADIO_SPINEL_WRITE = 3
     OT_SIM_EVENT_POSTCMD = 4
 
@@ -82,15 +135,16 @@ class VirtualTime:
     BASE_PORT = 9000
     MAX_NODES = 34
     MAX_MESSAGE = 1024
-    END_OF_TIME = 0x7fffffff
+    END_OF_TIME = 0x7FFFFFFF
     PORT_OFFSET = int(os.getenv('PORT_OFFSET', '0'))
 
     BLOCK_TIMEOUT = 4
 
-    RADIO_ONLY = os.getenv('RADIO_DEVICE') != None
+    RADIO_ONLY = os.getenv('RADIO_DEVICE') is not None
     NCP_SIM = os.getenv('NODE_TYPE', 'sim') == 'ncp-sim'
 
     def __init__(self):
+        super(VirtualTime, self).__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         ip = '127.0.0.1'
@@ -126,14 +180,13 @@ class VirtualTime:
 
         # Ignore any exceptions
         try:
-            msg = self._message_factory.create(io.BytesIO(message))
-
-            if msg is not None:
-                self.devices[addr]['msgs'].append(msg)
+            messages = self._message_factory.create(io.BytesIO(message))
+            self.devices[addr]['msgs'] += messages
 
         except Exception as e:
             # Just print the exception to the console
             print("EXCEPTION: %s" % e)
+            traceback.print_exc()
 
     def set_lowpan_context(self, cid, prefix):
         self._message_factory.set_lowpan_context(cid, prefix)
@@ -141,7 +194,8 @@ class VirtualTime:
     def get_messages_sent_by(self, nodeid):
         """ Get sniffed messages.
 
-        Note! This method flushes the message queue so calling this method again will return only the newly logged messages.
+        Note! This method flushes the message queue so calling this
+        method again will return only the newly logged messages.
 
         Args:
             nodeid (int): node id
@@ -154,7 +208,9 @@ class VirtualTime:
         messages = self.devices[addr]['msgs']
         self.devices[addr]['msgs'] = []
 
-        return message.MessagesSet(messages)
+        ret = message.MessagesSet(messages, self.commissioning_messages[nodeid])
+        self.commissioning_messages[nodeid] = []
+        return ret
 
     def _is_radio(self, addr):
         return addr[1] < self.BASE_PORT * 2
@@ -182,7 +238,9 @@ class VirtualTime:
     def receive_events(self):
         """ Receive events until all devices are asleep. """
         while True:
-            if self.current_event or len(self.awake_devices) or (self._next_event_time() > self._pause_time and self.current_nodeid):
+            if (self.current_event or len(self.awake_devices) or
+                (self._next_event_time() > self._pause_time and
+                 self.current_nodeid)):
                 self.sock.settimeout(self.BLOCK_TIMEOUT)
                 try:
                     msg, addr = self.sock.recvfrom(self.MAX_MESSAGE)
@@ -213,7 +271,7 @@ class VirtualTime:
                 self.devices[addr]['msgs'] = []
                 self.devices[addr]['time'] = self.current_time
                 self.awake_devices.discard(addr)
-                #print "New device:", addr, self.devices
+                # print "New device:", addr, self.devices
 
             delay, type, datalen = struct.unpack('=QBH', msg[:11])
             data = msg[11:]
@@ -221,7 +279,14 @@ class VirtualTime:
             event_time = self.current_time + delay
 
             if data:
-                dbg_print("New event: ", event_time, addr, type, datalen, binascii.hexlify(data))
+                dbg_print(
+                    "New event: ",
+                    event_time,
+                    addr,
+                    type,
+                    datalen,
+                    binascii.hexlify(data),
+                )
             else:
                 dbg_print("New event: ", event_time, addr, type, datalen)
 
@@ -229,19 +294,20 @@ class VirtualTime:
                 # remove any existing alarm event for device
                 if self.devices[addr]['alarm']:
                     self.event_queue.remove(self.devices[addr]['alarm'])
-                    #print "-- Remove\t", self.devices[addr]['alarm']
+                    # print "-- Remove\t", self.devices[addr]['alarm']
 
                 # add alarm event to event queue
                 event = (event_time, self.event_sequence, addr, type, datalen)
                 self.event_sequence += 1
-                #print "-- Enqueue\t", event, delay, self.current_time
+                # print "-- Enqueue\t", event, delay, self.current_time
                 bisect.insort(self.event_queue, event)
                 self.devices[addr]['alarm'] = event
 
                 self.awake_devices.discard(addr)
 
-                if self.current_event and self.current_event[self.EVENT_ADDR] == addr:
-                    #print "Done\t", self.current_event
+                if (self.current_event and
+                        self.current_event[self.EVENT_ADDR] == addr):
+                    # print "Done\t", self.current_event
                     self.current_event = None
 
             elif type == self.OT_SIM_EVENT_RADIO_RECEIVED:
@@ -249,16 +315,31 @@ class VirtualTime:
                 # add radio receive events event queue
                 for device in self.devices:
                     if device != addr and self._is_radio(device):
-                        event = (event_time, self.event_sequence, device, type, datalen, data)
+                        event = (
+                            event_time,
+                            self.event_sequence,
+                            device,
+                            type,
+                            datalen,
+                            data,
+                        )
                         self.event_sequence += 1
-                        #print "-- Enqueue\t", event
+                        # print "-- Enqueue\t", event
                         bisect.insort(self.event_queue, event)
 
-                self._pcap.append(data, (event_time // 1000000, event_time % 1000000))
+                self._pcap.append(data,
+                                  (event_time // 1000000, event_time % 1000000))
                 self._add_message(addr[1] - self.port, data)
 
                 # add radio transmit done events to event queue
-                event = (event_time, self.event_sequence, addr, type, datalen, data)
+                event = (
+                    event_time,
+                    self.event_sequence,
+                    addr,
+                    type,
+                    datalen,
+                    data,
+                )
                 self.event_sequence += 1
                 bisect.insort(self.event_queue, event)
 
@@ -267,10 +348,17 @@ class VirtualTime:
             elif type == self.OT_SIM_EVENT_RADIO_SPINEL_WRITE:
                 assert not self._is_radio(addr)
                 radio_addr = self._to_radio_addr(addr)
-                if not radio_addr in self.devices:
+                if radio_addr not in self.devices:
                     self.awake_devices.add(radio_addr)
 
-                event = (event_time, self.event_sequence, radio_addr, self.OT_SIM_EVENT_UART_WRITE, datalen, data)
+                event = (
+                    event_time,
+                    self.event_sequence,
+                    radio_addr,
+                    self.OT_SIM_EVENT_UART_WRITE,
+                    datalen,
+                    data,
+                )
                 self.event_sequence += 1
                 bisect.insort(self.event_queue, event)
 
@@ -279,10 +367,17 @@ class VirtualTime:
             elif type == self.OT_SIM_EVENT_UART_WRITE:
                 assert self._is_radio(addr)
                 core_addr = self._to_core_addr(addr)
-                if not core_addr in self.devices:
+                if core_addr not in self.devices:
                     self.awake_devices.add(core_addr)
 
-                event = (event_time, self.event_sequence, core_addr, self.OT_SIM_EVENT_RADIO_SPINEL_WRITE, datalen, data)
+                event = (
+                    event_time,
+                    self.event_sequence,
+                    core_addr,
+                    self.OT_SIM_EVENT_RADIO_SPINEL_WRITE,
+                    datalen,
+                    data,
+                )
                 self.event_sequence += 1
                 bisect.insort(self.event_queue, event)
 
@@ -317,11 +412,18 @@ class VirtualTime:
             dbg_print("Pop event: ", event_time, addr, type, datalen)
         else:
             event_time, sequence, addr, type, datalen, data = event
-            dbg_print("Pop event: ", event_time, addr, type, datalen, binascii.hexlify(data))
+            dbg_print(
+                "Pop event: ",
+                event_time,
+                addr,
+                type,
+                datalen,
+                binascii.hexlify(data),
+            )
 
         self.current_event = event
 
-        assert(event_time >= self.current_time)
+        assert event_time >= self.current_time
         self.current_time = event_time
 
         elapsed = event_time - self.devices[addr]['time']
@@ -350,11 +452,15 @@ class VirtualTime:
                 continue
             dbg_print('syncing', addr, elapsed)
             self.devices[addr]['time'] = self.current_time
-            message = struct.pack('=QBH', elapsed, self.OT_SIM_EVENT_ALARM_FIRED, 0)
+            message = struct.pack('=QBH', elapsed,
+                                  self.OT_SIM_EVENT_ALARM_FIRED, 0)
             self._send_message(message, addr)
             self.awake_devices.add(addr)
             self.receive_events()
         self.awake_devices.clear()
+
+    def now(self):
+        return self.current_time / 1000000
 
     def go(self, duration, nodeid=None):
         assert self.current_time == self._pause_time

@@ -32,22 +32,22 @@
  *
  */
 
-#define WPP_NAME "dataset.tmh"
-
 #include "dataset.hpp"
 
 #include <stdio.h>
 
 #include "common/code_utils.hpp"
 #include "common/instance.hpp"
+#include "common/locator-getters.hpp"
 #include "common/logging.hpp"
+#include "mac/mac_types.hpp"
 #include "meshcop/meshcop_tlvs.hpp"
 #include "thread/mle_tlvs.hpp"
 
 namespace ot {
 namespace MeshCoP {
 
-Dataset::Dataset(const Tlv::Type aType)
+Dataset::Dataset(Tlv::Type aType)
     : mUpdateTime(0)
     , mLength(0)
     , mType(aType)
@@ -144,13 +144,13 @@ void Dataset::Get(otOperationalDataset &aDataset) const
 
         case Tlv::kChannelMask:
         {
-            const ChannelMaskBaseTlv *tlv   = static_cast<const ChannelMaskBaseTlv *>(cur);
-            const ChannelMaskEntry *  entry = tlv->GetMaskEntry(OT_RADIO_CHANNEL_PAGE);
+            const ChannelMaskTlv *tlv = static_cast<const ChannelMaskTlv *>(cur);
+            uint32_t              mask;
 
-            if (entry != NULL)
+            if ((mask = tlv->GetChannelMask()) != 0)
             {
-                aDataset.mChannelMaskPage0                      = entry->GetMask();
-                aDataset.mComponents.mIsChannelMaskPage0Present = true;
+                aDataset.mChannelMask                      = mask;
+                aDataset.mComponents.mIsChannelMaskPresent = true;
             }
 
             break;
@@ -191,8 +191,7 @@ void Dataset::Get(otOperationalDataset &aDataset) const
         case Tlv::kNetworkName:
         {
             const NetworkNameTlv *tlv = static_cast<const NetworkNameTlv *>(cur);
-            memcpy(aDataset.mNetworkName.m8, tlv->GetNetworkName(), tlv->GetLength());
-            aDataset.mNetworkName.m8[tlv->GetLength()] = '\0';
+            static_cast<Mac::NetworkName &>(aDataset.mNetworkName).Set(tlv->GetNetworkName());
             aDataset.mComponents.mIsNetworkNamePresent = true;
             break;
         }
@@ -213,11 +212,11 @@ void Dataset::Get(otOperationalDataset &aDataset) const
             break;
         }
 
-        case Tlv::kPSKc:
+        case Tlv::kPskc:
         {
-            const PSKcTlv *tlv = static_cast<const PSKcTlv *>(cur);
-            memcpy(aDataset.mPSKc.m8, tlv->GetPSKc(), tlv->GetLength());
-            aDataset.mComponents.mIsPSKcPresent = true;
+            const PskcTlv *tlv                  = static_cast<const PskcTlv *>(cur);
+            aDataset.mPskc                      = tlv->GetPskc();
+            aDataset.mComponents.mIsPskcPresent = true;
             break;
         }
 
@@ -240,7 +239,7 @@ void Dataset::Get(otOperationalDataset &aDataset) const
     }
 }
 
-otError Dataset::Set(const Dataset &aDataset)
+void Dataset::Set(const Dataset &aDataset)
 {
     memcpy(mTlvs, aDataset.mTlvs, aDataset.mLength);
     mLength = aDataset.mLength;
@@ -252,58 +251,51 @@ otError Dataset::Set(const Dataset &aDataset)
     }
 
     mUpdateTime = aDataset.GetUpdateTime();
-
-    return OT_ERROR_NONE;
 }
 
-#if OPENTHREAD_FTD
 otError Dataset::Set(const otOperationalDataset &aDataset)
 {
-    otError                     error = OT_ERROR_NONE;
-    MeshCoP::ActiveTimestampTlv activeTimestampTlv;
+    otError error = OT_ERROR_NONE;
 
-    VerifyOrExit(aDataset.mComponents.mIsActiveTimestampPresent, error = OT_ERROR_INVALID_ARGS);
-
-    activeTimestampTlv.Init();
-    activeTimestampTlv.SetSeconds(aDataset.mActiveTimestamp);
-    activeTimestampTlv.SetTicks(0);
-    Set(activeTimestampTlv);
-
-    if (mType == Tlv::kPendingTimestamp)
+    if (aDataset.mComponents.mIsActiveTimestampPresent)
     {
-        MeshCoP::PendingTimestampTlv pendingTimestampTlv;
+        MeshCoP::ActiveTimestampTlv tlv;
+        tlv.Init();
+        tlv.SetSeconds(aDataset.mActiveTimestamp);
+        tlv.SetTicks(0);
+        Set(tlv);
+    }
 
-        VerifyOrExit(aDataset.mComponents.mIsPendingTimestampPresent, error = OT_ERROR_INVALID_ARGS);
+    if (aDataset.mComponents.mIsPendingTimestampPresent)
+    {
+        MeshCoP::PendingTimestampTlv tlv;
+        tlv.Init();
+        tlv.SetSeconds(aDataset.mPendingTimestamp);
+        tlv.SetTicks(0);
+        Set(tlv);
+    }
 
-        pendingTimestampTlv.Init();
-        pendingTimestampTlv.SetSeconds(aDataset.mPendingTimestamp);
-        pendingTimestampTlv.SetTicks(0);
-        Set(pendingTimestampTlv);
-
-        if (aDataset.mComponents.mIsDelayPresent)
-        {
-            MeshCoP::DelayTimerTlv tlv;
-            tlv.Init();
-            tlv.SetDelayTimer(aDataset.mDelay);
-            Set(tlv);
-        }
+    if (aDataset.mComponents.mIsDelayPresent)
+    {
+        MeshCoP::DelayTimerTlv tlv;
+        tlv.Init();
+        tlv.SetDelayTimer(aDataset.mDelay);
+        Set(tlv);
     }
 
     if (aDataset.mComponents.mIsChannelPresent)
     {
         MeshCoP::ChannelTlv tlv;
         tlv.Init();
-        tlv.SetChannelPage(OT_RADIO_CHANNEL_PAGE);
         tlv.SetChannel(aDataset.mChannel);
         Set(tlv);
     }
 
-    if (aDataset.mComponents.mIsChannelMaskPage0Present)
+    if (aDataset.mComponents.mIsChannelMaskPresent)
     {
         MeshCoP::ChannelMaskTlv tlv;
         tlv.Init();
-        tlv.SetChannelPage(OT_RADIO_CHANNEL_PAGE);
-        tlv.SetMask(aDataset.mChannelMaskPage0);
+        tlv.SetChannelMask(aDataset.mChannelMask);
         Set(tlv);
     }
 
@@ -311,7 +303,7 @@ otError Dataset::Set(const otOperationalDataset &aDataset)
     {
         MeshCoP::ExtendedPanIdTlv tlv;
         tlv.Init();
-        tlv.SetExtendedPanId(aDataset.mExtendedPanId);
+        tlv.SetExtendedPanId(static_cast<const Mac::ExtendedPanId &>(aDataset.mExtendedPanId));
         Set(tlv);
     }
 
@@ -327,7 +319,7 @@ otError Dataset::Set(const otOperationalDataset &aDataset)
     {
         MeshCoP::NetworkMasterKeyTlv tlv;
         tlv.Init();
-        tlv.SetNetworkMasterKey(aDataset.mMasterKey);
+        tlv.SetNetworkMasterKey(static_cast<const MasterKey &>(aDataset.mMasterKey));
         Set(tlv);
     }
 
@@ -335,7 +327,7 @@ otError Dataset::Set(const otOperationalDataset &aDataset)
     {
         MeshCoP::NetworkNameTlv tlv;
         tlv.Init();
-        tlv.SetNetworkName(aDataset.mNetworkName.m8);
+        tlv.SetNetworkName(static_cast<const Mac::NetworkName &>(aDataset.mNetworkName).GetAsData());
         Set(tlv);
     }
 
@@ -347,11 +339,11 @@ otError Dataset::Set(const otOperationalDataset &aDataset)
         Set(tlv);
     }
 
-    if (aDataset.mComponents.mIsPSKcPresent)
+    if (aDataset.mComponents.mIsPskcPresent)
     {
-        MeshCoP::PSKcTlv tlv;
+        MeshCoP::PskcTlv tlv;
         tlv.Init();
-        tlv.SetPSKc(aDataset.mPSKc.m8);
+        tlv.SetPskc(static_cast<const Pskc &>(aDataset.mPskc));
         Set(tlv);
     }
 
@@ -366,10 +358,8 @@ otError Dataset::Set(const otOperationalDataset &aDataset)
 
     mUpdateTime = TimerMilli::GetNow();
 
-exit:
     return error;
 }
-#endif // OPENTHREAD_FTD
 
 const Timestamp *Dataset::GetTimestamp(void) const
 {
@@ -499,11 +489,11 @@ otError Dataset::AppendMleDatasetTlv(Message &aMessage) const
                 delayTimer.SetDelayTimer(0);
             }
 
-            SuccessOrExit(error = aMessage.Append(&delayTimer, sizeof(delayTimer)));
+            SuccessOrExit(error = delayTimer.AppendTo(aMessage));
         }
         else
         {
-            SuccessOrExit(error = aMessage.Append(cur, sizeof(Tlv) + cur->GetLength()));
+            SuccessOrExit(error = cur->AppendTo(aMessage));
         }
 
         cur = cur->GetNext();
@@ -521,11 +511,11 @@ void Dataset::Remove(uint8_t *aStart, uint8_t aLength)
 
 otError Dataset::ApplyConfiguration(Instance &aInstance, bool *aIsMasterKeyUpdated) const
 {
-    ThreadNetif &netif = aInstance.GetThreadNetif();
-    Mac::Mac &   mac   = netif.GetMac();
-    otError      error = OT_ERROR_NONE;
-    const Tlv *  cur   = reinterpret_cast<const Tlv *>(mTlvs);
-    const Tlv *  end   = reinterpret_cast<const Tlv *>(mTlvs + mLength);
+    Mac::Mac &  mac        = aInstance.Get<Mac::Mac>();
+    KeyManager &keyManager = aInstance.Get<KeyManager>();
+    otError     error      = OT_ERROR_NONE;
+    const Tlv * cur        = reinterpret_cast<const Tlv *>(mTlvs);
+    const Tlv * end        = reinterpret_cast<const Tlv *>(mTlvs + mLength);
 
     VerifyOrExit(IsValid(), error = OT_ERROR_PARSE);
 
@@ -565,7 +555,7 @@ otError Dataset::ApplyConfiguration(Instance &aInstance, bool *aIsMasterKeyUpdat
         case Tlv::kNetworkName:
         {
             const NetworkNameTlv *name = static_cast<const NetworkNameTlv *>(cur);
-            mac.SetNetworkName(name->GetNetworkName(), name->GetLength());
+            mac.SetNetworkName(name->GetNetworkName());
             break;
         }
 
@@ -573,22 +563,21 @@ otError Dataset::ApplyConfiguration(Instance &aInstance, bool *aIsMasterKeyUpdat
         {
             const NetworkMasterKeyTlv *key = static_cast<const NetworkMasterKeyTlv *>(cur);
 
-            if (aIsMasterKeyUpdated &&
-                memcmp(&key->GetNetworkMasterKey(), &netif.GetKeyManager().GetMasterKey(), OT_MASTER_KEY_SIZE))
+            if (aIsMasterKeyUpdated && (key->GetNetworkMasterKey() != keyManager.GetMasterKey()))
             {
                 *aIsMasterKeyUpdated = true;
             }
 
-            netif.GetKeyManager().SetMasterKey(key->GetNetworkMasterKey());
+            keyManager.SetMasterKey(key->GetNetworkMasterKey());
             break;
         }
 
 #if OPENTHREAD_FTD
 
-        case Tlv::kPSKc:
+        case Tlv::kPskc:
         {
-            const PSKcTlv *pskc = static_cast<const PSKcTlv *>(cur);
-            netif.GetKeyManager().SetPSKc(pskc->GetPSKc());
+            const PskcTlv *pskc = static_cast<const PskcTlv *>(cur);
+            keyManager.SetPskc(pskc->GetPskc());
             break;
         }
 
@@ -597,15 +586,15 @@ otError Dataset::ApplyConfiguration(Instance &aInstance, bool *aIsMasterKeyUpdat
         case Tlv::kMeshLocalPrefix:
         {
             const MeshLocalPrefixTlv *prefix = static_cast<const MeshLocalPrefixTlv *>(cur);
-            netif.GetMle().SetMeshLocalPrefix(prefix->GetMeshLocalPrefix());
+            aInstance.Get<Mle::MleRouter>().SetMeshLocalPrefix(prefix->GetMeshLocalPrefix());
             break;
         }
 
         case Tlv::kSecurityPolicy:
         {
             const SecurityPolicyTlv *securityPolicy = static_cast<const SecurityPolicyTlv *>(cur);
-            netif.GetKeyManager().SetKeyRotation(securityPolicy->GetRotationTime());
-            netif.GetKeyManager().SetSecurityPolicyFlags(securityPolicy->GetFlags());
+            keyManager.SetKeyRotation(securityPolicy->GetRotationTime());
+            keyManager.SetSecurityPolicyFlags(securityPolicy->GetFlags());
             break;
         }
 
@@ -622,12 +611,11 @@ exit:
     return error;
 }
 
-otError Dataset::ConvertToActive(void)
+void Dataset::ConvertToActive(void)
 {
     Remove(Tlv::kPendingTimestamp);
     Remove(Tlv::kDelayTimer);
     mType = Tlv::kActiveTimestamp;
-    return OT_ERROR_NONE;
 }
 
 } // namespace MeshCoP

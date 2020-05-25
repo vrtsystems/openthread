@@ -34,13 +34,12 @@
 #include "hdlc_interface.hpp"
 
 #include "platform-posix.h"
-#include "radio_spinel.hpp"
 
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #if OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE
-#ifdef OPENTHREAD_TARGET_DARWIN
+#if defined(__APPLE__) || defined(__NetBSD__)
 #include <util.h>
 #else
 #include <pty.h>
@@ -56,64 +55,106 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include <common/code_utils.hpp>
-#include <common/logging.hpp>
+#include "common/code_utils.hpp"
+#include "common/logging.hpp"
 
 #ifndef SOCKET_UTILS_DEFAULT_SHELL
 #define SOCKET_UTILS_DEFAULT_SHELL "/bin/sh"
 #endif
 
+#ifdef __APPLE__
+
+#ifndef B230400
+#define B230400 230400
+#endif
+
+#ifndef B460800
+#define B460800 460800
+#endif
+
+#ifndef B500000
+#define B500000 500000
+#endif
+
+#ifndef B576000
+#define B576000 576000
+#endif
+
+#ifndef B921600
+#define B921600 921600
+#endif
+
+#ifndef B1000000
+#define B1000000 1000000
+#endif
+
+#ifndef B1152000
+#define B1152000 1152000
+#endif
+
+#ifndef B1500000
+#define B1500000 1500000
+#endif
+
+#ifndef B2000000
+#define B2000000 2000000
+#endif
+
+#ifndef B2500000
+#define B2500000 2500000
+#endif
+
+#ifndef B3000000
+#define B3000000 3000000
+#endif
+
+#ifndef B3500000
+#define B3500000 3500000
+#endif
+
+#ifndef B4000000
+#define B4000000 4000000
+#endif
+
+#endif // __APPLE__
+
+#if OPENTHREAD_POSIX_RCP_UART_ENABLE
+
 namespace ot {
 namespace PosixApp {
 
-class EncoderBuffer : public Hdlc::Encoder::BufferWriteIterator
-{
-public:
-    EncoderBuffer(void)
-    {
-        mWritePointer    = mBuffer;
-        mRemainingLength = sizeof(mBuffer);
-    }
-
-    uint16_t       GetLength(void) const { return static_cast<uint16_t>(mWritePointer - mBuffer); }
-    const uint8_t *GetBuffer(void) const { return mBuffer; }
-
-private:
-    uint8_t mBuffer[HdlcInterface::kMaxFrameSize];
-};
-
-HdlcInterface::HdlcInterface(Callbacks &aCallbacks)
-    : mCallbacks(aCallbacks)
+HdlcInterface::HdlcInterface(SpinelInterface::Callbacks &aCallback, SpinelInterface::RxFrameBuffer &aFrameBuffer)
+    : mCallbacks(aCallback)
+    , mRxFrameBuffer(aFrameBuffer)
     , mSockFd(-1)
-    , mIsDecoding(false)
-    , mHdlcDecoder(mDecoderBuffer, sizeof(mDecoderBuffer), HandleHdlcFrame, HandleHdlcError, this)
+    , mHdlcDecoder(aFrameBuffer, HandleHdlcFrame, this)
 {
 }
 
-otError HdlcInterface::Init(const char *aRadioFile, const char *aRadioConfig)
+otError HdlcInterface::Init(const otPlatformConfig &aPlatformConfig)
 {
     otError     error = OT_ERROR_NONE;
     struct stat st;
 
     VerifyOrExit(mSockFd == -1, error = OT_ERROR_ALREADY);
 
-    VerifyOrExit(stat(aRadioFile, &st) == 0, perror("stat ncp file failed"); error = OT_ERROR_INVALID_ARGS);
+    VerifyOrDie(stat(aPlatformConfig.mRadioFile, &st) == 0, OT_EXIT_INVALID_ARGUMENTS);
 
     if (S_ISCHR(st.st_mode))
     {
-        mSockFd = OpenFile(aRadioFile, aRadioConfig);
+        mSockFd = OpenFile(aPlatformConfig.mRadioFile, aPlatformConfig.mRadioConfig);
         VerifyOrExit(mSockFd != -1, error = OT_ERROR_INVALID_ARGS);
     }
 #if OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE
     else if (S_ISREG(st.st_mode))
     {
-        mSockFd = ForkPty(aRadioFile, aRadioConfig);
+        mSockFd = ForkPty(aPlatformConfig.mRadioFile, aPlatformConfig.mRadioConfig);
         VerifyOrExit(mSockFd != -1, error = OT_ERROR_INVALID_ARGS);
     }
 #endif // OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE
     else
     {
-        otLogCritPlat("Radio file '%s' not supported", aRadioFile);
+        otLogCritPlat("Radio file '%s' not supported", aPlatformConfig.mRadioFile);
         ExitNow(error = OT_ERROR_INVALID_ARGS);
     }
 
@@ -121,12 +162,17 @@ exit:
     return error;
 }
 
+HdlcInterface::~HdlcInterface(void)
+{
+    Deinit();
+}
+
 void HdlcInterface::Deinit(void)
 {
-    assert(mSockFd != -1);
+    VerifyOrExit(mSockFd != -1);
 
-    VerifyOrExit(0 == close(mSockFd), perror("close NCP"));
-    VerifyOrExit(-1 != wait(NULL), perror("wait NCP"));
+    VerifyOrExit(0 == close(mSockFd), perror("close RCP"));
+    VerifyOrExit(-1 != wait(NULL) || errno == ECHILD, perror("wait RCP"));
 
     mSockFd = -1;
 
@@ -141,40 +187,32 @@ void HdlcInterface::Read(void)
 
     rval = read(mSockFd, buffer, sizeof(buffer));
 
-    if (rval < 0)
-    {
-        perror("HdlcInterface::Read()");
-
-        if (errno != EAGAIN)
-        {
-            abort();
-        }
-    }
-
     if (rval > 0)
     {
         Decode(buffer, static_cast<uint16_t>(rval));
+    }
+    else if ((rval < 0) && (errno != EAGAIN) && (errno != EINTR))
+    {
+        DieNow(OT_EXIT_ERROR_ERRNO);
     }
 }
 
 void HdlcInterface::Decode(const uint8_t *aBuffer, uint16_t aLength)
 {
-    mIsDecoding = true;
     mHdlcDecoder.Decode(aBuffer, aLength);
-    mIsDecoding = false;
 }
 
 otError HdlcInterface::SendFrame(const uint8_t *aFrame, uint16_t aLength)
 {
-    otError       error = OT_ERROR_NONE;
-    Hdlc::Encoder hdlcEncoder;
-    EncoderBuffer encoderBuffer;
+    otError                          error = OT_ERROR_NONE;
+    Hdlc::FrameBuffer<kMaxFrameSize> encoderBuffer;
+    Hdlc::Encoder                    hdlcEncoder(encoderBuffer);
 
-    SuccessOrExit(error = hdlcEncoder.Init(encoderBuffer));
-    SuccessOrExit(error = hdlcEncoder.Encode(aFrame, aLength, encoderBuffer));
-    SuccessOrExit(error = hdlcEncoder.Finalize(encoderBuffer));
+    SuccessOrExit(error = hdlcEncoder.BeginFrame());
+    SuccessOrExit(error = hdlcEncoder.Encode(aFrame, aLength));
+    SuccessOrExit(error = hdlcEncoder.EndFrame());
 
-    SuccessOrExit(error = Write(encoderBuffer.GetBuffer(), encoderBuffer.GetLength()));
+    error = Write(encoderBuffer.GetFrame(), encoderBuffer.GetLength());
 
 exit:
     return error;
@@ -183,9 +221,8 @@ exit:
 otError HdlcInterface::Write(const uint8_t *aFrame, uint16_t aLength)
 {
     otError error = OT_ERROR_NONE;
-
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    otSimSendRadioSpinelWriteEvent(aFrame, aLength);
+    virtualTimeSendRadioSpinelWriteEvent(aFrame, aLength);
 #else
     while (aLength)
     {
@@ -195,19 +232,169 @@ otError HdlcInterface::Write(const uint8_t *aFrame, uint16_t aLength)
         {
             aLength -= static_cast<uint16_t>(rval);
             aFrame += static_cast<uint16_t>(rval);
+            continue;
         }
-        else if (rval < 0)
+
+        if ((rval < 0) && (errno != EAGAIN) && (errno != EWOULDBLOCK) && (errno != EINTR))
         {
-            perror("HdlcInterface::Write");
-            ExitNow(error = OT_ERROR_FAILED);
+            DieNow(OT_EXIT_ERROR_ERRNO);
+        }
+
+        SuccessOrExit(error = WaitForWritable());
+    }
+
+exit:
+#endif // OPENTHREAD_POSIX_VIRTUAL_TIME
+    return error;
+}
+
+otError HdlcInterface::WaitForFrame(const struct timeval &aTimeout)
+{
+    otError error = OT_ERROR_NONE;
+#if OPENTHREAD_POSIX_VIRTUAL_TIME
+    struct Event event;
+    uint64_t     delay = static_cast<uint64_t>(aTimeout.tv_sec) * US_PER_S + static_cast<uint64_t>(aTimeout.tv_usec);
+
+    virtualTimeSendSleepEvent(&aTimeout);
+    virtualTimeReceiveEvent(&event);
+
+    switch (event.mEvent)
+    {
+    case OT_SIM_EVENT_RADIO_SPINEL_WRITE:
+        Decode(event.mData, event.mDataLength);
+        break;
+
+    case OT_SIM_EVENT_ALARM_FIRED:
+        VerifyOrExit(event.mDelay <= delay, error = OT_ERROR_RESPONSE_TIMEOUT);
+        break;
+
+    default:
+        assert(false);
+        break;
+    }
+#else  // OPENTHREAD_POSIX_VIRTUAL_TIME
+    struct timeval timeout = aTimeout;
+
+    fd_set read_fds;
+    fd_set error_fds;
+    int rval;
+
+    FD_ZERO(&read_fds);
+    FD_ZERO(&error_fds);
+    FD_SET(mSockFd, &read_fds);
+    FD_SET(mSockFd, &error_fds);
+
+    rval = select(mSockFd + 1, &read_fds, NULL, &error_fds, &timeout);
+
+    if (rval > 0)
+    {
+        if (FD_ISSET(mSockFd, &read_fds))
+        {
+            Read();
+        }
+        else if (FD_ISSET(mSockFd, &error_fds))
+        {
+            DieNowWithMessage("NCP error", OT_EXIT_FAILURE);
         }
         else
         {
-            ExitNow(error = OT_ERROR_FAILED);
+            DieNow(OT_EXIT_FAILURE);
         }
     }
+    else if (rval == 0)
+    {
+        ExitNow(error = OT_ERROR_RESPONSE_TIMEOUT);
+    }
+    else if (errno != EINTR)
+    {
+        DieNowWithMessage("wait response", OT_EXIT_FAILURE);
+    }
+#endif // OPENTHREAD_POSIX_VIRTUAL_TIME
+
 exit:
-#endif
+    return error;
+}
+
+void HdlcInterface::UpdateFdSet(fd_set &aReadFdSet, fd_set &aWriteFdSet, int &aMaxFd, struct timeval &aTimeout)
+{
+    OT_UNUSED_VARIABLE(aWriteFdSet);
+    OT_UNUSED_VARIABLE(aTimeout);
+
+    FD_SET(mSockFd, &aReadFdSet);
+
+    if (aMaxFd < mSockFd)
+    {
+        aMaxFd = mSockFd;
+    }
+}
+
+void HdlcInterface::Process(const fd_set &aReadFdSet, const fd_set &aWriteFdSet)
+{
+    OT_UNUSED_VARIABLE(aWriteFdSet);
+
+    if (FD_ISSET(mSockFd, &aReadFdSet))
+    {
+        Read();
+    }
+}
+
+otError HdlcInterface::WaitForWritable(void)
+{
+    otError        error   = OT_ERROR_NONE;
+    struct timeval timeout = {kMaxWaitTime / 1000, (kMaxWaitTime % 1000) * 1000};
+    uint64_t       now     = platformGetTime();
+    uint64_t       end     = now + kMaxWaitTime * US_PER_MS;
+    fd_set         writeFds;
+    fd_set         errorFds;
+    int            rval;
+
+    while (true)
+    {
+        FD_ZERO(&writeFds);
+        FD_ZERO(&errorFds);
+        FD_SET(mSockFd, &writeFds);
+        FD_SET(mSockFd, &errorFds);
+
+        rval = select(mSockFd + 1, NULL, &writeFds, &errorFds, &timeout);
+
+        if (rval > 0)
+        {
+            if (FD_ISSET(mSockFd, &writeFds))
+            {
+                ExitNow();
+            }
+            else if (FD_ISSET(mSockFd, &errorFds))
+            {
+                DieNow(OT_EXIT_FAILURE);
+            }
+            else
+            {
+                assert(false);
+            }
+        }
+        else if ((rval < 0) && (errno != EINTR))
+        {
+            DieNow(OT_EXIT_ERROR_ERRNO);
+        }
+
+        now = platformGetTime();
+
+        if (end > now)
+        {
+            uint64_t remain = end - now;
+
+            timeout.tv_sec  = static_cast<time_t>(remain / US_PER_S);
+            timeout.tv_usec = static_cast<suseconds_t>(remain % US_PER_S);
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    error = OT_ERROR_FAILED;
+
+exit:
     return error;
 }
 
@@ -216,7 +403,7 @@ int HdlcInterface::OpenFile(const char *aFile, const char *aConfig)
     int fd   = -1;
     int rval = 0;
 
-    fd = open(aFile, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    fd = open(aFile, O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
     if (fd == -1)
     {
         perror("open uart failed");
@@ -230,6 +417,7 @@ int HdlcInterface::OpenFile(const char *aFile, const char *aConfig)
         int  speed  = 115200;
         int  cstopb = 1;
         char parity = 'N';
+        char flow   = 'N';
 
         VerifyOrExit((rval = tcgetattr(fd, &tios)) == 0);
 
@@ -237,8 +425,11 @@ int HdlcInterface::OpenFile(const char *aFile, const char *aConfig)
 
         tios.c_cflag = CS8 | HUPCL | CREAD | CLOCAL;
 
-        // example: 115200N1
-        sscanf(aConfig, "%u%c%d", &speed, &parity, &cstopb);
+        // example: 115200N1H
+        if (aConfig != NULL)
+        {
+            sscanf(aConfig, "%u%c%d%c", &speed, &parity, &cstopb, &flow);
+        }
 
         switch (parity)
         {
@@ -252,8 +443,7 @@ int HdlcInterface::OpenFile(const char *aFile, const char *aConfig)
             break;
         default:
             // not supported
-            assert(false);
-            exit(OT_EXIT_INVALID_ARGUMENTS);
+            DieNow(OT_EXIT_INVALID_ARGUMENTS);
             break;
         }
 
@@ -266,8 +456,7 @@ int HdlcInterface::OpenFile(const char *aFile, const char *aConfig)
             tios.c_cflag |= CSTOPB;
             break;
         default:
-            assert(false);
-            exit(OT_EXIT_INVALID_ARGUMENTS);
+            DieNow(OT_EXIT_INVALID_ARGUMENTS);
             break;
         }
 
@@ -354,8 +543,20 @@ int HdlcInterface::OpenFile(const char *aFile, const char *aConfig)
             break;
 #endif
         default:
-            assert(false);
-            exit(OT_EXIT_INVALID_ARGUMENTS);
+            DieNow(OT_EXIT_INVALID_ARGUMENTS);
+            break;
+        }
+
+        switch (flow)
+        {
+        case 'N':
+            break;
+        case 'H':
+            tios.c_cflag |= CRTSCTS;
+            break;
+        default:
+            // not supported
+            DieNow(OT_EXIT_INVALID_ARGUMENTS);
             break;
         }
 
@@ -367,7 +568,7 @@ int HdlcInterface::OpenFile(const char *aFile, const char *aConfig)
 exit:
     if (rval != 0)
     {
-        exit(OT_EXIT_FAILURE);
+        DieNow(OT_EXIT_FAILURE);
     }
 
     return fd;
@@ -376,8 +577,9 @@ exit:
 #if OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE
 int HdlcInterface::ForkPty(const char *aCommand, const char *aArguments)
 {
-    int fd  = -1;
-    int pid = -1;
+    int fd   = -1;
+    int pid  = -1;
+    int rval = -1;
 
     {
         struct termios tios;
@@ -386,72 +588,53 @@ int HdlcInterface::ForkPty(const char *aCommand, const char *aArguments)
         cfmakeraw(&tios);
         tios.c_cflag = CS8 | HUPCL | CREAD | CLOCAL;
 
-        pid = forkpty(&fd, NULL, &tios, NULL);
-        VerifyOrExit(pid >= 0);
+        VerifyOrExit((pid = forkpty(&fd, NULL, &tios, NULL)) != -1, perror("forkpty()"));
     }
 
     if (0 == pid)
     {
-        const int     kMaxCommand = 255;
-        char          cmd[kMaxCommand];
-        int           rval;
-        struct rlimit limit;
-
-        rval = getrlimit(RLIMIT_NOFILE, &limit);
-        rval = setenv("SHELL", SOCKET_UTILS_DEFAULT_SHELL, 0);
-
-        VerifyOrExit(rval == 0, perror("setenv failed"));
-
-        // Close all file descriptors larger than STDERR_FILENO.
-        for (rlim_t i = (STDERR_FILENO + 1); i < limit.rlim_cur; i++)
-        {
-            close(static_cast<int>(i));
-        }
+        const int kMaxCommand = 255;
+        char      cmd[kMaxCommand];
 
         rval = snprintf(cmd, sizeof(cmd), "exec %s %s", aCommand, aArguments);
         VerifyOrExit(rval > 0 && static_cast<size_t>(rval) < sizeof(cmd),
-                     otLogCritPlat("NCP file and configuration is too long!"));
+                     fprintf(stderr, "NCP file and configuration is too long!");
+                     rval = -1);
 
-        execl(getenv("SHELL"), getenv("SHELL"), "-c", cmd, NULL);
-        perror("open pty failed");
-        exit(OT_EXIT_INVALID_ARGUMENTS);
+        VerifyOrExit((rval = execl(SOCKET_UTILS_DEFAULT_SHELL, SOCKET_UTILS_DEFAULT_SHELL, "-c", cmd,
+                                   static_cast<char *>(NULL))) != -1,
+                     perror("execl(OT_RCP)"));
     }
     else
     {
-        int rval = fcntl(fd, F_GETFL);
-
-        if (rval != -1)
-        {
-            rval = fcntl(fd, F_SETFL, rval | O_NONBLOCK);
-        }
-
-        if (rval == -1)
-        {
-            perror("set nonblock failed");
-            close(fd);
-            fd = -1;
-        }
+        VerifyOrExit((rval = fcntl(fd, F_GETFL)) != -1, perror("fcntl(F_GETFL)"));
+        VerifyOrExit((rval = fcntl(fd, F_SETFL, rval | O_NONBLOCK | O_CLOEXEC)) != -1, perror("fcntl(F_SETFL)"));
     }
 
 exit:
+    VerifyOrDie(rval == 0, OT_EXIT_ERROR_ERRNO);
     return fd;
 }
 #endif // OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE
 
-void HdlcInterface::HandleHdlcFrame(void *aContext, uint8_t *aFrame, uint16_t aFrameLength)
+void HdlcInterface::HandleHdlcFrame(void *aContext, otError aError)
 {
-    static_cast<HdlcInterface *>(aContext)->mCallbacks.HandleReceivedFrame(aFrame, aFrameLength);
+    static_cast<HdlcInterface *>(aContext)->HandleHdlcFrame(aError);
 }
 
-void HdlcInterface::HandleHdlcError(void *aContext, otError aError, uint8_t *aFrame, uint16_t aFrameLength)
+void HdlcInterface::HandleHdlcFrame(otError aError)
 {
-    otLogWarnPlat("Error decoding hdlc frame: %s", otThreadErrorToString(aError));
-
-    OT_UNUSED_VARIABLE(aContext);
-    OT_UNUSED_VARIABLE(aError);
-    OT_UNUSED_VARIABLE(aFrame);
-    OT_UNUSED_VARIABLE(aFrameLength);
+    if (aError == OT_ERROR_NONE)
+    {
+        mCallbacks.HandleReceivedFrame();
+    }
+    else
+    {
+        mRxFrameBuffer.DiscardFrame();
+        otLogWarnPlat("Error decoding hdlc frame: %s", otThreadErrorToString(aError));
+    }
 }
 
 } // namespace PosixApp
 } // namespace ot
+#endif // OPENTHREAD_POSIX_RCP_UART_ENABLE

@@ -77,8 +77,7 @@ run() {
 
 cd $(dirname $0)
 
-# On Travis CI, the $BUILD_TARGET is defined as "toranj-test-framework".
-if [ "$BUILD_TARGET" = "toranj-test-framework" ]; then
+if [ "$COVERAGE" = 1 ]; then
     coverage_option="--enable-coverage"
 else
     coverage_option=""
@@ -128,8 +127,19 @@ run test-022-multicast-ip6-address.py
 run test-023-multicast-traffic.py
 run test-024-partition-merge.py
 run test-025-network-data-timeout.py
-run test-026-slaac-address.py
+run test-026-slaac-address-wpantund.py
 run test-027-child-mode-change.py
+run test-028-router-leader-reset-recovery.py
+run test-029-data-poll-interval.py
+run test-030-slaac-address-ncp.py
+run test-031-meshcop-joiner-commissioner.py
+run test-032-child-attach-with-multiple-ip-addresses.py
+run test-033-mesh-local-prefix-change.py
+run test-034-poor-link-parent-child-attach.py
+run test-035-child-timeout-large-data-poll.py
+run test-036-wpantund-host-route-management.py
+run test-037-wpantund-auto-add-route-for-on-mesh-prefix.py
+run test-038-clear-address-cache-for-sed.py
 run test-100-mcu-power-state.py
 run test-600-channel-manager-properties.py
 run test-601-channel-manager-channel-change.py

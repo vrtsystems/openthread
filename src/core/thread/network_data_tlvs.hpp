@@ -36,17 +36,15 @@
 
 #include "openthread-core-config.h"
 
-#include "utils/wrap_string.h"
-
 #include "common/encoding.hpp"
 #include "net/ip6_address.hpp"
-
-using ot::Encoding::BigEndian::HostSwap16;
 
 #define THREAD_ENTERPRISE_NUMBER 44970
 
 namespace ot {
 namespace NetworkData {
+
+using ot::Encoding::BigEndian::HostSwap16;
 
 /**
  * @addtogroup core-netdata-tlvs
@@ -223,7 +221,9 @@ public:
      */
     void SetPreference(int8_t aPrf)
     {
-        mFlags = (mFlags & ~kPreferenceMask) | ((aPrf << kPreferenceOffset) & kPreferenceMask);
+        assert((aPrf == OT_ROUTE_PREFERENCE_LOW) || (aPrf == OT_ROUTE_PREFERENCE_MED) ||
+               (aPrf == OT_ROUTE_PREFERENCE_HIGH));
+        mFlags = (mFlags & ~kPreferenceMask) | ((static_cast<uint8_t>(aPrf) << kPreferenceOffset) & kPreferenceMask);
     }
 
     /**
@@ -343,7 +343,8 @@ public:
     bool IsValid(void) const
     {
         return ((GetLength() >= sizeof(*this) - sizeof(NetworkDataTlv)) &&
-                (GetLength() >= BitVectorBytes(mPrefixLength) + sizeof(*this) - sizeof(NetworkDataTlv)));
+                (GetLength() >= BitVectorBytes(mPrefixLength) + sizeof(*this) - sizeof(NetworkDataTlv)) &&
+                (BitVectorBytes(mPrefixLength) <= sizeof(Ip6::Address)));
     }
 
     /**
@@ -486,7 +487,7 @@ public:
      */
     void SetPreference(int8_t aPrf)
     {
-        mFlags = (mFlags & ~kPreferenceMask) | ((aPrf << kPreferenceOffset) & kPreferenceMask);
+        mFlags = (mFlags & ~kPreferenceMask) | ((static_cast<uint8_t>(aPrf) << kPreferenceOffset) & kPreferenceMask);
     }
 
     /**

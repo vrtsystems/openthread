@@ -36,8 +36,9 @@
 #include <openthread/border_agent.h>
 
 #include "common/instance.hpp"
+#include "common/locator-getters.hpp"
 
-#if OPENTHREAD_ENABLE_BORDER_AGENT
+#if OPENTHREAD_CONFIG_BORDER_AGENT_ENABLE
 
 using namespace ot;
 
@@ -45,7 +46,7 @@ otBorderAgentState otBorderAgentGetState(otInstance *aInstance)
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    return instance.GetThreadNetif().GetBorderAgent().GetState();
+    return instance.Get<MeshCoP::BorderAgent>().GetState();
 }
 
-#endif // OPENTHREAD_ENABLE_BORDER_AGENT
+#endif // OPENTHREAD_CONFIG_BORDER_AGENT_ENABLE

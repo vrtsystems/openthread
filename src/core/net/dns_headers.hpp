@@ -36,13 +36,8 @@
 
 #include "openthread-core-config.h"
 
-#include "utils/wrap_string.h"
-
 #include "common/encoding.hpp"
 #include "common/message.hpp"
-
-using ot::Encoding::BigEndian::HostSwap16;
-using ot::Encoding::BigEndian::HostSwap32;
 
 namespace ot {
 
@@ -53,6 +48,9 @@ namespace ot {
  *
  */
 namespace Dns {
+
+using ot::Encoding::BigEndian::HostSwap16;
+using ot::Encoding::BigEndian::HostSwap32;
 
 /**
  * @addtogroup core-dns
@@ -489,7 +487,7 @@ public:
     otIp6Address &GetAddress(void) { return mAddress; }
 
 private:
-    otIp6Address mAddress; ///< Ipv6 Address of AAAA Resource Record.
+    otIp6Address mAddress; ///< IPv6 Address of AAAA Resource Record.
 
 } OT_TOOL_PACKED_END;
 
@@ -565,7 +563,9 @@ public:
      *
      */
     QuestionAaaa(void)
-        : Question(kType, kClass){};
+        : Question(kType, kClass)
+    {
+    }
 
     /**
      * This method appends request data to the message.
@@ -576,7 +576,7 @@ public:
      * @retval OT_ERROR_NO_BUFS  Insufficient available buffers to grow the message.
      *
      */
-    otError AppendTo(Message &aMessage) const { return aMessage.Append(this, sizeof(*this)); };
+    otError AppendTo(Message &aMessage) const { return aMessage.Append(this, sizeof(*this)); }
 };
 
 /**

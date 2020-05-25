@@ -35,12 +35,12 @@
 
 #include "common/code_utils.hpp"
 #include "common/instance.hpp"
+#include "common/locator-getters.hpp"
 #include "common/logging.hpp"
-#include "common/owner-locator.hpp"
 #include "common/random.hpp"
 #include "thread/thread_netif.hpp"
 
-#if OPENTHREAD_ENABLE_JAM_DETECTION
+#if OPENTHREAD_CONFIG_JAM_DETECTION_ENABLE
 
 namespace ot {
 namespace Utils {
@@ -49,7 +49,7 @@ JamDetector::JamDetector(Instance &aInstance)
     : InstanceLocator(aInstance)
     , mHandler(NULL)
     , mContext(NULL)
-    , mNotifierCallback(HandleStateChanged, this)
+    , mNotifierCallback(aInstance, HandleStateChanged, this)
     , mTimer(aInstance, &JamDetector::HandleTimer, this)
     , mHistoryBitmap(0)
     , mCurSecondStartTime(0)
@@ -61,7 +61,6 @@ JamDetector::JamDetector(Instance &aInstance)
     , mJamState(false)
     , mRssiThreshold(kDefaultRssiThreshold)
 {
-    aInstance.GetNotifier().RegisterCallback(mNotifierCallback);
 }
 
 otError JamDetector::Start(Handler aHandler, void *aContext)
@@ -104,7 +103,7 @@ void JamDetector::CheckState(void)
 {
     VerifyOrExit(mEnabled);
 
-    switch (GetInstance().Get<Mle::MleRouter>().GetRole())
+    switch (Get<Mle::MleRouter>().GetRole())
     {
     case OT_DEVICE_ROLE_DISABLED:
         VerifyOrExit(mTimer.IsRunning());
@@ -127,12 +126,10 @@ exit:
     return;
 }
 
-otError JamDetector::SetRssiThreshold(int8_t aThreshold)
+void JamDetector::SetRssiThreshold(int8_t aThreshold)
 {
     mRssiThreshold = aThreshold;
     otLogInfoUtil("JamDetector - RSSI threshold set to %d", mRssiThreshold);
-
-    return OT_ERROR_NONE;
 }
 
 otError JamDetector::SetWindow(uint8_t aWindow)
@@ -175,7 +172,7 @@ void JamDetector::HandleTimer(void)
 
     VerifyOrExit(mEnabled);
 
-    rssi = otPlatRadioGetRssi(&GetInstance());
+    rssi = Get<Radio>().GetRssi();
 
     // If the RSSI is valid, check if it exceeds the threshold
     // and try to update the history bit map
@@ -203,7 +200,7 @@ void JamDetector::HandleTimer(void)
         }
     }
 
-    mTimer.Start(mSampleInterval + Random::GetUint32InRange(0, kMaxRandomDelay));
+    mTimer.Start(mSampleInterval + Random::NonCrypto::GetUint32InRange(0, kMaxRandomDelay));
 
 exit:
     return;
@@ -211,7 +208,7 @@ exit:
 
 void JamDetector::UpdateHistory(bool aDidExceedThreshold)
 {
-    uint32_t now = TimerMilli::GetNow();
+    uint32_t interval = TimerMilli::GetNow() - mCurSecondStartTime;
 
     // If the RSSI is ever below the threshold, update mAlwaysAboveThreshold
     // for current second interval.
@@ -221,7 +218,8 @@ void JamDetector::UpdateHistory(bool aDidExceedThreshold)
     }
 
     // If we reached end of current one second interval, update the history bitmap
-    if (now - mCurSecondStartTime >= kOneSecondInterval)
+
+    if (interval >= kOneSecondInterval)
     {
         mHistoryBitmap <<= 1;
 
@@ -232,10 +230,7 @@ void JamDetector::UpdateHistory(bool aDidExceedThreshold)
 
         mAlwaysAboveThreshold = true;
 
-        while (now - mCurSecondStartTime >= kOneSecondInterval)
-        {
-            mCurSecondStartTime += kOneSecondInterval;
-        }
+        mCurSecondStartTime += (interval / kOneSecondInterval) * kOneSecondInterval;
 
         UpdateJamState();
     }
@@ -292,4 +287,4 @@ void JamDetector::HandleStateChanged(otChangedFlags aFlags)
 } // namespace Utils
 } // namespace ot
 
-#endif // OPENTHREAD_ENABLE_JAM_DETECTION
+#endif // OPENTHREAD_CONFIG_JAM_DETECTION_ENABLE
