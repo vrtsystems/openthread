@@ -263,6 +263,17 @@
 #endif
 
 /**
+ * @def OPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN
+ *
+ * This defines the PA output gain in dB.  For example, if your part produces +22dBm of transmit power when the nRF52840 is set to 8dBm (as is the case for Skyworks SKY66112), then your gain is +14dB.
+ *
+ * If your FEM does not include a PA (or it is disabled), leave this set to 0.
+ */
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN
+#define OPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN 0
+#endif
+
+/**
  * @def OPENTHREAD_CONFIG_NRF5_FEM_PA_TIME_IN_ADVANCE_US
  *
  * This sets the time delay between us signalling the PA to come on and the PA
