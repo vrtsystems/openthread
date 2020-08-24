@@ -231,7 +231,8 @@ CPPFLAGS                                                                        
 endif
 ifneq ($(FEM),)
 CPPFLAGS                                                                               += \
-    -DENABLE_FEM=$(FEM)                                                                   \
+    -DENABLE_FEM=$(FEM)                                                                    \
+    -DOPENTHREAD_CONFIG_NRF5_FEM=$(FEM)                                                   \
     $(NULL)
 endif
 ifneq ($(DEFAULT_TX_POWER),)
