@@ -336,8 +336,16 @@ CPPFLAGS                                                                        
     $(NULL)
 endif
 ifneq ($(SKY66112),)
+# Skyworks SKY66112 is about +14dB (8dBm in produces 22dBm out)
+FEM_PA_GAIN ?= 14
+
 CPPFLAGS                                                                               += \
     -DOPENTHREAD_CONFIG_NRF5_WITH_SKY66112=$(SKY66112)                                    \
+    $(NULL)
+endif
+ifneq ($(FEM_PA_GAIN),)
+CPPFLAGS                                                                               += \
+    -DOPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN=$(FEM_PA_GAIN)                                   \
     $(NULL)
 endif
 
