@@ -214,6 +214,7 @@ static void nrf5RadioInitChl(void)
 static void dataInit(void)
 {
     sDisabled = true;
+    sDefaultTxPower = OPENTHREAD_CONFIG_DEFAULT_TRANSMIT_POWER;
 
     sTransmitFrame.mPsdu = sTransmitPsdu + 1;
 #if OPENTHREAD_CONFIG_MAC_HEADER_IE_SUPPORT
