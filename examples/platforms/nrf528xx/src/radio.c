@@ -79,6 +79,13 @@
 _Pragma("diag_suppress=Pe167")
 #endif
 
+/* For nRF5 platforms other than nRF52840 */
+#if !OPENTHREAD_CONFIG_NRF5_FEM
+#ifndef OPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN
+#define OPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN 0
+#endif
+#endif
+
 enum
 {
     NRF528XX_RECEIVE_SENSITIVITY  = -100, // dBm
@@ -510,7 +517,7 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
     bool result;
 
     nrf_802154_channel_set(aChannel);
-    nrf_802154_tx_power_set(sDefaultTxPower);
+    nrf_802154_tx_power_set(sDefaultTxPower - OPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN);
     result = nrf_802154_receive();
     clearPendingEvents();
 
@@ -724,7 +731,7 @@ otError otPlatRadioGetTransmitPower(otInstance *aInstance, int8_t *aPower)
     }
     else
     {
-        *aPower = nrf_802154_tx_power_get();
+        *aPower = nrf_802154_tx_power_get() + OPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN;
     }
 
     return error;
@@ -735,7 +742,7 @@ otError otPlatRadioSetTransmitPower(otInstance *aInstance, int8_t aPower)
     OT_UNUSED_VARIABLE(aInstance);
 
     sDefaultTxPower = aPower;
-    nrf_802154_tx_power_set(aPower);
+    nrf_802154_tx_power_set(aPower - OPENTHREAD_CONFIG_NRF5_FEM_PA_GAIN);
 
     return OT_ERROR_NONE;
 }
