@@ -234,6 +234,11 @@ CPPFLAGS                                                                        
     -DENABLE_FEM=$(FEM)                                                                   \
     $(NULL)
 endif
+ifneq ($(DEFAULT_TX_POWER),)
+CPPFLAGS                                                                               += \
+    -DOPENTHREAD_CONFIG_DEFAULT_TRANSMIT_POWER=$(DEFAULT_TX_POWER)                        \
+    $(NULL)
+endif
 ifneq ($(PA_TIME_IN_ADVANCE_US),)
 CPPFLAGS                                                                               += \
     -DOPENTHREAD_CONFIG_NRF5_FEM_PA_TIME_IN_ADVANCE_US=$(PA_TIME_IN_ADVANCE_US)           \
