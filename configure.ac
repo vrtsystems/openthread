@@ -601,7 +601,9 @@ AC_ARG_ENABLE(ncp,
         case "${enableval}" in
 
         no|yes)
-            enable_ncp=${enableval}
+            enable_ncp=no # disabled because it's broken
+            echo "WARNING: ignoring --enable-ncp because NCP support currently"
+            echo "         does not build."
             ;;
 
         *)
