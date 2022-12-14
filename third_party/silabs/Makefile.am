@@ -28,6 +28,12 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
+if OPENTHREAD_EXAMPLES_EFR32MG1
+lib_LIBRARIES                                                                 = \
+    libsilabs-efr32mg1-sdk.a                                                    \
+    $(NULL)
+endif
+
 if OPENTHREAD_EXAMPLES_EFR32MG12
 lib_LIBRARIES                                                                 = \
     libsilabs-efr32mg12-sdk.a                                                   \
@@ -62,6 +68,10 @@ override CXXFLAGS  := $(filter-out -Wshadow,$(CXXFLAGS))
 override CFLAGS    := $(filter-out -Wundef,$(CFLAGS))
 override CXXFLAGS  := $(filter-out -Wundef,$(CXXFLAGS))
 
+# Do not enable -Wcast-align for Silicon Labs SDK sources
+override CFLAGS    := $(filter-out -Wcast-align,$(CFLAGS))
+override CXXFLAGS  := $(filter-out -Wcast-align,$(CXXFLAGS))
+
 EFR32_BOARD_DIR = $(shell echo $(BOARD) | tr A-Z a-z)
 
 SDK_SRC_DIR = $(top_srcdir)/third_party/silabs/gecko_sdk_suite/v2.7
@@ -90,6 +100,8 @@ COMMONCPPFLAGS                                                                = 
     -I$(SDK_SRC_DIR)/platform/emdrv/ustimer/inc                                 \
     -I$(SDK_SRC_DIR)/platform/emdrv/dmadrv/inc                                  \
     -I$(SDK_SRC_DIR)/platform/emdrv/dmadrv/config                               \
+    -I$(SDK_SRC_DIR)/platform/emdrv/nvm3/inc                                    \
+    -I$(SDK_SRC_DIR)/platform/emdrv/nvm3/config                                 \
     -I$(SDK_SRC_DIR)/platform/emlib/inc                                         \
     -I$(SDK_SRC_DIR)/platform/halconfig/inc/hal-config                          \
     -I$(SDK_SRC_DIR)/platform/radio/rail_lib/chip/efr32                         \
@@ -106,6 +118,12 @@ COMMONCPPFLAGS                                                                = 
     -I$(SDK_SRC_DIR)/util/third_party/mbedtls/sl_crypto/include                 \
     -Wno-unused-parameter                                                       \
     -Wno-missing-field-initializers                                             \
+    $(NULL)
+
+SILABS_EFR32MG1_CPPFLAGS                                                      = \
+    -I$(SDK_SRC_DIR)/hardware/kit/EFR32MG1_$(BOARD)/config                      \
+    -I$(SDK_SRC_DIR)/platform/Device/SiliconLabs/EFR32MG1P/Include              \
+    -I$(SDK_SRC_DIR)/platform/radio/rail_lib/chip/efr32/efr32xg1x               \
     $(NULL)
 
 SILABS_EFR32MG12_CPPFLAGS                                                     = \
@@ -134,6 +152,9 @@ SILABS_COMMON_SOURCES                                                           
     gecko_sdk_suite/v2.7/hardware/kit/common/bsp/bsp_stk_leds.c                           \
     gecko_sdk_suite/v2.7/platform/emdrv/dmadrv/src/dmadrv.c                               \
     gecko_sdk_suite/v2.7/platform/emdrv/gpiointerrupt/src/gpiointerrupt.c                 \
+    gecko_sdk_suite/v2.7/platform/emdrv/nvm3/src/nvm3_default.c                           \
+    gecko_sdk_suite/v2.7/platform/emdrv/nvm3/src/nvm3_hal_flash.c                         \
+    gecko_sdk_suite/v2.7/platform/emdrv/nvm3/src/nvm3_lock.c                              \
     gecko_sdk_suite/v2.7/platform/emdrv/uartdrv/src/uartdrv.c                             \
     gecko_sdk_suite/v2.7/platform/emdrv/ustimer/src/ustimer.c                             \
     gecko_sdk_suite/v2.7/platform/emlib/src/em_adc.c                                      \
@@ -159,6 +180,13 @@ SILABS_COMMON_SOURCES                                                           
     gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/crypto_aes.c              \
     gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/crypto_ecp.c              \
     gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/crypto_management.c       \
+    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/crypto_sha.c              \
+    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/shax.c                    \
+    $(NULL)
+
+SILABS_EFR32MG1_SOURCES                                                                           = \
+    gecko_sdk_suite/v2.7/platform/Device/SiliconLabs/EFR32MG1P/Source/system_efr32mg1p.c            \
+    gecko_sdk_suite/v2.7/platform/Device/SiliconLabs/EFR32MG1P/Source/GCC/startup_efr32mg1p.c       \
     $(NULL)
 
 SILABS_EFR32MG12_SOURCES                                                                          = \
@@ -177,9 +205,24 @@ SILABS_EFR32MG21_SOURCES                                                        
     gecko_sdk_suite/v2.7/platform/Device/SiliconLabs/EFR32MG21/Source/system_efr32mg21.c        \
     gecko_sdk_suite/v2.7/platform/Device/SiliconLabs/EFR32MG21/Source/GCC/startup_efr32mg21.c   \
     gecko_sdk_suite/v2.7/platform/emlib/src/em_se.c                                             \
-    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_trng.c                       \
     gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_aes.c                        \
+    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_ccm.c                        \
+    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_cmac.c                       \
+    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_ecp.c                        \
+    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_jpake.c                      \
     gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_management.c                 \
+    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_sha.c                        \
+    gecko_sdk_suite/v2.7/util/third_party/mbedtls/sl_crypto/src/se_trng.c                       \
+    $(NULL)
+
+libsilabs_efr32mg1_sdk_a_CPPFLAGS                                                             = \
+    $(COMMONCPPFLAGS)                                                                           \
+    $(SILABS_EFR32MG1_CPPFLAGS)                                                                 \
+    $(NULL)
+
+libsilabs_efr32mg1_sdk_a_SOURCES                                                              = \
+    $(SILABS_COMMON_SOURCES)                                                                    \
+    $(SILABS_EFR32MG1_SOURCES)                                                                  \
     $(NULL)
 
 libsilabs_efr32mg12_sdk_a_CPPFLAGS                                                            = \

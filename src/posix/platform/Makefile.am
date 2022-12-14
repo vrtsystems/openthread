@@ -27,6 +27,7 @@
 #
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
+include $(top_srcdir)/src/lib/common.am
 
 lib_LIBRARIES                             = libopenthread-posix.a
 
@@ -49,7 +50,8 @@ libopenthread_posix_a_SOURCES             = \
     logging.cpp                             \
     misc.cpp                                \
     netif.cpp                               \
-    radio_spinel.cpp                        \
+    radio.cpp                               \
+    radio_url.cpp                           \
     settings.cpp                            \
     spi_interface.cpp                       \
     system.cpp                              \
@@ -58,12 +60,16 @@ libopenthread_posix_a_SOURCES             = \
     virtual_time.cpp                        \
     $(NULL)
 
+libopenthread_posix_a_LIBADD                                                        = \
+    $(call ot_list_objects,$(top_builddir)/src/lib/url/libopenthread-url.a)           \
+    $(call ot_list_objects,$(top_builddir)/src/lib/platform/libopenthread-platform.a) \
+    $(NULL)
+
 noinst_HEADERS                            = \
     hdlc_interface.hpp                      \
     openthread-posix-config.h               \
     platform-posix.h                        \
-    radio_spinel.hpp                        \
-    spinel_interface.hpp                    \
+    radio_url.hpp                           \
     $(NULL)
 
 openthread_HEADERS                        = \
@@ -73,12 +79,6 @@ openthread_HEADERS                        = \
 openthreaddir = $(includedir)/openthread
 dist_openthread_HEADERS = $(openthread_headers)
 
-PRETTY_FILES                              = \
-    $(libopenthread_posix_a_SOURCES)        \
-    $(noinst_HEADERS)                       \
-    $(openthread_HEADERS)                   \
-    $(NULL)
-
 if OPENTHREAD_BUILD_COVERAGE
 CLEANFILES                                = $(wildcard *.gcda *.gcno)
 endif # OPENTHREAD_BUILD_COVERAGE
@@ -87,6 +87,7 @@ check_PROGRAMS = test-settings
 
 test_settings_CPPFLAGS                                        = \
     -I$(top_srcdir)/include                                     \
+    -I$(top_srcdir)/src                                         \
     -I$(top_srcdir)/src/core                                    \
     -I$(top_srcdir)/src/posix/platform/include                  \
     -DOPENTHREAD_CONFIG_LOG_PLATFORM=0                          \

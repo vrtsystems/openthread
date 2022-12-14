@@ -37,6 +37,10 @@ override CXXFLAGS                            := $(filter-out -pedantic-errors,$(
 override CFLAGS                              := $(filter-out -Wundef,$(CFLAGS))
 override CXXFLAGS                            := $(filter-out -Wundef,$(CXXFLAGS))
 
+# Do not enable -Wcast-align for this platform
+override CFLAGS                              := $(filter-out -Wcast-align,$(CFLAGS))
+override CXXFLAGS                            := $(filter-out -Wcast-align,$(CXXFLAGS))
+
 libopenthread_samr21_a_CPPFLAGS                                                                              = \
     -D ARM_MATH_CM0PLUS=true                                                                                   \
     -D PHY_AT86RF233                                                                                           \
@@ -135,10 +139,6 @@ nodist_libopenthread_samr21_a_SOURCES                                           
     @top_builddir@/third_party/microchip/asf/thirdparty/wireless/avr2130_lwmesh/source/phy/at86rf233/src/phy.c \
     @top_builddir@/third_party/microchip/asf/thirdparty/wireless/services/sal/at86rf2xx/src/sal.c              \
     @top_builddir@/third_party/microchip/asf/thirdparty/wireless/services/trx_access/trx_access.c              \
-    $(NULL)
-
-PRETTY_FILES                                                                                                 = \
-    $(PLATFORM_SOURCES)                                                                                        \
     $(NULL)
 
 Dash                                                                                                         = -

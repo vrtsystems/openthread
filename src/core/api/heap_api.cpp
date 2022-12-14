@@ -47,10 +47,10 @@ void *otHeapCAlloc(size_t aCount, size_t aSize)
     OT_UNUSED_VARIABLE(aSize);
 
     // Should never get called!
-    assert(false);
+    OT_ASSERT(false);
 
     // This function is reachable when asserts are disabled
-    OT_UNREACHABLE_CODE(return NULL;)
+    OT_UNREACHABLE_CODE(return nullptr;)
 }
 
 void otHeapFree(void *aPointer)
@@ -58,7 +58,7 @@ void otHeapFree(void *aPointer)
     OT_UNUSED_VARIABLE(aPointer);
 
     // Should never get called!
-    assert(false);
+    OT_ASSERT(false);
 }
 
 #else // OPENTHREAD_RADIO

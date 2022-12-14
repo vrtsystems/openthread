@@ -60,7 +60,7 @@ extern "C" {
 
 #define OT_COAP_MAX_TOKEN_LENGTH 8 ///< Max token length as specified (RFC 7252).
 
-#define OT_COAP_MAX_RETRANSMIT 30 ///< Max retransmit supported by OpenThread.
+#define OT_COAP_MAX_RETRANSMIT 20 ///< Max retransmit supported by OpenThread.
 
 #define OT_COAP_MIN_ACK_TIMEOUT 1000 ///< Minimal ACK timeout in milliseconds supported by OpenThread.
 
@@ -142,6 +142,7 @@ typedef enum otCoapOptionType
     OT_COAP_OPTION_LOCATION_QUERY = 20, ///< Location-Query
     OT_COAP_OPTION_BLOCK2         = 23, ///< Block2 (RFC7959)
     OT_COAP_OPTION_BLOCK1         = 27, ///< Block1 (RFC7959)
+    OT_COAP_OPTION_SIZE2          = 28, ///< Size2 (RFC7959)
     OT_COAP_OPTION_PROXY_URI      = 35, ///< Proxy-Uri
     OT_COAP_OPTION_PROXY_SCHEME   = 39, ///< Proxy-Scheme
     OT_COAP_OPTION_SIZE1          = 60, ///< Size1
@@ -367,6 +368,10 @@ typedef struct otCoapResource
 
 /**
  * This structure represents the CoAP transmission parameters.
+ *
+ * @note mAckTimeout * ((2 ** (mMaxRetransmit + 1)) - 1) * (mAckRandomFactorNumerator / mAckRandomFactorDenominator)
+ *       must not exceed what can be represented by a uint32_t (0xffffffff). This limitation allows OpenThread to
+ *       avoid 64-bit arithmetic.
  *
  */
 typedef struct otCoapTxParameters
@@ -850,11 +855,8 @@ otError otCoapStop(otInstance *aInstance);
  * @param[in]  aInstance  A pointer to an OpenThread instance.
  * @param[in]  aResource  A pointer to the resource.
  *
- * @retval OT_ERROR_NONE     Successfully added @p aResource.
- * @retval OT_ERROR_ALREADY  The @p aResource was already added.
- *
  */
-otError otCoapAddResource(otInstance *aInstance, otCoapResource *aResource);
+void otCoapAddResource(otInstance *aInstance, otCoapResource *aResource);
 
 /**
  * This function removes a resource from the CoAP server.

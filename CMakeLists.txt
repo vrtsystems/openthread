@@ -26,29 +26,54 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 #
 
-cmake_minimum_required(VERSION 3.13.1)
-project(openthread)
+cmake_policy(SET CMP0048 NEW)
+cmake_minimum_required(VERSION 3.10.2)
+
+file(READ .default-version OT_DEFAULT_VERSION)
+string(STRIP ${OT_DEFAULT_VERSION} OT_DEFAULT_VERSION)
+
+project(openthread VERSION ${OT_DEFAULT_VERSION})
 
 option(OT_BUILD_EXECUTABLES "Build executables" ON)
-option(OT_BUILTIN_MBEDTLS "Enable builtin mbedTLS" ON)
+option(OT_COVERAGE "enable coverage" OFF)
+set(OT_EXTERNAL_MBEDTLS "" CACHE STRING "Specify external mbedtls library")
+
+add_library(ot-config INTERFACE)
+
+target_include_directories(ot-config INTERFACE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core
+)
+
+include(TestBigEndian)
+TEST_BIG_ENDIAN(OT_BIG_ENDIAN)
+if(OT_BIG_ENDIAN)
+    target_compile_definitions(ot-config INTERFACE "BYTE_ORDER_BIG_ENDIAN=1")
+endif()
 
 include("${PROJECT_SOURCE_DIR}/etc/cmake/checks.cmake")
 include("${PROJECT_SOURCE_DIR}/etc/cmake/options.cmake")
 include("${PROJECT_SOURCE_DIR}/etc/cmake/functions.cmake")
 
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "(Apple)?[Cc]lang")
-    option(OT_COMPILE_WARNING_AS_ERROR "whether to include -Werror with gcc-compatible compilers")
+    option(OT_COMPILE_WARNING_AS_ERROR "whether to include -Werror -pedantic-errors with gcc-compatible compilers")
     if (OT_COMPILE_WARNING_AS_ERROR)
-        set(OT_CFLAGS -Werror)
+        set(OT_CFLAGS -Werror -pedantic-errors)
+    endif()
+
+    if(OT_COVERAGE)
+        target_compile_definitions(ot-config INTERFACE "OPENTHREAD_ENABLE_COVERAGE=1")
+        target_compile_options(ot-config INTERFACE -g -O0 --coverage)
+        target_link_libraries(ot-config INTERFACE --coverage)
     endif()
 
     set(OT_CFLAGS
-        $<$<COMPILE_LANGUAGE:C>:${OT_CFLAGS} -Wall -Wextra -Wshadow -Werror -pedantic-errors>
-        $<$<COMPILE_LANGUAGE:CXX>:${OT_FLAGS} -Wall -Wextra -Wshadow -Wno-c++14-compat -fno-exceptions>
+        $<$<COMPILE_LANGUAGE:C>:${OT_CFLAGS} -Wall -Wextra -Wshadow>
+        $<$<COMPILE_LANGUAGE:CXX>:${OT_CFLAGS} -Wall -Wextra -Wshadow -Wno-c++14-compat -fno-exceptions>
     )
 endif()
 
-file(READ .default-version OT_DEFAULT_VERSION)
 execute_process(
     COMMAND bash "-c" "third_party/nlbuild-autotools/repo/scripts/mkversion -b ${OT_DEFAULT_VERSION}"
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
@@ -56,7 +81,7 @@ execute_process(
 )
 message(STATUS "Version: ${OT_VERSION}")
 
-list(APPEND OT_PRIVATE_DEFINES
+target_compile_definitions(ot-config INTERFACE
     "PACKAGE_NAME=\"OPENTHREAD\""
     "PACKAGE_VERSION=\"${OT_VERSION}\""
 )
@@ -64,21 +89,38 @@ list(APPEND OT_PRIVATE_DEFINES
 set(OT_THREAD_VERSION "1.1" CACHE STRING "Thread version chosen by the user at configure time")
 set_property(CACHE OT_THREAD_VERSION PROPERTY STRINGS "1.1" "1.2")
 if(${OT_THREAD_VERSION} EQUAL "1.1")
-    list(APPEND OT_PRIVATE_DEFINES "OPENTHREAD_CONFIG_THREAD_VERSION=OT_THREAD_VERSION_1_1")
+    target_compile_definitions(ot-config INTERFACE "OPENTHREAD_CONFIG_THREAD_VERSION=OT_THREAD_VERSION_1_1")
 elseif(${OT_THREAD_VERSION} EQUAL "1.2")
-    list(APPEND OT_PRIVATE_DEFINES "OPENTHREAD_CONFIG_THREAD_VERSION=OT_THREAD_VERSION_1_2")
+    target_compile_definitions(ot-config INTERFACE "OPENTHREAD_CONFIG_THREAD_VERSION=OT_THREAD_VERSION_1_2")
 else()
     message(FATAL_ERROR "Thread version unknown: ${OT_THREAD_VERSION}")
 endif()
 
+set(OT_PLATFORM "NO" CACHE STRING "Target platform chosen by the user at configure time")
+ot_get_platforms(OT_PLATFORMS)
+set_property(CACHE OT_PLATFORM PROPERTY STRINGS ${OT_PLATFORMS})
+if(NOT OT_PLATFORM IN_LIST OT_PLATFORMS)
+    message(FATAL_ERROR "Platform unknown: ${OT_PLATFORM}")
+endif()
 
-set(OT_PLATFORM "none" CACHE STRING "Target platform chosen by the user at configure time")
-ot_get_platforms(OT_EXAMPLE_PLATFORMS)
-set_property(CACHE OT_PLATFORM PROPERTY STRINGS ${OT_EXAMPLE_PLATFORMS})
-if(NOT OT_PLATFORM IN_LIST OT_EXAMPLE_PLATFORMS)
-    if(NOT OT_PLATFORM STREQUAL "posix-host")
-        message(FATAL_ERROR "Platform unknown: ${OT_PLATFORM}")
+set(OT_LOG_OUTPUT_VALUES
+    "APP"
+    "DEBUG_UART"
+    "NONE"
+    "PLATFORM_DEFINED"
+)
+if(OT_REFERENCE_DEVICE AND NOT OT_PLATFORM STREQUAL "posix")
+    set(OT_LOG_OUTPUT "APP" CACHE STRING "Set log output to application for reference device")
+else()
+    set(OT_LOG_OUTPUT "" CACHE STRING "Where log output goes to")
+endif()
+set_property(CACHE OT_LOG_OUTPUT PROPERTY STRINGS ${OT_LOG_OUTPUT_VALUES})
+if(OT_LOG_OUTPUT)
+    if(NOT OT_LOG_OUTPUT IN_LIST OT_LOG_OUTPUT_VALUES)
+        message(FATAL_ERROR "Log output unknown: ${OT_LOG_OUTPUT}")
     endif()
+    target_compile_definitions(ot-config INTERFACE "OPENTHREAD_CONFIG_LOG_OUTPUT=OPENTHREAD_CONFIG_LOG_OUTPUT_${OT_LOG_OUTPUT}")
+    message(STATUS "Log output: ${OT_LOG_OUTPUT}")
 endif()
 
 # OT_CONFIG allows users to specify the path to OpenThread project core
@@ -93,26 +135,37 @@ list(APPEND OT_PUBLIC_INCLUDES ${PROJECT_BINARY_DIR}/etc/cmake)
 list(APPEND OT_PUBLIC_INCLUDES ${PROJECT_SOURCE_DIR}/etc/cmake)
 list(APPEND OT_PUBLIC_INCLUDES ${PROJECT_SOURCE_DIR}/include)
 
-if(OT_PLATFORM STREQUAL "posix-host")
-    list(APPEND OT_PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/posix/platform)
+if(OT_PLATFORM STREQUAL "posix")
+    target_include_directories(ot-config INTERFACE ${PROJECT_SOURCE_DIR}/src/posix/platform)
     add_subdirectory("${PROJECT_SOURCE_DIR}/src/posix/platform")
-elseif(NOT OT_PLATFORM MATCHES "none")
-    list(APPEND OT_PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/examples/platforms/${OT_PLATFORM})
+elseif(OT_PLATFORM)
+    target_include_directories(ot-config INTERFACE ${PROJECT_SOURCE_DIR}/examples/platforms/${OT_PLATFORM})
     add_subdirectory("${PROJECT_SOURCE_DIR}/examples/platforms/${OT_PLATFORM}")
 endif()
 
 if(OT_CONFIG)
-    list(APPEND OT_PRIVATE_DEFINES "OPENTHREAD_PROJECT_CORE_CONFIG_FILE=\"${OT_CONFIG}\"")
+    target_compile_definitions(ot-config INTERFACE "OPENTHREAD_PROJECT_CORE_CONFIG_FILE=\"${OT_CONFIG}\"")
     message(STATUS "Project core config: \"${OT_CONFIG}\"")
 endif()
 
-list(APPEND OT_PRIVATE_DEFINES ${OT_PLATFORM_DEFINES})
+target_compile_definitions(ot-config INTERFACE ${OT_PLATFORM_DEFINES})
 
-if(OT_PLATFORM STREQUAL "posix-host")
-    add_subdirectory(src/posix)
-elseif(NOT OT_PLATFORM MATCHES "none")
+if(OT_PLATFORM STREQUAL "posix")
+    if(OT_BUILD_EXECUTABLES)
+        add_subdirectory(src/posix)
+    else()
+        add_subdirectory(src/posix EXCLUDE_FROM_ALL)
+    endif()
+elseif(OT_PLATFORM)
     add_subdirectory(examples)
 endif()
 
 add_subdirectory(src)
-add_subdirectory(third_party)
+add_subdirectory(third_party EXCLUDE_FROM_ALL)
+
+if(OT_PLATFORM STREQUAL "simulation")
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+add_custom_target(print-ot-config ALL COMMAND echo -e "$<JOIN:$<TARGET_PROPERTY:ot-config,INTERFACE_COMPILE_DEFINITIONS>,\"\\n\">")

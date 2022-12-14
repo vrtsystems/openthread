@@ -39,7 +39,6 @@
 
 #include "common/debug.hpp"
 #include "common/instance.hpp"
-#include "common/locator-getters.hpp"
 
 using namespace ot;
 
@@ -47,89 +46,88 @@ otError otBorderRouterGetNetData(otInstance *aInstance, bool aStable, uint8_t *a
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    assert(aData != NULL && aDataLength != NULL);
+    OT_ASSERT(aData != nullptr && aDataLength != nullptr);
 
     return instance.Get<NetworkData::Local>().GetNetworkData(aStable, aData, *aDataLength);
 }
 
 otError otBorderRouterAddOnMeshPrefix(otInstance *aInstance, const otBorderRouterConfig *aConfig)
 {
-    uint8_t   flags    = 0;
-    Instance &instance = *static_cast<Instance *>(aInstance);
+    otError                                error    = OT_ERROR_NONE;
+    Instance &                             instance = *static_cast<Instance *>(aInstance);
+    const NetworkData::OnMeshPrefixConfig *config   = static_cast<const NetworkData::OnMeshPrefixConfig *>(aConfig);
 
-    assert(aConfig != NULL);
+    OT_ASSERT(aConfig != nullptr);
+    // Add Prefix validation check:
+    // Thread 1.1 Specification 5.13.2 says
+    // "A valid prefix MUST NOT allow both DHCPv6 and SLAAC for address configuration"
+    VerifyOrExit(!aConfig->mDhcp || !aConfig->mSlaac, error = OT_ERROR_INVALID_ARGS);
 
-    if (aConfig->mPreferred)
+    error = instance.Get<NetworkData::Local>().AddOnMeshPrefix(*config);
+#if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
+    // Only try to configure Domain Prefix after the parameter is vaidated via above `AddOnMeshPrefix()`.
+    if (error == OT_ERROR_NONE && aConfig->mDp)
     {
-        flags |= NetworkData::BorderRouterEntry::kPreferredFlag;
-    }
+        // Restore local server data
+        IgnoreError(instance.Get<NetworkData::Local>().RemoveOnMeshPrefix(config->GetPrefix()));
 
-    if (aConfig->mSlaac)
-    {
-        flags |= NetworkData::BorderRouterEntry::kSlaacFlag;
+        instance.Get<BackboneRouter::Local>().SetDomainPrefix(*config);
     }
+#endif
 
-    if (aConfig->mDhcp)
-    {
-        flags |= NetworkData::BorderRouterEntry::kDhcpFlag;
-    }
-
-    if (aConfig->mConfigure)
-    {
-        flags |= NetworkData::BorderRouterEntry::kConfigureFlag;
-    }
-
-    if (aConfig->mDefaultRoute)
-    {
-        flags |= NetworkData::BorderRouterEntry::kDefaultRouteFlag;
-    }
-
-    if (aConfig->mOnMesh)
-    {
-        flags |= NetworkData::BorderRouterEntry::kOnMeshFlag;
-    }
-
-    return instance.Get<NetworkData::Local>().AddOnMeshPrefix(
-        aConfig->mPrefix.mPrefix.mFields.m8, aConfig->mPrefix.mLength, aConfig->mPreference, flags, aConfig->mStable);
+exit:
+    return error;
 }
 
 otError otBorderRouterRemoveOnMeshPrefix(otInstance *aInstance, const otIp6Prefix *aPrefix)
 {
-    Instance &instance = *static_cast<Instance *>(aInstance);
+    otError            error    = OT_ERROR_NONE;
+    Instance &         instance = *static_cast<Instance *>(aInstance);
+    const Ip6::Prefix *prefix   = static_cast<const Ip6::Prefix *>(aPrefix);
 
-    assert(aPrefix != NULL);
+    OT_ASSERT(aPrefix != nullptr);
 
-    return instance.Get<NetworkData::Local>().RemoveOnMeshPrefix(aPrefix->mPrefix.mFields.m8, aPrefix->mLength);
+#if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
+    error = instance.Get<BackboneRouter::Local>().RemoveDomainPrefix(*prefix);
+
+    if (error == OT_ERROR_NOT_FOUND)
+#endif
+    {
+        error = instance.Get<NetworkData::Local>().RemoveOnMeshPrefix(*prefix);
+    }
+
+    return error;
 }
 
 otError otBorderRouterGetNextOnMeshPrefix(otInstance *           aInstance,
                                           otNetworkDataIterator *aIterator,
                                           otBorderRouterConfig * aConfig)
 {
-    Instance &instance = *static_cast<Instance *>(aInstance);
+    Instance &                       instance = *static_cast<Instance *>(aInstance);
+    NetworkData::OnMeshPrefixConfig *config   = static_cast<NetworkData::OnMeshPrefixConfig *>(aConfig);
 
-    assert(aIterator != NULL && aConfig != NULL);
+    OT_ASSERT(aIterator != nullptr && aConfig != nullptr);
 
-    return instance.Get<NetworkData::Local>().GetNextOnMeshPrefix(*aIterator, *aConfig);
+    return instance.Get<NetworkData::Local>().GetNextOnMeshPrefix(*aIterator, *config);
 }
 
 otError otBorderRouterAddRoute(otInstance *aInstance, const otExternalRouteConfig *aConfig)
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    assert(aConfig != NULL);
+    OT_ASSERT(aConfig != nullptr);
 
     return instance.Get<NetworkData::Local>().AddHasRoutePrefix(
-        aConfig->mPrefix.mPrefix.mFields.m8, aConfig->mPrefix.mLength, aConfig->mPreference, aConfig->mStable);
+        *static_cast<const NetworkData::ExternalRouteConfig *>(aConfig));
 }
 
 otError otBorderRouterRemoveRoute(otInstance *aInstance, const otIp6Prefix *aPrefix)
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    assert(aPrefix != NULL);
+    OT_ASSERT(aPrefix != nullptr);
 
-    return instance.Get<NetworkData::Local>().RemoveHasRoutePrefix(aPrefix->mPrefix.mFields.m8, aPrefix->mLength);
+    return instance.Get<NetworkData::Local>().RemoveHasRoutePrefix(*static_cast<const Ip6::Prefix *>(aPrefix));
 }
 
 otError otBorderRouterGetNextRoute(otInstance *           aInstance,
@@ -138,16 +136,19 @@ otError otBorderRouterGetNextRoute(otInstance *           aInstance,
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    assert(aIterator != NULL && aConfig != NULL);
+    OT_ASSERT(aIterator != nullptr && aConfig != nullptr);
 
-    return instance.Get<NetworkData::Local>().GetNextExternalRoute(*aIterator, *aConfig);
+    return instance.Get<NetworkData::Local>().GetNextExternalRoute(
+        *aIterator, *static_cast<NetworkData::ExternalRouteConfig *>(aConfig));
 }
 
 otError otBorderRouterRegister(otInstance *aInstance)
 {
     Instance &instance = *static_cast<Instance *>(aInstance);
 
-    return instance.Get<NetworkData::Local>().SendServerDataNotification();
+    instance.Get<NetworkData::Notifier>().HandleServerDataUpdated();
+
+    return OT_ERROR_NONE;
 }
 
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE

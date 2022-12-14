@@ -1,5 +1,5 @@
 #
-#  Copyright (c) 2019, The OpenThread Authors.
+#  Copyright (c) 2020, The OpenThread Authors.
 #  All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
@@ -26,73 +26,81 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 #
 
-add_library(mbedcrypto)
-
-set(OT_MBEDTLS_DEFAULT_CONFIG_FILE "\"mbedtls-config.h\"")
+set(OT_MBEDTLS_DEFAULT_CONFIG_FILE \"${CMAKE_CURRENT_BINARY_DIR}/openthread-mbedtls-config.h\")
 
 set(OT_MBEDTLS_CONFIG_FILE "" CACHE STRING "The mbedTLS config file")
+
+set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedtls test" FORCE)
+set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbetls program" FORCE)
+
+find_program(UNIFDEFALL_EXE unifdefall)
+find_program(UNIFDEF_EXE unifdef)
+if(UNIFDEF_EXE)
+    execute_process(COMMAND ${UNIFDEF_EXE} -V ERROR_VARIABLE VERSION_OUTPUT)
+    string(REGEX MATCH "Version: unifdef-([0-9]+\\.[0-9]+)" VERSION_MATCH "${VERSION_OUTPUT}")
+    set(UNIFDEF_VERSION ${CMAKE_MATCH_1})
+endif()
+find_program(SED_EXE sed)
+
+add_subdirectory(repo)
+
+if(UNIFDEFALL_EXE AND SED_EXE AND UNIFDEF_VERSION VERSION_GREATER_EQUAL 2.10)
+    add_custom_target(openthread-mbedtls-config
+        ${UNIFDEFALL_EXE}
+            "'-D$<JOIN:$<TARGET_PROPERTY:ot-config,INTERFACE_COMPILE_DEFINITIONS>,';'-D>'"
+            "-I$<JOIN:$<TARGET_PROPERTY:ot-config,INTERFACE_INCLUDE_DIRECTORIES>,;-I>"
+            "-I$<JOIN:${OT_PUBLIC_INCLUDES},;-I>"
+            "-I${CMAKE_CURRENT_SOURCE_DIR}/repo/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/mbedtls-config.h" |
+            ${SED_EXE} '/openthread-core-config\.h/d' >
+            openthread-mbedtls-config.h
+        COMMAND_EXPAND_LISTS
+    )
+    add_dependencies(mbedtls openthread-mbedtls-config)
+    add_dependencies(mbedx509 openthread-mbedtls-config)
+    add_dependencies(mbedcrypto openthread-mbedtls-config)
+else()
+    configure_file(mbedtls-config.h openthread-mbedtls-config.h COPYONLY)
+endif()
+
+target_compile_definitions(mbedtls
+    PUBLIC
+        "MBEDTLS_CONFIG_FILE=$<IF:$<BOOL:${OT_MBEDTLS_CONFIG_FILE}>,${OT_MBEDTLS_CONFIG_FILE},${OT_MBEDTLS_DEFAULT_CONFIG_FILE}>"
+    PRIVATE
+        $<TARGET_PROPERTY:ot-config,INTERFACE_COMPILE_DEFINITIONS>
+)
+target_include_directories(mbedtls
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/repo/include
+    PRIVATE
+        ${OT_PUBLIC_INCLUDES}
+        $<TARGET_PROPERTY:ot-config,INTERFACE_INCLUDE_DIRECTORIES>
+)
+
+target_compile_definitions(mbedx509
+    PUBLIC
+        "MBEDTLS_CONFIG_FILE=$<IF:$<BOOL:${OT_MBEDTLS_CONFIG_FILE}>,${OT_MBEDTLS_CONFIG_FILE},${OT_MBEDTLS_DEFAULT_CONFIG_FILE}>"
+    PRIVATE
+        $<TARGET_PROPERTY:ot-config,INTERFACE_COMPILE_DEFINITIONS>
+)
+target_include_directories(mbedx509
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/repo/include
+    PRIVATE
+        ${OT_PUBLIC_INCLUDES}
+        $<TARGET_PROPERTY:ot-config,INTERFACE_INCLUDE_DIRECTORIES>
+)
 
 target_compile_definitions(mbedcrypto
     PUBLIC
         "MBEDTLS_CONFIG_FILE=$<IF:$<BOOL:${OT_MBEDTLS_CONFIG_FILE}>,${OT_MBEDTLS_CONFIG_FILE},${OT_MBEDTLS_DEFAULT_CONFIG_FILE}>"
     PRIVATE
-        ${OT_PRIVATE_DEFINES}
+        $<TARGET_PROPERTY:ot-config,INTERFACE_COMPILE_DEFINITIONS>
 )
-
 target_include_directories(mbedcrypto
     PUBLIC
-        ${PROJECT_SOURCE_DIR}/third_party/mbedtls/repo/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/repo/include
     PRIVATE
         ${OT_PUBLIC_INCLUDES}
-        ${OT_PRIVATE_INCLUDES}
-)
-
-if (NOT OT_MBEDTLS_CONFIG_FILE)
-    target_include_directories(mbedcrypto
-        PUBLIC
-            ${PROJECT_SOURCE_DIR}/src/core
-            ${PROJECT_SOURCE_DIR}/third_party/mbedtls
-    )
-endif()
-
-target_sources(mbedcrypto PRIVATE
-    repo/library/aes.c
-    repo/library/asn1parse.c
-    repo/library/asn1write.c
-    repo/library/base64.c
-    repo/library/bignum.c
-    repo/library/ccm.c
-    repo/library/cipher.c
-    repo/library/cipher_wrap.c
-    repo/library/cmac.c
-    repo/library/ctr_drbg.c
-    repo/library/debug.c
-    repo/library/ecdh.c
-    repo/library/ecdsa.c
-    repo/library/ecjpake.c
-    repo/library/ecp.c
-    repo/library/ecp_curves.c
-    repo/library/entropy.c
-    repo/library/entropy_poll.c
-    repo/library/md.c
-    repo/library/md_wrap.c
-    repo/library/memory_buffer_alloc.c
-    repo/library/oid.c
-    repo/library/pem.c
-    repo/library/pk.c
-    repo/library/pk_wrap.c
-    repo/library/pkparse.c
-    repo/library/platform.c
-    repo/library/platform_util.c
-    repo/library/sha256.c
-    repo/library/ssl_cookie.c
-    repo/library/ssl_ciphersuites.c
-    repo/library/ssl_cli.c
-    repo/library/ssl_srv.c
-    repo/library/ssl_ticket.c
-    repo/library/ssl_tls.c
-    repo/library/threading.c
-    repo/library/timing.c
-    repo/library/x509.c
-    repo/library/x509_crt.c
+        $<TARGET_PROPERTY:ot-config,INTERFACE_INCLUDE_DIRECTORIES>
 )

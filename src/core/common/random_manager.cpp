@@ -59,19 +59,21 @@ RandomManager::RandomManager(void)
     uint32_t seed;
     otError  error;
 
-    assert(sInitCount < 0xffff);
+    OT_UNUSED_VARIABLE(error);
 
-    VerifyOrExit(sInitCount == 0);
+    OT_ASSERT(sInitCount < 0xffff);
+
+    VerifyOrExit(sInitCount == 0, OT_NOOP);
 
 #if !OPENTHREAD_RADIO
     sEntropy.Init();
     sCtrDrbg.Init();
 
     error = Random::Crypto::FillBuffer(reinterpret_cast<uint8_t *>(&seed), sizeof(seed));
-    assert(error == OT_ERROR_NONE);
+    OT_ASSERT(error == OT_ERROR_NONE);
 #else
     error = otPlatEntropyGet(reinterpret_cast<uint8_t *>(&seed), sizeof(seed));
-    assert(error == OT_ERROR_NONE);
+    OT_ASSERT(error == OT_ERROR_NONE);
 #endif
 
     sPrng.Init(seed);
@@ -82,10 +84,10 @@ exit:
 
 RandomManager::~RandomManager(void)
 {
-    assert(sInitCount > 0);
+    OT_ASSERT(sInitCount > 0);
 
     sInitCount--;
-    VerifyOrExit(sInitCount == 0);
+    VerifyOrExit(sInitCount == 0, OT_NOOP);
 
 #if !OPENTHREAD_RADIO
     sCtrDrbg.Deinit();
@@ -98,7 +100,7 @@ exit:
 
 uint32_t RandomManager::NonCryptoGetUint32(void)
 {
-    assert(sInitCount > 0);
+    OT_ASSERT(sInitCount > 0);
 
     return sPrng.GetNext();
 }
@@ -151,7 +153,7 @@ void RandomManager::Entropy::Init(void)
     mbedtls_entropy_init(&mEntropyContext);
 
 #ifndef OT_MBEDTLS_STRONG_DEFAULT_ENTROPY_PRESENT
-    mbedtls_entropy_add_source(&mEntropyContext, &RandomManager::Entropy::HandleMbedtlsEntropyPoll, NULL,
+    mbedtls_entropy_add_source(&mEntropyContext, &RandomManager::Entropy::HandleMbedtlsEntropyPoll, nullptr,
                                MBEDTLS_ENTROPY_MIN_HARDWARE, MBEDTLS_ENTROPY_SOURCE_STRONG);
 #endif // OT_MBEDTLS_STRONG_DEFAULT_ENTROPY_PRESENT
 }
@@ -173,7 +175,7 @@ int RandomManager::Entropy::HandleMbedtlsEntropyPoll(void *         aData,
     SuccessOrExit(otPlatEntropyGet(reinterpret_cast<uint8_t *>(aOutput), static_cast<uint16_t>(aInLen)));
     rval = 0;
 
-    VerifyOrExit(aOutLen != NULL);
+    VerifyOrExit(aOutLen != nullptr, OT_NOOP);
     *aOutLen = aInLen;
 
 exit:
@@ -189,7 +191,7 @@ exit:
 void RandomManager::CryptoCtrDrbg::Init(void)
 {
     mbedtls_ctr_drbg_init(&mCtrDrbg);
-    mbedtls_ctr_drbg_seed(&mCtrDrbg, mbedtls_entropy_func, RandomManager::GetMbedTlsEntropyContext(), NULL, 0);
+    mbedtls_ctr_drbg_seed(&mCtrDrbg, mbedtls_entropy_func, RandomManager::GetMbedTlsEntropyContext(), nullptr, 0);
 }
 
 void RandomManager::CryptoCtrDrbg::Deinit(void)

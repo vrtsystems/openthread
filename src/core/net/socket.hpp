@@ -36,9 +36,13 @@
 
 #include "openthread-core-config.h"
 
+#include "common/clearable.hpp"
 #include "net/ip6_address.hpp"
 
 namespace ot {
+
+class ThreadLinkInfo;
+
 namespace Ip6 {
 
 /**
@@ -52,14 +56,14 @@ namespace Ip6 {
  * This class implements message information for an IPv6 message.
  *
  */
-class MessageInfo : public otMessageInfo
+class MessageInfo : public otMessageInfo, public Clearable<MessageInfo>
 {
 public:
     /**
      * This constructor initializes the object.
      *
      */
-    MessageInfo(void) { memset(this, 0, sizeof(*this)); }
+    MessageInfo(void) { Clear(); }
 
     /**
      * This method returns a reference to the local socket address.
@@ -158,20 +162,28 @@ public:
     void SetHopLimit(uint8_t aHopLimit) { mHopLimit = aHopLimit; }
 
     /**
-     * This method returns a pointer to the Link Info.
+     * This method returns a pointer to the link-specific information object.
      *
-     * @returns A pointer to the Link Info.
+     * @returns A pointer to the link-specific information object.
      *
      */
     const void *GetLinkInfo(void) const { return mLinkInfo; }
 
     /**
-     * This method sets the pointer to the Link Info.
+     * This method sets the pointer to the link-specific information object.
      *
-     * @param[in]  aLinkInfo  A pointer to the Link Info.
+     * @param[in]  aLinkInfo  A pointer to the link-specific information object.
      *
      */
     void SetLinkInfo(const void *aLinkInfo) { mLinkInfo = aLinkInfo; }
+
+    /**
+     * This method returns a pointer to the link-specific information as a `ThreadLinkInfo`.
+     *
+     * @returns A pointer to to the link-specific information object as `ThreadLinkInfo`.
+     *
+     */
+    const ThreadLinkInfo *GetThreadLinkInfo(void) const { return reinterpret_cast<const ThreadLinkInfo *>(mLinkInfo); }
 
     /**
      * This method indicates whether peer is via the host interface.
@@ -204,20 +216,39 @@ public:
  * This class implements a socket address.
  *
  */
-class SockAddr : public otSockAddr
+class SockAddr : public otSockAddr, public Clearable<SockAddr>
 {
 public:
     /**
-     * This constructor initializes the object.
+     * This constructor initializes the socket address (all fields are set to zero).
      *
      */
     SockAddr(void) { Clear(); }
 
     /**
-     * This method clears the object (sets all fields to zero).
+     * This constructor initializes the socket address with a given port number.
+     *
+     * @param[in] aPort   A port number.
      *
      */
-    void Clear(void) { memset(this, 0, sizeof(*this)); }
+    explicit SockAddr(uint16_t aPort)
+    {
+        mPort = aPort;
+        GetAddress().Clear();
+    }
+
+    /**
+     * This constructor initializes the socket address with a given address and port number.
+     *
+     * @param[in] aAddress  An IPv6 address.
+     * @param[in] aPort     A port number.
+     *
+     */
+    SockAddr(const Address &aAddress, uint16_t aPort)
+    {
+        mAddress = aAddress;
+        mPort    = aPort;
+    }
 
     /**
      * This method returns a reference to the IPv6 address.

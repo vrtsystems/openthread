@@ -54,7 +54,7 @@ public:
      * @param[in]  aType      The type of the dataset, active or pending.
      *
      */
-    DatasetLocal(Instance &aInstance, Tlv::Type aType);
+    DatasetLocal(Instance &aInstance, Dataset::Type aType);
 
     /**
      * This method indicates whether this is an Active or Pending Dataset.
@@ -63,7 +63,7 @@ public:
      * @retval Tlv::kPendingTimetamp when this is a Pending Dataset.
      *
      */
-    Tlv::Type GetType(void) const { return mType; }
+    Dataset::Type GetType(void) const { return mType; }
 
     /**
      * This method clears the Dataset.
@@ -125,6 +125,17 @@ public:
     otError Read(otOperationalDataset &aDataset) const;
 
     /**
+     * This method retrieves the dataset from non-volatile memory.
+     *
+     * @param[out]  aDataset  Where to place the dataset.
+     *
+     * @retval OT_ERROR_NONE       Successfully retrieved the dataset.
+     * @retval OT_ERROR_NOT_FOUND  There is no corresponding dataset stored in non-volatile memory.
+     *
+     */
+    otError Read(otOperationalDatasetTlvs &aDataset) const;
+
+    /**
      * This method returns the local time this dataset was last updated or restored.
      *
      * @returns The local time this dataset was last updated or restored.
@@ -135,7 +146,8 @@ public:
     /**
      * This method stores the dataset into non-volatile memory.
      *
-     * @retval OT_ERROR_NONE  Successfully stored the dataset.
+     * @retval OT_ERROR_NONE              Successfully saved the dataset.
+     * @retval OT_ERROR_NOT_IMPLEMENTED   The platform does not implement settings functionality.
      *
      */
     otError Save(const otOperationalDataset &aDataset);
@@ -143,7 +155,17 @@ public:
     /**
      * This method stores the dataset into non-volatile memory.
      *
-     * @retval OT_ERROR_NONE  Successfully stored the dataset.
+     * @retval OT_ERROR_NONE              Successfully saved the dataset.
+     * @retval OT_ERROR_NOT_IMPLEMENTED   The platform does not implement settings functionality.
+     *
+     */
+    otError Save(const otOperationalDatasetTlvs &aDataset);
+
+    /**
+     * This method stores the dataset into non-volatile memory.
+     *
+     * @retval OT_ERROR_NONE              Successfully saved the dataset.
+     * @retval OT_ERROR_NOT_IMPLEMENTED   The platform does not implement settings functionality.
      *
      */
     otError Save(const Dataset &aDataset);
@@ -161,14 +183,14 @@ public:
     int Compare(const Timestamp *aCompare);
 
 private:
-    bool IsActive(void) const { return (mType == Tlv::kActiveTimestamp); }
+    bool IsActive(void) const { return (mType == Dataset::kActive); }
     void SetTimestamp(const Dataset &aDataset);
 
-    Timestamp mTimestamp;            ///< Active or Pending Timestamp
-    TimeMilli mUpdateTime;           ///< Local time last updated
-    Tlv::Type mType;                 ///< Active or Pending
-    bool      mTimestampPresent : 1; ///< Whether a timestamp is present
-    bool      mSaved : 1;            ///< Whether a dataset is saved in non-volatile
+    Timestamp     mTimestamp;            ///< Active or Pending Timestamp
+    TimeMilli     mUpdateTime;           ///< Local time last updated
+    Dataset::Type mType;                 ///< Active or Pending
+    bool          mTimestampPresent : 1; ///< Whether a timestamp is present
+    bool          mSaved : 1;            ///< Whether a dataset is saved in non-volatile
 };
 
 } // namespace MeshCoP

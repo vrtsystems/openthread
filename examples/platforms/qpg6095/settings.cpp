@@ -5,7 +5,7 @@
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
  *  1. Redistributions of source code must retain the above copyright
- *     noqtice, this list of conditions and the following disclaimer.
+ *     notice, this list of conditions and the following disclaimer.
  *  2. Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
@@ -72,7 +72,7 @@ otError otPlatSettingsGet(otInstance *aInstance, uint16_t aKey, int aIndex, uint
 
     if (error == OT_ERROR_NOT_FOUND)
     {
-        if (aValue != NULL)
+        if (aValue != nullptr)
         {
             *aValueLength = 0;
         }
@@ -110,7 +110,7 @@ otError otPlatSettingsDelete(otInstance *aInstance, uint16_t aKey, int aIndex)
     otError error = OT_ERROR_NOT_FOUND;
     OT_UNUSED_VARIABLE(aInstance);
 
-    if (otPlatSettingsGet(aInstance, aKey, 0, NULL, NULL) == OT_ERROR_NONE)
+    if (otPlatSettingsGet(aInstance, aKey, 0, nullptr, nullptr) == OT_ERROR_NONE)
     {
         qorvoSettingsDelete(aKey, aIndex);
         error = OT_ERROR_NONE;

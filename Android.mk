@@ -32,15 +32,19 @@ OPENTHREAD_DEFAULT_VERSION := $(shell cat $(LOCAL_PATH)/.default-version)
 OPENTHREAD_SOURCE_VERSION := $(shell git -C $(LOCAL_PATH) describe --always --match "[0-9].*" 2> /dev/null)
 OPENTHREAD_PROJECT_CFLAGS ?= -DOPENTHREAD_PROJECT_CORE_CONFIG_FILE=\"openthread-core-posix-config.h\"
 
-OPENTHREAD_COMMON_FLAGS                                          := \
-    -DMBEDTLS_CONFIG_FILE=\"mbedtls-config.h\"                      \
+OPENTHREAD_PUBLIC_CFLAGS                                         := \
+    -DOPENTHREAD_CONFIG_COMMISSIONER_ENABLE=1                       \
     -DOPENTHREAD_CONFIG_FILE=\<openthread-config-android.h\>        \
     -DOPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE=1                  \
     -DOPENTHREAD_CONFIG_MAC_FILTER_ENABLE=1                         \
-    -DOPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE=1               \
+    -DOPENTHREAD_POSIX_CONFIG_RCP_PTY_ENABLE=1                      \
     -DOPENTHREAD_FTD=1                                              \
     -DOPENTHREAD_POSIX=1                                            \
     -DOPENTHREAD_SPINEL_CONFIG_OPENTHREAD_MESSAGE_ENABLE=1          \
+    $(NULL)
+
+OPENTHREAD_PRIVATE_CFLAGS                                        := \
+    -DMBEDTLS_CONFIG_FILE=\"mbedtls-config.h\"                      \
     -DPACKAGE=\"openthread\"                                        \
     -DPACKAGE_BUGREPORT=\"openthread-devel@googlegroups.com\"       \
     -DPACKAGE_NAME=\"OPENTHREAD\"                                   \
@@ -54,32 +58,32 @@ OPENTHREAD_COMMON_FLAGS                                          := \
 
 # Enable required features for on-device tests.
 ifeq ($(TARGET_BUILD_VARIANT),eng)
-OPENTHREAD_COMMON_FLAGS                                          += \
+OPENTHREAD_PUBLIC_CFLAGS                                         += \
     -DOPENTHREAD_CONFIG_DIAG_ENABLE=1                               \
     $(NULL)
 endif
 
 ifeq ($(USE_OTBR_DAEMON), 1)
-OPENTHREAD_COMMON_FLAGS                                          += \
+OPENTHREAD_PUBLIC_CFLAGS                                         += \
     -DOPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE=1                     \
     -DOPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE=1                       \
-    -DOPENTHREAD_ENABLE_POSIX_APP_DAEMON                            \
+    -DOPENTHREAD_CONFIG_UNSECURE_TRAFFIC_MANAGED_BY_STACK_ENABLE=1  \
+    -DOPENTHREAD_POSIX_CONFIG_DAEMON_ENABLE=1                       \
     $(NULL)
 else
-OPENTHREAD_COMMON_FLAGS += -DOPENTHREAD_CONFIG_UDP_FORWARD_ENABLE=1
+OPENTHREAD_PUBLIC_CFLAGS += -DOPENTHREAD_CONFIG_UDP_FORWARD_ENABLE=1
 endif
 
 ifeq ($(USE_OT_RCP_BUS), spi)
-OPENTHREAD_COMMON_FLAGS += -DOPENTHREAD_POSIX_RCP_SPI_ENABLE=1
+OPENTHREAD_PUBLIC_CFLAGS += -DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_SPI
 else
-OPENTHREAD_COMMON_FLAGS += -DOPENTHREAD_POSIX_RCP_UART_ENABLE=1
+OPENTHREAD_PUBLIC_CFLAGS += -DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_UART
 endif
 
 # Enable all optional features for CI tests.
 ifeq ($(TARGET_PRODUCT),generic)
-OPENTHREAD_COMMON_FLAGS                                          += \
+OPENTHREAD_PUBLIC_CFLAGS                                         += \
     -DOPENTHREAD_CONFIG_COAP_API_ENABLE=1                           \
-    -DOPENTHREAD_CONFIG_COMMISSIONER_ENABLE=1                       \
     -DOPENTHREAD_CONFIG_DHCP6_CLIENT_ENABLE=1                       \
     -DOPENTHREAD_CONFIG_DHCP6_SERVER_ENABLE=1                       \
     -DOPENTHREAD_CONFIG_DNS_CLIENT_ENABLE=1                         \
@@ -116,15 +120,30 @@ LOCAL_C_INCLUDES                                         := \
     $(NULL)
 
 LOCAL_CFLAGS                                                                := \
-    $(OPENTHREAD_COMMON_FLAGS)                                                 \
+    $(OPENTHREAD_PUBLIC_CFLAGS)                                                \
+    $(OPENTHREAD_PRIVATE_CFLAGS)                                               \
     $(OPENTHREAD_PROJECT_CFLAGS)                                               \
     $(NULL)
 
+LOCAL_EXPORT_CFLAGS                                        := \
+    $(OPENTHREAD_PUBLIC_CFLAGS)                               \
+    $(OPENTHREAD_PROJECT_CFLAGS)                              \
+    $(NULL)
+
+LOCAL_EXPORT_C_INCLUDE_DIRS     := \
+    $(OPENTHREAD_PROJECT_INCLUDES) \
+    $(LOCAL_PATH)/include          \
+    $(LOCAL_PATH)/src              \
+    $(NULL)
+
 LOCAL_CPPFLAGS                                                              := \
-    -Wno-non-virtual-dtor                                                      \
+    -std=c++11                                                                 \
+    -pedantic-errors                                                           \
     $(NULL)
 
 LOCAL_SRC_FILES                                          := \
+    src/core/api/backbone_router_api.cpp                    \
+    src/core/api/backbone_router_ftd_api.cpp                \
     src/core/api/border_router_api.cpp                      \
     src/core/api/channel_manager_api.cpp                    \
     src/core/api/channel_monitor_api.cpp                    \
@@ -146,6 +165,7 @@ LOCAL_SRC_FILES                                          := \
     src/core/api/logging_api.cpp                            \
     src/core/api/message_api.cpp                            \
     src/core/api/netdata_api.cpp                            \
+    src/core/api/netdiag_api.cpp                            \
     src/core/api/random_crypto_api.cpp                      \
     src/core/api/random_noncrypto_api.cpp                   \
     src/core/api/server_api.cpp                             \
@@ -153,6 +173,9 @@ LOCAL_SRC_FILES                                          := \
     src/core/api/thread_api.cpp                             \
     src/core/api/thread_ftd_api.cpp                         \
     src/core/api/udp_api.cpp                                \
+    src/core/backbone_router/bbr_leader.cpp                 \
+    src/core/backbone_router/bbr_local.cpp                  \
+    src/core/backbone_router/bbr_manager.cpp                \
     src/core/coap/coap.cpp                                  \
     src/core/coap/coap_message.cpp                          \
     src/core/coap/coap_secure.cpp                           \
@@ -195,8 +218,8 @@ LOCAL_SRC_FILES                                          := \
     src/core/meshcop/energy_scan_client.cpp                 \
     src/core/meshcop/joiner.cpp                             \
     src/core/meshcop/joiner_router.cpp                      \
-    src/core/meshcop/leader.cpp                             \
     src/core/meshcop/meshcop.cpp                            \
+    src/core/meshcop/meshcop_leader.cpp                     \
     src/core/meshcop/meshcop_tlvs.cpp                       \
     src/core/meshcop/panid_query_client.cpp                 \
     src/core/meshcop/timestamp.cpp                          \
@@ -211,13 +234,15 @@ LOCAL_SRC_FILES                                          := \
     src/core/net/ip6_mpl.cpp                                \
     src/core/net/netif.cpp                                  \
     src/core/net/udp6.cpp                                   \
+    src/core/radio/radio.cpp                                \
     src/core/radio/radio_callbacks.cpp                      \
     src/core/radio/radio_platform.cpp                       \
     src/core/thread/address_resolver.cpp                    \
     src/core/thread/announce_begin_server.cpp               \
     src/core/thread/announce_sender.cpp                     \
     src/core/thread/child_table.cpp                         \
-    src/core/thread/device_mode.cpp                         \
+    src/core/thread/discover_scanner.cpp                    \
+    src/core/thread/dua_manager.cpp                         \
     src/core/thread/energy_scan_server.cpp                  \
     src/core/thread/indirect_sender.cpp                     \
     src/core/thread/key_manager.cpp                         \
@@ -228,10 +253,14 @@ LOCAL_SRC_FILES                                          := \
     src/core/thread/mesh_forwarder_mtd.cpp                  \
     src/core/thread/mle.cpp                                 \
     src/core/thread/mle_router.cpp                          \
+    src/core/thread/mle_types.cpp                           \
+    src/core/thread/mlr_manager.cpp                         \
+    src/core/thread/neighbor_table.cpp                      \
     src/core/thread/network_data.cpp                        \
     src/core/thread/network_data_leader.cpp                 \
     src/core/thread/network_data_leader_ftd.cpp             \
     src/core/thread/network_data_local.cpp                  \
+    src/core/thread/network_data_notifier.cpp               \
     src/core/thread/network_diagnostic.cpp                  \
     src/core/thread/panid_query_server.cpp                  \
     src/core/thread/router_table.cpp                        \
@@ -246,16 +275,19 @@ LOCAL_SRC_FILES                                          := \
     src/core/utils/parse_cmdline.cpp                        \
     src/core/utils/slaac_address.cpp                        \
     src/lib/hdlc/hdlc.cpp                                   \
+    src/lib/platform/exit_code.c                            \
     src/lib/spinel/spinel.c                                 \
     src/lib/spinel/spinel_decoder.cpp                       \
     src/lib/spinel/spinel_encoder.cpp                       \
+    src/lib/url/url.cpp                                     \
     src/posix/platform/alarm.cpp                            \
     src/posix/platform/entropy.cpp                          \
     src/posix/platform/hdlc_interface.cpp                   \
     src/posix/platform/logging.cpp                          \
     src/posix/platform/misc.cpp                             \
     src/posix/platform/netif.cpp                            \
-    src/posix/platform/radio_spinel.cpp                     \
+    src/posix/platform/radio.cpp                            \
+    src/posix/platform/radio_url.cpp                        \
     src/posix/platform/settings.cpp                         \
     src/posix/platform/spi_interface.cpp                    \
     src/posix/platform/system.cpp                           \
@@ -309,14 +341,15 @@ LOCAL_C_INCLUDES                                         := \
     $(NULL)
 
 LOCAL_CFLAGS                                                                := \
-    $(OPENTHREAD_COMMON_FLAGS)                                                 \
+    $(OPENTHREAD_PUBLIC_CFLAGS)                                                \
+    $(OPENTHREAD_PRIVATE_CFLAGS)                                               \
     -DOPENTHREAD_CONFIG_UART_CLI_RAW=1                                         \
-    -DOPENTHREAD_POSIX_APP_TYPE=2                                              \
     $(OPENTHREAD_PROJECT_CFLAGS)                                               \
     $(NULL)
 
 LOCAL_CPPFLAGS                                                              := \
-    -Wno-non-virtual-dtor                                                      \
+    -std=c++11                                                                 \
+    -pedantic-errors                                                           \
     $(NULL)
 
 LOCAL_SRC_FILES                            := \
@@ -327,7 +360,6 @@ LOCAL_SRC_FILES                            := \
     src/cli/cli_console.cpp                   \
     src/cli/cli_dataset.cpp                   \
     src/cli/cli_joiner.cpp                    \
-    src/cli/cli_server.cpp                    \
     src/cli/cli_uart.cpp                      \
     src/cli/cli_udp.cpp                       \
     $(NULL)
@@ -352,17 +384,19 @@ LOCAL_C_INCLUDES                                         := \
     $(NULL)
 
 LOCAL_CFLAGS                                                                := \
-    $(OPENTHREAD_COMMON_FLAGS)                                                 \
-    -DOPENTHREAD_CONFIG_UART_CLI_RAW=1                                         \
-    -DOPENTHREAD_POSIX_APP_TYPE=2                                              \
+    $(OPENTHREAD_PUBLIC_CFLAGS)                                                \
+    $(OPENTHREAD_PRIVATE_CFLAGS)                                               \
+    -DOPENTHREAD_POSIX_APP_TYPE=OT_POSIX_APP_TYPE_CLI                          \
     $(OPENTHREAD_PROJECT_CFLAGS)                                               \
     $(NULL)
 
 LOCAL_CPPFLAGS                                                              := \
-    -Wno-non-virtual-dtor                                                      \
+    -std=c++11                                                                 \
+    -pedantic-errors                                                           \
     $(NULL)
 
 LOCAL_LDLIBS                               := \
+    -lrt                                      \
     -lutil
 
 LOCAL_SRC_FILES                            := \
@@ -390,13 +424,14 @@ LOCAL_C_INCLUDES                                         := \
     $(NULL)
 
 LOCAL_CFLAGS                                                                := \
-    $(OPENTHREAD_COMMON_FLAGS)                                                 \
-    -DOPENTHREAD_POSIX_APP_TYPE=1                                              \
+    $(OPENTHREAD_PUBLIC_CFLAGS)                                                \
+    $(OPENTHREAD_PRIVATE_CFLAGS)                                               \
     $(OPENTHREAD_PROJECT_CFLAGS)                                               \
     $(NULL)
 
 LOCAL_CPPFLAGS                                                              := \
-    -Wno-non-virtual-dtor                                                      \
+    -std=c++11                                                                 \
+    -pedantic-errors                                                           \
     $(NULL)
 
 LOCAL_SRC_FILES                            := \
@@ -429,13 +464,15 @@ LOCAL_C_INCLUDES                                         := \
     $(NULL)
 
 LOCAL_CFLAGS                                                                := \
-    $(OPENTHREAD_COMMON_FLAGS)                                                 \
-    -DOPENTHREAD_POSIX_APP_TYPE=1                                              \
+    $(OPENTHREAD_PUBLIC_CFLAGS)                                                \
+    $(OPENTHREAD_PRIVATE_CFLAGS)                                               \
+    -DOPENTHREAD_POSIX_APP_TYPE=OT_POSIX_APP_TYPE_NCP                          \
     $(OPENTHREAD_PROJECT_CFLAGS)                                               \
     $(NULL)
 
 LOCAL_CPPFLAGS                                                              := \
-    -Wno-non-virtual-dtor                                                      \
+    -std=c++11                                                                 \
+    -pedantic-errors                                                           \
     $(NULL)
 
 LOCAL_SRC_FILES                            := \
@@ -443,6 +480,7 @@ LOCAL_SRC_FILES                            := \
     $(NULL)
 
 LOCAL_LDLIBS                               := \
+    -lrt                                      \
     -lutil
 
 LOCAL_STATIC_LIBRARIES = libopenthread-ncp ot-core
@@ -455,6 +493,11 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := ot-ctl
 LOCAL_MODULE_TAGS := eng
 
+LOCAL_CPPFLAGS                                                              := \
+    -std=c++11                                                                 \
+    -pedantic-errors                                                           \
+    $(NULL)
+
 LOCAL_CFLAGS                                               := \
     -DOPENTHREAD_CONFIG_FILE=\<openthread-config-android.h\>  \
     $(NULL)
@@ -462,6 +505,7 @@ LOCAL_CFLAGS                                               := \
 LOCAL_C_INCLUDES                                         := \
     $(OPENTHREAD_PROJECT_INCLUDES)                          \
     $(LOCAL_PATH)/include                                   \
+    $(LOCAL_PATH)/src/                                      \
     $(LOCAL_PATH)/src/core                                  \
     $(LOCAL_PATH)/src/posix/platform                        \
     $(LOCAL_PATH)/src/posix/platform/include                \

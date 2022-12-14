@@ -6,10 +6,11 @@ See [README_COMMISSIONING.md](README_COMMISSIONING.md).
 
 ## Command List
 
-* [help](#help)
-* [id](#id)
-* [start](#start)
-* [stop](#stop)
+- [help](#help)
+- [discerner](#discerner)
+- [id](#id)
+- [start](#start)
+- [stop](#stop)
 
 ## Command Details
 
@@ -25,6 +26,24 @@ help
 id
 start
 stop
+Done
+```
+
+### discerner
+
+Usage: `joiner discerner [discerner]`
+
+Print or set the Joiner Discerner. Note this value takes the place of the place of EUI-64 during the joiner session of Thread commissioning.
+
+- discerner: `clear` to clear discerner, `number/length` to set discerner
+
+```bash
+> joiner discerner 0xabc/12
+Done
+> joiner discerner
+0xabc/12
+Done
+> joiner discerner clear
 Done
 ```
 
@@ -46,8 +65,8 @@ Usage: `joiner start <pskd> [provisioning-url]`
 
 Start the Joiner role.
 
-* pskd: Pre-Shared Key for the Joiner.
-* provisioning-url: Provisioning URL for the Joiner (optional).
+- pskd: Pre-Shared Key for the Joiner.
+- provisioning-url: Provisioning URL for the Joiner (optional).
 
 This command will cause the device to start the Joiner process.
 

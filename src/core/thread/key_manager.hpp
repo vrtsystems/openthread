@@ -40,11 +40,14 @@
 
 #include <openthread/dataset.h>
 
+#include "common/clearable.hpp"
+#include "common/equatable.hpp"
 #include "common/locator.hpp"
 #include "common/random.hpp"
 #include "common/timer.hpp"
 #include "crypto/hmac_sha256.hpp"
 #include "mac/mac_types.hpp"
+#include "thread/mle_types.hpp"
 
 namespace ot {
 
@@ -62,31 +65,19 @@ namespace ot {
  *
  */
 OT_TOOL_PACKED_BEGIN
-class MasterKey : public otMasterKey
+class MasterKey : public otMasterKey, public Equatable<MasterKey>
 {
 public:
+#if !OPENTHREAD_RADIO
     /**
-     * This method evaluates whether or not the Thread Master Keys match.
+     * This method generates a cryptographically secure random sequence to populate the Thread Master Key.
      *
-     * @param[in]  aOther  The Thread Master Key to compare.
-     *
-     * @retval TRUE   If the Thread Master Keys match.
-     * @retval FALSE  If the Thread Master Keys do not match.
+     * @retval OT_ERROR_NONE     Successfully generated a random Thread Master Key.
+     * @retval OT_ERROR_FAILED   Failed to generate random sequence.
      *
      */
-    bool operator==(const MasterKey &aOther) const { return memcmp(m8, aOther.m8, sizeof(MasterKey)) == 0; }
-
-    /**
-     * This method evaluates whether or not the Thread Master Keys match.
-     *
-     * @param[in]  aOther  The Thread Master Key to compare.
-     *
-     * @retval TRUE   If the Thread Master Keys do not match.
-     * @retval FALSE  If the Thread Master Keys match.
-     *
-     */
-    bool operator!=(const MasterKey &aOther) const { return !(*this == aOther); }
-
+    otError GenerateRandom(void) { return Random::Crypto::FillBuffer(m8, sizeof(m8)); }
+#endif
 } OT_TOOL_PACKED_END;
 
 /**
@@ -94,37 +85,9 @@ public:
  *
  */
 OT_TOOL_PACKED_BEGIN
-class Pskc : public otPskc
+class Pskc : public otPskc, public Equatable<Pskc>, public Clearable<Pskc>
 {
 public:
-    /**
-     * This method clears the PSKc (sets all bytes to zero).
-     *
-     */
-    void Clear(void) { memset(this, 0, sizeof(*this)); }
-
-    /**
-     * This method evaluates whether or not the Thread PSKc values match.
-     *
-     * @param[in]  aOther  The Thread PSKc to compare.
-     *
-     * @retval TRUE   If the Thread PSKc values match.
-     * @retval FALSE  If the Thread PSKc values do not match.
-     *
-     */
-    bool operator==(const Pskc &aOther) const { return memcmp(m8, aOther.m8, sizeof(Pskc)) == 0; }
-
-    /**
-     * This method evaluates whether or not the Thread PSKc values match.
-     *
-     * @param[in]  aOther  The Thread PSKc to compare.
-     *
-     * @retval TRUE   If the Thread PSKc values do not match.
-     * @retval FALSE  If the Thread PSKc values match.
-     *
-     */
-    bool operator!=(const Pskc &aOther) const { return !(*this == aOther); }
-
 #if !OPENTHREAD_RADIO
     /**
      * This method generates a cryptographically secure random sequence to populate the Thread PSKc.
@@ -138,18 +101,19 @@ public:
 } OT_TOOL_PACKED_END;
 
 /**
+ *
+ * This class represents a Key Encryption Key (KEK).
+ *
+ */
+typedef Mac::Key Kek;
+
+/**
  * This class defines Thread Key Manager.
  *
  */
 class KeyManager : public InstanceLocator
 {
 public:
-    enum
-    {
-        kMaxKeyLength = 16,
-        kNonceSize    = 13, ///< Size of IEEE 802.15.4 Nonce (bytes).
-    };
-
     /**
      * This constructor initializes the object.
      *
@@ -235,30 +199,12 @@ public:
     void SetCurrentKeySequence(uint32_t aKeySequence);
 
     /**
-     * This method returns a pointer to the current MAC key.
-     *
-     * @returns A pointer to the current MAC key.
-     *
-     */
-    const uint8_t *GetCurrentMacKey(void) const { return mKey + kMacKeyOffset; }
-
-    /**
      * This method returns a pointer to the current MLE key.
      *
      * @returns A pointer to the current MLE key.
      *
      */
-    const uint8_t *GetCurrentMleKey(void) const { return mKey; }
-
-    /**
-     * This method returns a pointer to a temporary MAC key computed from the given key sequence.
-     *
-     * @param[in]  aKeySequence  The key sequence value.
-     *
-     * @returns A pointer to the temporary MAC key.
-     *
-     */
-    const uint8_t *GetTemporaryMacKey(uint32_t aKeySequence);
+    const Mle::Key &GetCurrentMleKey(void) const { return mMleKey; }
 
     /**
      * This method returns a pointer to a temporary MLE key computed from the given key sequence.
@@ -268,7 +214,7 @@ public:
      * @returns A pointer to the temporary MLE key.
      *
      */
-    const uint8_t *GetTemporaryMleKey(uint32_t aKeySequence);
+    const Mle::Key &GetTemporaryMleKey(uint32_t aKeySequence);
 
     /**
      * This method returns the current MAC Frame Counter value.
@@ -276,7 +222,7 @@ public:
      * @returns The current MAC Frame Counter value.
      *
      */
-    uint32_t GetMacFrameCounter(void) const { return mMacFrameCounter; }
+    uint32_t GetMacFrameCounter(void) const;
 
     /**
      * This method sets the current MAC Frame Counter value.
@@ -284,7 +230,7 @@ public:
      * @param[in]  aMacFrameCounter  The MAC Frame Counter value.
      *
      */
-    void SetMacFrameCounter(uint32_t aMacFrameCounter) { mMacFrameCounter = aMacFrameCounter; }
+    void SetMacFrameCounter(uint32_t aMacFrameCounter);
 
     /**
      * This method sets the MAC Frame Counter value which is stored in non-volatile memory.
@@ -293,12 +239,6 @@ public:
      *
      */
     void SetStoredMacFrameCounter(uint32_t aStoredMacFrameCounter) { mStoredMacFrameCounter = aStoredMacFrameCounter; }
-
-    /**
-     * This method increments the current MAC Frame Counter value.
-     *
-     */
-    void IncrementMacFrameCounter(void);
 
     /**
      * This method returns the current MLE Frame Counter value.
@@ -336,7 +276,15 @@ public:
      * @returns A pointer to the KEK.
      *
      */
-    const uint8_t *GetKek(void) const { return mKek; }
+    const Kek &GetKek(void) const { return mKek; }
+
+    /**
+     * This method sets the KEK.
+     *
+     * @param[in]  aKek  A KEK.
+     *
+     */
+    void SetKek(const Kek &aKek);
 
     /**
      * This method sets the KEK.
@@ -426,18 +374,74 @@ public:
     void SetSecurityPolicyFlags(uint8_t aSecurityPolicyFlags);
 
     /**
-     * This static method generates IEEE 802.15.4 nonce byte sequence.
+     * This method indicates whether or not obtaining Master key for out-of-band is enabled.
      *
-     * @param[in]  aAddress        An extended address.
-     * @param[in]  aFrameCounter   A frame counter.
-     * @param[in]  aSecurityLevel  A security level.
-     * @param[out] aNonce          A buffer (with `kNonceSize` bytes) to place the generated nonce.
+     * @retval TRUE   If obtaining Master key for out-of-band is enabled.
+     * @retval FALSE  If obtaining Master key for out-of-band is not enabled.
      *
      */
-    static void GenerateNonce(const Mac::ExtAddress &aAddress,
-                              uint32_t               aFrameCounter,
-                              uint8_t                aSecurityLevel,
-                              uint8_t *              aNonce);
+    bool IsObtainMasterKeyEnabled(void) const
+    {
+        return (mSecurityPolicyFlags & OT_SECURITY_POLICY_OBTAIN_MASTER_KEY) != 0;
+    }
+
+    /**
+     * This method indicates whether or not Native Commissioning using PSKc is allowed.
+     *
+     * @retval TRUE   If Native Commissioning using PSKc is allowed.
+     * @retval FALSE  If Native Commissioning using PSKc is not allowed.
+     *
+     */
+    bool IsNativeCommissioningAllowed(void) const
+    {
+        return (mSecurityPolicyFlags & OT_SECURITY_POLICY_NATIVE_COMMISSIONING) != 0;
+    }
+
+    /**
+     * This method indicates whether or not Thread 1.1 Routers are enabled.
+     *
+     * @retval TRUE   If Thread 1.1 Routers are enabled.
+     * @retval FALSE  If Thread 1.1 Routers are not enabled.
+     *
+     */
+    bool IsRouterEnabled(void) const { return (mSecurityPolicyFlags & OT_SECURITY_POLICY_ROUTERS) != 0; }
+
+    /**
+     * This method indicates whether or not external Commissioner authentication is allowed using PSKc.
+     *
+     * @retval TRUE   If the commissioning sessions by an external Commissioner based on the PSKc are allowed
+     *                to be established and that changes to the Commissioner Dataset by on-mesh nodes are allowed.
+     * @retval FALSE  If the commissioning sessions by an external Commissioner based on the PSKc are not allowed
+     *                to be established and that changes to the Commissioner Dataset by on-mesh nodes are not allowed.
+     *
+     */
+    bool IsExternalCommissionerAllowed(void) const
+    {
+        return (mSecurityPolicyFlags & OT_SECURITY_POLICY_EXTERNAL_COMMISSIONER) != 0;
+    }
+
+    /**
+     * This method indicates whether or not Thread Beacons are enabled.
+     *
+     * @retval TRUE   If Thread Beacons are enabled.
+     * @retval FALSE  If Thread Beacons are not enabled.
+     *
+     */
+    bool IsThreadBeaconEnabled(void) const { return (mSecurityPolicyFlags & OT_SECURITY_POLICY_BEACONS) != 0; }
+
+    /**
+     * This method updates the MAC keys and MLE key.
+     *
+     */
+    void UpdateKeyMaterial(void);
+
+    /**
+     * This method handles MAC frame counter change.
+     *
+     * @param[in]  aMacFrameCounter  The MAC frame counter value.
+     *
+     */
+    void MacFrameCounterUpdated(uint32_t aMacFrameCounter);
 
 private:
     enum
@@ -445,11 +449,23 @@ private:
         kMinKeyRotationTime        = 1,
         kDefaultKeyRotationTime    = 672,
         kDefaultKeySwitchGuardTime = 624,
-        kMacKeyOffset              = 16,
         kOneHourIntervalInMsec     = 3600u * 1000u,
     };
 
-    void ComputeKey(uint32_t aKeySequence, uint8_t *aKey);
+    OT_TOOL_PACKED_BEGIN
+    struct Keys
+    {
+        Mle::Key mMleKey;
+        Mac::Key mMacKey;
+    } OT_TOOL_PACKED_END;
+
+    union HashKeys
+    {
+        uint8_t mHash[Crypto::HmacSha256::kHashSize];
+        Keys    mKeys;
+    };
+
+    void ComputeKeys(uint32_t aKeySequence, HashKeys &aHashKeys);
 
     void        StartKeyRotationTimer(void);
     static void HandleKeyRotationTimer(Timer &aTimer);
@@ -461,11 +477,9 @@ private:
     MasterKey mMasterKey;
 
     uint32_t mKeySequence;
-    uint8_t  mKey[Crypto::HmacSha256::kHashSize];
+    Mle::Key mMleKey;
+    Mle::Key mTemporaryMleKey;
 
-    uint8_t mTemporaryKey[Crypto::HmacSha256::kHashSize];
-
-    uint32_t mMacFrameCounter;
     uint32_t mMleFrameCounter;
     uint32_t mStoredMacFrameCounter;
     uint32_t mStoredMleFrameCounter;
@@ -479,7 +493,7 @@ private:
 #if OPENTHREAD_MTD || OPENTHREAD_FTD
     Pskc mPskc;
 #endif
-    uint8_t  mKek[kMaxKeyLength];
+    Kek      mKek;
     uint32_t mKekFrameCounter;
 
     uint8_t mSecurityPolicyFlags;

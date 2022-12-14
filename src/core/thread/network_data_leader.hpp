@@ -38,6 +38,10 @@
 
 #include <stdint.h>
 
+#if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
+#include "backbone_router/bbr_leader.hpp"
+#endif
+
 #include "coap/coap.hpp"
 #include "common/timer.hpp"
 #include "net/ip6_address.hpp"
@@ -105,7 +109,7 @@ public:
      * @retval OT_ERROR_NOT_FOUND  Could not find the 6LoWPAN Context information.
      *
      */
-    otError GetContext(const Ip6::Address &aAddress, Lowpan::Context &aContext);
+    otError GetContext(const Ip6::Address &aAddress, Lowpan::Context &aContext) const;
 
     /**
      * This method retrieves the 6LoWPAN Context information based on a given Context ID.
@@ -117,7 +121,7 @@ public:
      * @retval OT_ERROR_NOT_FOUND  Could not find the 6LoWPAN Context information.
      *
      */
-    otError GetContext(uint8_t aContextId, Lowpan::Context &aContext);
+    otError GetContext(uint8_t aContextId, Lowpan::Context &aContext) const;
 
     /**
      * This method indicates whether or not the given IPv6 address is on-mesh.
@@ -128,15 +132,15 @@ public:
      * @retval FALSE  If @p aAddress if not on-link.
      *
      */
-    bool IsOnMesh(const Ip6::Address &aAddress);
+    bool IsOnMesh(const Ip6::Address &aAddress) const;
 
     /**
      * This method performs a route lookup using the Network Data.
      *
-     * @param[in]   aSource       A reference to the IPv6 source address.
-     * @param[in]   aDestination  A reference to the IPv6 destination address.
-     * @param[out]  aPrefixMatch  A pointer to the longest prefix match length in bits.
-     * @param[out]  aRloc16       A pointer to the RLOC16 for the selected route.
+     * @param[in]   aSource             A reference to the IPv6 source address.
+     * @param[in]   aDestination        A reference to the IPv6 destination address.
+     * @param[out]  aPrefixMatchLength  A pointer to output the longest prefix match length in bits.
+     * @param[out]  aRloc16             A pointer to the RLOC16 for the selected route.
      *
      * @retval OT_ERROR_NONE      Successfully found a route.
      * @retval OT_ERROR_NO_ROUTE  No valid route was found.
@@ -144,8 +148,8 @@ public:
      */
     otError RouteLookup(const Ip6::Address &aSource,
                         const Ip6::Address &aDestination,
-                        uint8_t *           aPrefixMatch,
-                        uint16_t *          aRloc16);
+                        uint8_t *           aPrefixMatchLength,
+                        uint16_t *          aRloc16) const;
 
     /**
      * This method is used by non-Leader devices to set newly received Network Data from the Leader.
@@ -180,20 +184,44 @@ public:
     /**
      * This method returns a pointer to the Commissioning Data.
      *
-     * @returns A pointer to the Commissioning Data or NULL if no Commissioning Data exists.
+     * @returns A pointer to the Commissioning Data or nullptr if no Commissioning Data exists.
      *
      */
-    NetworkDataTlv *GetCommissioningData(void);
+    CommissioningDataTlv *GetCommissioningData(void)
+    {
+        return const_cast<CommissioningDataTlv *>(const_cast<const LeaderBase *>(this)->GetCommissioningData());
+    }
+
+    /**
+     * This method returns a pointer to the Commissioning Data.
+     *
+     * @returns A pointer to the Commissioning Data or nullptr if no Commissioning Data exists.
+     *
+     */
+    const CommissioningDataTlv *GetCommissioningData(void) const;
 
     /**
      * This method returns a pointer to the Commissioning Data Sub-TLV.
      *
      * @param[in]  aType  The TLV type value.
      *
-     * @returns A pointer to the Commissioning Data Sub-TLV or NULL if no Sub-TLV exists.
+     * @returns A pointer to the Commissioning Data Sub-TLV or nullptr if no Sub-TLV exists.
      *
      */
-    MeshCoP::Tlv *GetCommissioningDataSubTlv(MeshCoP::Tlv::Type aType);
+    MeshCoP::Tlv *GetCommissioningDataSubTlv(MeshCoP::Tlv::Type aType)
+    {
+        return const_cast<MeshCoP::Tlv *>(const_cast<const LeaderBase *>(this)->GetCommissioningDataSubTlv(aType));
+    }
+
+    /**
+     * This method returns a pointer to the Commissioning Data Sub-TLV.
+     *
+     * @param[in]  aType  The TLV type value.
+     *
+     * @returns A pointer to the Commissioning Data Sub-TLV or nullptr if no Sub-TLV exists.
+     *
+     */
+    const MeshCoP::Tlv *GetCommissioningDataSubTlv(MeshCoP::Tlv::Type aType) const;
 
     /**
      * This method indicates whether or not the Commissioning Data TLV indicates Joining is enabled.
@@ -203,7 +231,7 @@ public:
      * @returns TRUE if the Commissioning Data TLV says Joining is enabled, FALSE otherwise.
      *
      */
-    bool IsJoiningEnabled(void);
+    bool IsJoiningEnabled(void) const;
 
     /**
      * This method adds Commissioning Data to the Thread Network Data.
@@ -218,6 +246,30 @@ public:
     otError SetCommissioningData(const uint8_t *aValue, uint8_t aValueLength);
 
     /**
+     * This method checks if the steering data includes a Joiner.
+     *
+     * @param[in]  aEui64             A reference to the Joiner's IEEE EUI-64.
+     *
+     * @retval OT_ERROR_NONE          @p aEui64 is in the bloom filter.
+     * @retval OT_ERROR_INVALID_STATE No steering data present.
+     * @retval OT_ERROR_NOT_FOUND     @p aEui64 is not in the bloom filter.
+     *
+     */
+    otError SteeringDataCheckJoiner(const Mac::ExtAddress &aEui64) const;
+
+    /**
+     * This method checks if the steering data includes a Joiner with a given discerner value.
+     *
+     * @param[in]  aDiscerner         A reference to the Joiner Discerner.
+     *
+     * @retval OT_ERROR_NONE          @p aDiscerner is in the bloom filter.
+     * @retval OT_ERROR_INVALID_STATE No steering data present.
+     * @retval OT_ERROR_NOT_FOUND     @p aDiscerner is not in the bloom filter.
+     *
+     */
+    otError SteeringDataCheckJoiner(const MeshCoP::JoinerDiscerner &aDiscerner) const;
+
+    /**
      * This method gets the Rloc of Dhcp Agent of specified contextId.
      *
      * @param[in]  aContextId      A pointer to the Commissioning Data value.
@@ -227,20 +279,57 @@ public:
      * @retval OT_ERROR_NOT_FOUND  The specified @p aContextId could not be found.
      *
      */
-    otError GetRlocByContextId(uint8_t aContextId, uint16_t &aRloc16);
+    otError GetRlocByContextId(uint8_t aContextId, uint16_t &aRloc16) const;
+
+    /**
+     * This method gets the Service ID for the specified service.
+     *
+     * @param[in]  aEnterpriseNumber  Enterprise Number (IANA-assigned) for Service TLV
+     * @param[in]  aServiceData       A pointer to the Service Data
+     * @param[in]  aServiceDataLength The length of @p aServiceData in bytes.
+     * @param[in]  aServerStable      The Stable flag value for Server TLV
+     * @param[out] aServiceId         A reference where to put the Service ID.
+     *
+     * @retval OT_ERROR_NONE       Successfully got the Service ID.
+     * @retval OT_ERROR_NOT_FOUND  The specified service was not found.
+     *
+     */
+    otError GetServiceId(uint32_t       aEnterpriseNumber,
+                         const uint8_t *aServiceData,
+                         uint8_t        aServiceDataLength,
+                         bool           aServerStable,
+                         uint8_t &      aServiceId) const;
+
+#if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
+    /**
+     * This method gets the Primary Backbone Router (PBBR) in the Thread Network.
+     *
+     * @param[out]  aConfig      The Primary Backbone Router configuration.
+     *
+     * @retval OT_ERROR_NONE       Successfully got the Primary Backbone Router configuration.
+     * @retval OT_ERROR_NOT_FOUND  No Backbone Router Service in the Thread Network.
+     *
+     */
+    otError GetBackboneRouterPrimary(BackboneRouter::BackboneRouterConfig &aConfig) const;
+#endif
 
 protected:
     uint8_t mStableVersion;
     uint8_t mVersion;
 
 private:
-    otError RemoveCommissioningData(void);
+    using FilterIndexes = MeshCoP::SteeringData::HashBitIndexes;
+
+    const PrefixTlv *FindNextMatchingPrefix(const Ip6::Address &aAddress, const PrefixTlv *aPrevTlv) const;
+
+    void RemoveCommissioningData(void);
 
     otError ExternalRouteLookup(uint8_t             aDomainId,
                                 const Ip6::Address &aDestination,
-                                uint8_t *           aPrefixMatch,
-                                uint16_t *          aRloc16);
-    otError DefaultRouteLookup(PrefixTlv &aPrefix, uint16_t *aRloc16);
+                                uint8_t *           aPrefixMatchLength,
+                                uint16_t *          aRloc16) const;
+    otError DefaultRouteLookup(const PrefixTlv &aPrefix, uint16_t *aRloc16) const;
+    otError SteeringDataCheck(const FilterIndexes &aFilterIndexes) const;
 };
 
 /**

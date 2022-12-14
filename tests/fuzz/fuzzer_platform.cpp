@@ -64,9 +64,9 @@ static AlarmState   sAlarmMilli;
 static AlarmState   sAlarmMicro;
 static uint32_t     sRandomState = 1;
 static uint8_t      sRadioTransmitPsdu[OT_RADIO_FRAME_MAX_SIZE];
-static otRadioFrame sRadioTransmitFrame = {.mPsdu = sRadioTransmitPsdu};
+static otRadioFrame sRadioTransmitFrame;
 static uint8_t      sRadioAckPsdu[OT_RADIO_FRAME_MAX_SIZE];
-static otRadioFrame sRadioAckFrame     = {.mPsdu = sRadioAckPsdu};
+static otRadioFrame sRadioAckFrame;
 static bool         sResetWasRequested = false;
 static otRadioState sRadioState        = OT_RADIO_STATE_DISABLED;
 
@@ -86,6 +86,9 @@ void FuzzerPlatformInit(void)
     sAlarmNow    = 0;
     memset(&sAlarmMilli, 0, sizeof(sAlarmMilli));
     memset(&sAlarmMicro, 0, sizeof(sAlarmMicro));
+
+    sRadioTransmitFrame.mPsdu = sRadioTransmitPsdu;
+    sRadioAckFrame.mPsdu      = sRadioAckPsdu;
 }
 
 void FuzzerPlatformProcess(otInstance *aInstance)
@@ -106,7 +109,7 @@ void FuzzerPlatformProcess(otInstance *aInstance)
         }
         else
         {
-            otPlatRadioTxDone(aInstance, &sRadioTransmitFrame, NULL, OT_ERROR_NONE);
+            otPlatRadioTxDone(aInstance, &sRadioTransmitFrame, nullptr, OT_ERROR_NONE);
         }
     }
 
@@ -194,11 +197,11 @@ bool otDiagIsEnabled(otInstance *aInstance)
     return false;
 }
 
-otError otDiagProcessCmd(otInstance *aInstance, int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen)
+otError otDiagProcessCmd(otInstance *aInstance, uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aInstance);
-    OT_UNUSED_VARIABLE(aArgCount);
-    OT_UNUSED_VARIABLE(aArgVector);
+    OT_UNUSED_VARIABLE(aArgsLength);
+    OT_UNUSED_VARIABLE(aArgs);
     OT_UNUSED_VARIABLE(aOutput);
     OT_UNUSED_VARIABLE(aOutputMaxLen);
 
@@ -276,18 +279,27 @@ bool otPlatRadioIsEnabled(otInstance *aInstance)
 otError otPlatRadioEnable(otInstance *aInstance)
 {
     OT_UNUSED_VARIABLE(aInstance);
+
+    sRadioState = OT_RADIO_STATE_SLEEP;
+
     return OT_ERROR_NONE;
 }
 
 otError otPlatRadioDisable(otInstance *aInstance)
 {
     OT_UNUSED_VARIABLE(aInstance);
+
+    sRadioState = OT_RADIO_STATE_DISABLED;
+
     return OT_ERROR_NONE;
 }
 
 otError otPlatRadioSleep(otInstance *aInstance)
 {
     OT_UNUSED_VARIABLE(aInstance);
+
+    sRadioState = OT_RADIO_STATE_SLEEP;
+
     return OT_ERROR_NONE;
 }
 
@@ -295,6 +307,9 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
 {
     OT_UNUSED_VARIABLE(aInstance);
     OT_UNUSED_VARIABLE(aChannel);
+
+    sRadioState = OT_RADIO_STATE_RECEIVE;
+
     return OT_ERROR_NONE;
 }
 
@@ -344,7 +359,7 @@ void otPlatRadioEnableSrcMatch(otInstance *aInstance, bool aEnable)
     OT_UNUSED_VARIABLE(aEnable);
 }
 
-otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, const uint16_t aShortAddress)
+otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, uint16_t aShortAddress)
 {
     OT_UNUSED_VARIABLE(aInstance);
     OT_UNUSED_VARIABLE(aShortAddress);
@@ -358,7 +373,7 @@ otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress
     return OT_ERROR_NONE;
 }
 
-otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, const uint16_t aShortAddress)
+otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, uint16_t aShortAddress)
 {
     OT_UNUSED_VARIABLE(aInstance);
     OT_UNUSED_VARIABLE(aShortAddress);
@@ -500,15 +515,19 @@ otError otPlatUartFlush(void)
     return OT_ERROR_NOT_IMPLEMENTED;
 }
 
-otError otPlatDiagProcess(otInstance *aInstance, int argc, char *argv[], char *aOutput, size_t aOutputMaxLen)
+otError otPlatDiagProcess(otInstance *aInstance,
+                          uint8_t     aArgsLength,
+                          char *      aArgs[],
+                          char *      aOutput,
+                          size_t      aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aInstance);
-    OT_UNUSED_VARIABLE(argc);
-    OT_UNUSED_VARIABLE(argv);
+    OT_UNUSED_VARIABLE(aArgsLength);
+    OT_UNUSED_VARIABLE(aArgs);
     OT_UNUSED_VARIABLE(aOutput);
     OT_UNUSED_VARIABLE(aOutputMaxLen);
 
-    return OT_ERROR_INVALID_ARGS;
+    return OT_ERROR_INVALID_COMMAND;
 }
 
 void otPlatDiagModeSet(bool aMode)

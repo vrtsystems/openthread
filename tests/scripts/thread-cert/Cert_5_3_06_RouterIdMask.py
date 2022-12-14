@@ -29,51 +29,41 @@
 
 import unittest
 
-import node
-import mle
-import config
 import command
+import config
+import mle
+import thread_cert
 
 DUT_LEADER = 1
 ROUTER1 = 2
 ROUTER2 = 3
 
 
-class Cert_5_3_6_RouterIdMask(unittest.TestCase):
-
-    def setUp(self):
-        self.simulator = config.create_default_simulator()
-
-        self.nodes = {}
-        for i in range(1, 4):
-            self.nodes[i] = node.Node(i, simulator=self.simulator)
-
-        self.nodes[DUT_LEADER].set_panid(0xface)
-        self.nodes[DUT_LEADER].set_mode('rsdn')
-        self.nodes[DUT_LEADER].add_whitelist(self.nodes[ROUTER1].get_addr64())
-        self.nodes[DUT_LEADER].enable_whitelist()
-
-        self.nodes[ROUTER1].set_panid(0xface)
-        self.nodes[ROUTER1].set_mode('rsdn')
-        self.nodes[ROUTER1].add_whitelist(self.nodes[DUT_LEADER].get_addr64())
-        self.nodes[ROUTER1].add_whitelist(self.nodes[ROUTER2].get_addr64())
-        self.nodes[ROUTER1].enable_whitelist()
-        self.nodes[ROUTER1].set_router_selection_jitter(1)
-
-        self.nodes[ROUTER2].set_panid(0xface)
-        self.nodes[ROUTER2].set_mode('rsdn')
-        self._setUpRouter2()
+class Cert_5_3_6_RouterIdMask(thread_cert.TestCase):
+    TOPOLOGY = {
+        DUT_LEADER: {
+            'mode': 'rsdn',
+            'panid': 0xface,
+            'whitelist': [ROUTER1]
+        },
+        ROUTER1: {
+            'mode': 'rsdn',
+            'panid': 0xface,
+            'router_selection_jitter': 1,
+            'whitelist': [DUT_LEADER, ROUTER2]
+        },
+        ROUTER2: {
+            'mode': 'rsdn',
+            'panid': 0xface,
+            'router_selection_jitter': 1,
+            'whitelist': [ROUTER1]
+        },
+    }
 
     def _setUpRouter2(self):
         self.nodes[ROUTER2].add_whitelist(self.nodes[ROUTER1].get_addr64())
         self.nodes[ROUTER2].enable_whitelist()
         self.nodes[ROUTER2].set_router_selection_jitter(1)
-
-    def tearDown(self):
-        for n in list(self.nodes.values()):
-            n.stop()
-            n.destroy()
-        self.simulator.stop()
 
     def test(self):
         # 1
@@ -111,8 +101,7 @@ class Cert_5_3_6_RouterIdMask(unittest.TestCase):
             print("%ss" % ((i + 1) * 30))
 
             leader_messages = self.simulator.get_messages_sent_by(DUT_LEADER)
-            msg = leader_messages.last_mle_message(
-                mle.CommandType.ADVERTISEMENT, False)
+            msg = leader_messages.last_mle_message(mle.CommandType.ADVERTISEMENT, False)
             if msg is None:
                 continue
 
@@ -123,8 +112,7 @@ class Cert_5_3_6_RouterIdMask(unittest.TestCase):
                 break
         self.assertTrue(routing_cost == 0)
 
-        self.simulator.go(config.INFINITE_COST_TIMEOUT +
-                          config.MAX_ADVERTISEMENT_INTERVAL)
+        self.simulator.go(config.INFINITE_COST_TIMEOUT + config.MAX_ADVERTISEMENT_INTERVAL)
         leader_messages = self.simulator.get_messages_sent_by(DUT_LEADER)
         msg = leader_messages.last_mle_message(mle.CommandType.ADVERTISEMENT)
         self.assertFalse(command.check_id_set(msg, router2_id))
@@ -149,14 +137,12 @@ class Cert_5_3_6_RouterIdMask(unittest.TestCase):
         router1_id = self.nodes[ROUTER1].get_router_id()
         router2_id = self.nodes[ROUTER2].get_router_id()
 
-        self.simulator.go(config.MAX_NEIGHBOR_AGE +
-                          config.MAX_ADVERTISEMENT_INTERVAL)
+        self.simulator.go(config.MAX_NEIGHBOR_AGE + config.MAX_ADVERTISEMENT_INTERVAL)
         leader_messages = self.simulator.get_messages_sent_by(DUT_LEADER)
         msg = leader_messages.last_mle_message(mle.CommandType.ADVERTISEMENT)
         self.assertEqual(command.get_routing_cost(msg, router1_id), 0)
 
-        self.simulator.go(config.INFINITE_COST_TIMEOUT +
-                          config.MAX_ADVERTISEMENT_INTERVAL)
+        self.simulator.go(config.INFINITE_COST_TIMEOUT + config.MAX_ADVERTISEMENT_INTERVAL)
         leader_messages = self.simulator.get_messages_sent_by(DUT_LEADER)
         msg = leader_messages.last_mle_message(mle.CommandType.ADVERTISEMENT)
         self.assertFalse(command.check_id_set(msg, router1_id))

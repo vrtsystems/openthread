@@ -71,10 +71,9 @@ using ot::Encoding::BigEndian::HostSwap16;
  */
 struct Context
 {
-    const uint8_t *mPrefix;       ///< A pointer to the prefix.
-    uint8_t        mPrefixLength; ///< The prefix length.
-    uint8_t        mContextId;    ///< The Context ID.
-    bool           mCompressFlag; ///< The Context compression flag.
+    Ip6::Prefix mPrefix;       ///< The Prefix
+    uint8_t     mContextId;    ///< The Context ID.
+    bool        mCompressFlag; ///< The Context compression flag.
 };
 
 /**
@@ -197,10 +196,12 @@ public:
         otError error = OT_ERROR_NONE;
         int     rval;
 
+        OT_UNUSED_VARIABLE(rval);
+
         VerifyOrExit(CanWrite(aLength), error = OT_ERROR_NO_BUFS);
 
         rval = aMessage.Read(aMessage.GetOffset(), aLength, mWritePointer);
-        assert(rval == aLength);
+        OT_ASSERT(rval == aLength);
 
         mWritePointer += aLength;
 
@@ -307,7 +308,7 @@ public:
      * @returns The size of the compressed header in bytes or -1 if decompression fails.
      *
      */
-    int DecompressUdpHeader(Ip6::UdpHeader &aUdpHeader, const uint8_t *aBuf, uint16_t aBufLength);
+    int DecompressUdpHeader(Ip6::Udp::Header &aUdpHeader, const uint8_t *aBuf, uint16_t aBufLength);
 
 private:
     enum
@@ -351,12 +352,19 @@ private:
         kExtHdrEidMask     = 0x0e,
 
         kExtHdrNextHeader = 0x01,
+        kExtHdrMaxLength  = 255,
 
         kUdpDispatch     = 0xf0,
         kUdpDispatchMask = 0xf8,
         kUdpChecksum     = 1 << 2,
         kUdpPortMask     = 3 << 0,
     };
+
+    otError Compress(Message &           aMessage,
+                     const Mac::Address &aMacSource,
+                     const Mac::Address &aMacDest,
+                     BufferWriter &      aBuf,
+                     uint8_t &           aHeaderDepth);
 
     otError CompressExtensionHeader(Message &aMessage, BufferWriter &aBuf, uint8_t &aNextHeader);
     otError CompressSourceIid(const Mac::Address &aMacAddr,

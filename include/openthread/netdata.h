@@ -65,7 +65,7 @@ typedef struct otBorderRouterConfig
     /**
      * A 2-bit signed integer indicating router preference as defined in RFC 4191.
      */
-    int mPreference : 2;
+    signed int mPreference : 2;
 
     /**
      * TRUE, if @p mPrefix is preferred.  FALSE, otherwise.
@@ -103,6 +103,18 @@ typedef struct otBorderRouterConfig
     bool mStable : 1;
 
     /**
+     * TRUE, if this border router is able to supply DNS infomration obtained via ND.  FALSE, otherwise.
+     */
+    bool mNdDns : 1;
+
+    /**
+     * TRUE, if this prefix is a Thread Domain Prefix.  FALSE, otherwise.
+     *
+     * Note: Domain Prefix is introduced since Thread 1.2.
+     */
+    bool mDp : 1;
+
+    /**
      * The Border Agent Rloc.
      */
     uint16_t mRloc16;
@@ -129,7 +141,7 @@ typedef struct otExternalRouteConfig
     /**
      * A 2-bit signed integer indicating router preference as defined in RFC 4191.
      */
-    int mPreference : 2;
+    signed int mPreference : 2;
 
     /**
      * TRUE, if this configuration is considered Stable Network Data.  FALSE, otherwise.
@@ -179,7 +191,7 @@ typedef struct otServerConfig
  */
 typedef struct otServiceConfig
 {
-    uint8_t        mServiceID;         ///< Used to return service ID when iterating over the partition's Network Data.
+    uint8_t        mServiceId;         ///< Used to return Service ID when iterating over the partition's Network Data.
     uint32_t       mEnterpriseNumber;  ///< IANA Enterprise Number.
     uint8_t        mServiceDataLength; ///< Length of service data.
     uint8_t        mServiceData[OT_SERVICE_DATA_MAX_SIZE]; ///< Service data bytes.
@@ -261,6 +273,36 @@ uint8_t otNetDataGetVersion(otInstance *aInstance);
  *
  */
 uint8_t otNetDataGetStableVersion(otInstance *aInstance);
+
+/**
+ * Check if the steering data includes a Joiner.
+ *
+ * @param[in]  aInstance          A pointer to an OpenThread instance.
+ * @param[in]  aEui64             A pointer to the Joiner's IEEE EUI-64.
+ *
+ * @retval OT_ERROR_NONE          @p aEui64 is included in the steering data.
+ * @retval OT_ERROR_INVALID_STATE No steering data present.
+ * @retval OT_ERROR_NOT_FOUND     @p aEui64 is not included in the steering data.
+ *
+ */
+otError otNetDataSteeringDataCheckJoiner(otInstance *aInstance, const otExtAddress *aEui64);
+
+// Forward declaration
+struct otJoinerDiscerner;
+
+/**
+ * Check if the steering data includes a Joiner with a given discerner value.
+ *
+ * @param[in]  aInstance          A pointer to an OpenThread instance.
+ * @param[in]  aDiscerner         A pointer to the Joiner Discerner.
+ *
+ * @retval OT_ERROR_NONE          @p aDiscerner is included in the steering data.
+ * @retval OT_ERROR_INVALID_STATE No steering data present.
+ * @retval OT_ERROR_NOT_FOUND     @p aDiscerner is not included in the steering data.
+ *
+ */
+otError otNetDataSteeringDataCheckJoinerWithDiscerner(otInstance *                    aInstance,
+                                                      const struct otJoinerDiscerner *aDiscerner);
 
 /**
  * @}

@@ -36,12 +36,12 @@
 
 #include "openthread-core-config.h"
 
+#if OPENTHREAD_FTD
+
 #include "common/locator.hpp"
 #include "thread/topology.hpp"
 
 namespace ot {
-
-#if OPENTHREAD_FTD
 
 /**
  * This class represents the Thread child table.
@@ -49,6 +49,9 @@ namespace ot {
  */
 class ChildTable : public InstanceLocator
 {
+    friend class NeighborTable;
+    class IteratorBuilder;
+
 public:
     /**
      * This class represents an iterator for iterating through the child entries in the child table.
@@ -56,31 +59,17 @@ public:
      */
     class Iterator : public InstanceLocator
     {
+        friend class IteratorBuilder;
+
     public:
         /**
-         * This constructor initializes an `Iterator` instance to start from beginning of the child table.
+         * This constructor initializes an `Iterator` instance.
          *
          * @param[in] aInstance  A reference to the OpenThread instance.
          * @param[in] aFilter    A child state filter.
          *
          */
         Iterator(Instance &aInstance, Child::StateFilter aFilter);
-
-        /**
-         * This constructor initializes an `Iterator` instance to start from a given child.
-         *
-         * This constructor allows the iterator to start from a given `Child` entry. The iterator will start from the
-         * given child and will go through all entries in the child table (matching the filter) till it gets back to
-         * the starting `Child` entry.
-         *
-         * If the given starting `Child` pointer is `NULL`, then the iterator starts from beginning of the child table.
-         *
-         * @param[in] aInstance        A reference to the OpenThread instance.
-         * @param[in] aFilter          A child state filter.
-         * @param[in] aStartingChild   A pointer to a child. If non-NULL, the iterator starts from the given entry.
-         *
-         */
-        Iterator(Instance &aInstance, Child::StateFilter aFilter, Child *aStartingChild);
 
         /**
          * This method resets the iterator to start over.
@@ -96,24 +85,14 @@ public:
          * @retval FALSE  The current entry is valid.
          *
          */
-        bool IsDone(void) const { return (mChild == NULL); }
-
-        /**
-         * This method advances the iterator.
-         *
-         * The iterator is moved to point to the next `Child` entry matching the given state filter in the constructor.
-         * If there are no more `Child` entries matching the given filter, the iterator becomes empty (i.e.,
-         * `GetChild()` returns `NULL` and `IsDone()` returns `true`).
-         *
-         */
-        void Advance(void);
+        bool IsDone(void) const { return (mChild == nullptr); }
 
         /**
          * This method overloads `++` operator (pre-increment) to advance the iterator.
          *
          * The iterator is moved to point to the next `Child` entry matching the given state filter in the constructor.
          * If there are no more `Child` entries matching the given filter, the iterator becomes empty (i.e.,
-         * `GetChild()` returns `NULL` and `IsDone()` returns `true`).
+         * `GetChild()` returns `nullptr` and `IsDone()` returns `true`).
          *
          */
         void operator++(void) { Advance(); }
@@ -123,7 +102,7 @@ public:
          *
          * The iterator is moved to point to the next `Child` entry matching the given state filter in the constructor.
          * If there are no more `Child` entries matching the given filter, the iterator becomes empty (i.e.,
-         * `GetChild()` returns `NULL` and `IsDone()` returns `true`).
+         * `GetChild()` returns `nullptr` and `IsDone()` returns `true`).
          *
          */
         void operator++(int) { Advance(); }
@@ -131,14 +110,66 @@ public:
         /**
          * This method gets the `Child` entry to which the iterator is currently pointing.
          *
-         * @returns A pointer to the `Child` entry, or `NULL` if the iterator is done and/or empty.
+         * @returns A pointer to the `Child` entry, or `nullptr` if the iterator is done and/or empty.
          *
          */
         Child *GetChild(void) { return mChild; }
 
+        /**
+         * This method overloads the `*` dereference operator and gets a reference to `Child` entry to which the
+         * iterator is currently pointing.
+         *
+         * This method MUST be used when the iterator is not empty/finished (i.e., `IsDone()` returns `false`).
+         *
+         * @returns A reference to the `Child` entry currently pointed by the iterator.
+         *
+         */
+        Child &operator*(void) { return *mChild; }
+
+        /**
+         * This method overloads the `->` dereference operator and gets a pointer to `Child` entry to which the iterator
+         * is currently pointing.
+         *
+         * @returns A pointer to the `Child` entry associated with the iterator, or `nullptr` if iterator is empty/done.
+         *
+         */
+        Child *operator->(void) { return mChild; }
+
+        /**
+         * This method overloads operator `==` to evaluate whether or not two `Iterator` instances point to the same
+         * child entry.
+         *
+         * @param[in]  aOther  The other `Iterator` to compare with.
+         *
+         * @retval TRUE   If the two `Iterator` objects point to the same child entry or both are done.
+         * @retval FALSE  If the two `Iterator` objects do not point to the same child entry.
+         *
+         */
+        bool operator==(const Iterator &aOther) const { return mChild == aOther.mChild; }
+
+        /**
+         * This method overloads operator `!=` to evaluate whether or not two `Iterator` instances point to the same
+         * child entry.
+         *
+         * @param[in]  aOther  The other `Iterator` to compare with.
+         *
+         * @retval TRUE   If the two `Iterator` objects do not point to the same child entry.
+         * @retval FALSE  If the two `Iterator` objects point to the same child entry or both are done.
+         *
+         */
+        bool operator!=(const Iterator &aOther) const { return mChild != aOther.mChild; }
+
     private:
+        Iterator(Instance &aInstance)
+            : InstanceLocator(aInstance)
+            , mFilter(Child::StateFilter::kInStateValid)
+            , mChild(nullptr)
+        {
+        }
+
+        void Advance(void);
+
         Child::StateFilter mFilter;
-        Child *            mStart;
         Child *            mChild;
     };
 
@@ -167,12 +198,12 @@ public:
     uint16_t GetChildIndex(const Child &aChild) const { return static_cast<uint16_t>(&aChild - mChildren); }
 
     /**
-     * This method returns a pointer to a `Child` entry at a given index, or `NULL` if the index is out of bounds,
+     * This method returns a pointer to a `Child` entry at a given index, or `nullptr` if the index is out of bounds,
      * i.e., index is larger or equal to maximum number of children allowed (@sa GetMaxChildrenAllowed()).
      *
      * @param[in]  aChildIndex  A child index.
      *
-     * @returns A pointer to the `Child` corresponding to the given index, or `NULL` if the index is out of bounds.
+     * @returns A pointer to the `Child` corresponding to the given index, or `nullptr` if the index is out of bounds.
      *
      */
     Child *GetChildAtIndex(uint16_t aChildIndex);
@@ -182,7 +213,7 @@ public:
      *
      * @note The returned child entry will be cleared (`memset` to zero).
      *
-     * @returns A pointer to a new `Child` entry, or `NULL` if all `Child` entries are in use.
+     * @returns A pointer to a new `Child` entry, or `nullptr` if all `Child` entries are in use.
      *
      */
     Child *GetNewChild(void);
@@ -193,7 +224,7 @@ public:
      * @param[in]  aRloc16  A RLOC16 address.
      * @param[in]  aFilter  A child state filter.
      *
-     * @returns  A pointer to the `Child` entry if one is found, or `NULL` otherwise.
+     * @returns  A pointer to the `Child` entry if one is found, or `nullptr` otherwise.
      *
      */
     Child *FindChild(uint16_t aRloc16, Child::StateFilter aFilter);
@@ -205,7 +236,7 @@ public:
      * @param[in]  aAddress A reference to an extended address.
      * @param[in]  aFilter  A child state filter.
      *
-     * @returns  A pointer to the `Child` entry if one is found, or `NULL` otherwise.
+     * @returns  A pointer to the `Child` entry if one is found, or `nullptr` otherwise.
      *
      */
     Child *FindChild(const Mac::ExtAddress &aAddress, Child::StateFilter aFilter);
@@ -216,7 +247,7 @@ public:
      * @param[in]  aAddress A reference to a MAC address.
      * @param[in]  aFilter  A child state filter.
      *
-     * @returns  A pointer to the `Child` entry if one is found, or `NULL` otherwise.
+     * @returns  A pointer to the `Child` entry if one is found, or `nullptr` otherwise.
      *
      */
     Child *FindChild(const Mac::Address &aAddress, Child::StateFilter aFilter);
@@ -275,60 +306,112 @@ public:
      */
     otError SetMaxChildrenAllowed(uint16_t aMaxChildren);
 
+    /**
+     * This method enables range-based `for` loop iteration over all child entries in the child table matching a given
+     * state filter.
+     *
+     * This method should be used as follows:
+     *
+     *     for (Child &child : aChildTable.Iterate(aFilter)) { ... }
+     *
+     * @param[in] aFilter  A child state filter.
+     *
+     * @returns An IteratorBuilder instance.
+     *
+     */
+    IteratorBuilder Iterate(Child::StateFilter aFilter) { return IteratorBuilder(GetInstance(), aFilter); }
+
+    /**
+     * This method retains diagnostic information for an attached child by Child ID or RLOC16.
+     *
+     * @param[in]   aChildId    The Child ID or RLOC16 for an attached child.
+     * @param[out]  aChildInfo  A reference to a `Child::Info` to populate with the child information.
+     *
+     */
+    otError GetChildInfoById(uint16_t aChildId, Child::Info &aChildInfo);
+
+    /**
+     * This method retains diagnostic information for an attached child by the internal table index.
+     *
+     * @param[in]   aChildIndex  The table index.
+     * @param[out]  aChildInfo   A reference to a `Child::Info` to populate with the child information.
+     *
+     */
+    otError GetChildInfoByIndex(uint16_t aChildIndex, Child::Info &aChildInfo);
+
+    /**
+     * This method restores child table from non-volatile memory.
+     *
+     */
+    void Restore(void);
+
+    /**
+     * This method removes a stored child information from non-volatile memory.
+     *
+     * @param[in]  aChildRloc16     A reference to the child to remove from non-volatile memory.
+     *
+     */
+    void RemoveStoredChild(const Child &aChild);
+
+    /**
+     * This method store a child information into non-volatile memory.
+     *
+     * @param[in]  aChild          A reference to the child to store.
+     *
+     * @retval  OT_ERROR_NONE      Successfully store child.
+     * @retval  OT_ERROR_NO_BUFS   Insufficient available buffers to store child.
+     *
+     */
+    otError StoreChild(const Child &aChild);
+
+    /**
+     * This method indicates whether the child table contains any sleepy child (in states valid or restoring) with a
+     * given IPv6 address.
+     *
+     * @param[in]  aIp6Address  An IPv6 address.
+     *
+     * @retval TRUE   If the child table contains any sleepy child with @p aIp6Address.
+     * @retval FALSE  If the child table does not contain any sleepy child with @p aIp6Address.
+     *
+     */
+    bool HasSleepyChildWithAddress(const Ip6::Address &aIp6ddress) const;
+
 private:
     enum
     {
         kMaxChildren = OPENTHREAD_CONFIG_MLE_MAX_CHILDREN,
     };
 
+    class IteratorBuilder : public InstanceLocator
+    {
+    public:
+        IteratorBuilder(Instance &aInstance, Child::StateFilter aFilter)
+            : InstanceLocator(aInstance)
+            , mFilter(aFilter)
+        {
+        }
+
+        Iterator begin(void) { return Iterator(GetInstance(), mFilter); }
+        Iterator end(void) { return Iterator(GetInstance()); }
+
+    private:
+        Child::StateFilter mFilter;
+    };
+
+    Child *FindChild(const Child::AddressMatcher &aMatcher)
+    {
+        return const_cast<Child *>(const_cast<const ChildTable *>(this)->FindChild(aMatcher));
+    }
+
+    const Child *FindChild(const Child::AddressMatcher &aMatcher) const;
+    void         RefreshStoredChildren(void);
+
     uint16_t mMaxChildrenAllowed;
     Child    mChildren[kMaxChildren];
 };
 
-#endif // OPENTHREAD_FTD
-
-#if OPENTHREAD_MTD
-
-class ChildTable : public InstanceLocator
-{
-public:
-    class Iterator
-    {
-    public:
-        Iterator(Instance &, Child::StateFilter) {}
-        Iterator(Instance &, Child::StateFilter, Child *) {}
-        void   Reset(void) {}
-        bool   IsDone(void) const { return true; }
-        void   Advance(void) {}
-        void   operator++(void) {}
-        void   operator++(int) {}
-        Child *GetChild(void) { return NULL; }
-    };
-
-    explicit ChildTable(Instance &aInstance)
-        : InstanceLocator(aInstance)
-    {
-    }
-    void Clear(void) {}
-
-    uint16_t GetChildIndex(const Child &) const { return 0; }
-    Child *  GetChildAtIndex(uint16_t) { return NULL; }
-
-    Child *GetNewChild(void) { return NULL; }
-
-    Child *FindChild(uint16_t, Child::StateFilter) { return NULL; }
-    Child *FindChild(const Mac::ExtAddress &, Child::StateFilter) { return NULL; }
-    Child *FindChild(const Mac::Address &, Child::StateFilter) { return NULL; }
-
-    bool     HasChildren(Child::StateFilter) const { return false; }
-    uint16_t GetNumChildren(Child::StateFilter) const { return 0; }
-    uint16_t GetMaxChildren(void) const { return 0; }
-    uint16_t GetMaxChildrenAllowed(void) const { return 0; }
-    otError  SetMaxChildrenAllowed(uint16_t) { return OT_ERROR_INVALID_STATE; }
-};
-
-#endif // OPENTHREAD_MTD
-
 } // namespace ot
+
+#endif // OPENTHREAD_FTD
 
 #endif // CHILD_TABLE_HPP_

@@ -47,6 +47,22 @@
 #include "meshcop/commissioner.hpp"
 #endif // OPENTHREAD_CONFIG_COMMISSIONER_ENABLE && OPENTHREAD_FTD
 
+#if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
+#include "backbone_router/bbr_leader.hpp"
+#endif
+#if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
+#include "backbone_router/bbr_local.hpp"
+#include "backbone_router/bbr_manager.hpp"
+#endif
+
+#if OPENTHREAD_CONFIG_MLR_ENABLE || OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE
+#include "thread/mlr_manager.hpp"
+#endif
+
+#if OPENTHREAD_CONFIG_DUA_ENABLE || OPENTHREAD_CONFIG_TMF_PROXY_DUA_ENABLE
+#include "thread/dua_manager.hpp"
+#endif
+
 #include "meshcop/dataset_manager.hpp"
 
 #if OPENTHREAD_CONFIG_JOINER_ENABLE
@@ -54,7 +70,7 @@
 #endif // OPENTHREAD_CONFIG_JOINER_ENABLE
 
 #include "meshcop/joiner_router.hpp"
-#include "meshcop/leader.hpp"
+#include "meshcop/meshcop_leader.hpp"
 #include "net/dhcp6.hpp"
 #include "net/dhcp6_client.hpp"
 #include "net/dhcp6_server.hpp"
@@ -64,12 +80,14 @@
 #include "net/sntp_client.hpp"
 #include "thread/address_resolver.hpp"
 #include "thread/announce_begin_server.hpp"
+#include "thread/discover_scanner.hpp"
 #include "thread/energy_scan_server.hpp"
 #include "thread/key_manager.hpp"
 #include "thread/mesh_forwarder.hpp"
 #include "thread/mle.hpp"
 #include "thread/mle_router.hpp"
 #include "thread/network_data_local.hpp"
+#include "thread/network_data_notifier.hpp"
 #include "thread/network_diagnostic.hpp"
 #include "thread/panid_query_server.hpp"
 #include "thread/time_sync_service.hpp"
@@ -152,6 +170,17 @@ public:
     otError RouteLookup(const Ip6::Address &aSource, const Ip6::Address &aDestination, uint8_t *aPrefixMatch);
 
     /**
+     * This method indicates whether @p aAddress matches an on-mesh prefix.
+     *
+     * @param[in]  aAddress  The IPv6 address.
+     *
+     * @retval TRUE   If @p aAddress matches an on-mesh prefix.
+     * @retval FALSE  If @p aAddress does not match an on-mesh prefix.
+     *
+     */
+    bool IsOnMesh(const Ip6::Address &aAddress) const;
+
+    /**
      * This method returns whether Thread Management Framework Addressing Rules are met.
      *
      * @retval TRUE   if Thread Management Framework Addressing Rules are met.
@@ -165,10 +194,10 @@ private:
 
     Coap::Coap mCoap;
 #if OPENTHREAD_CONFIG_DHCP6_CLIENT_ENABLE
-    Dhcp6::Dhcp6Client mDhcp6Client;
+    Dhcp6::Client mDhcp6Client;
 #endif // OPENTHREAD_CONFIG_DHCP6_CLIENT_ENABLE
 #if OPENTHREAD_CONFIG_DHCP6_SERVER_ENABLE
-    Dhcp6::Dhcp6Server mDhcp6Server;
+    Dhcp6::Server mDhcp6Server;
 #endif // OPENTHREAD_CONFIG_DHCP6_SERVER_ENABLE
 #if OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE
     Utils::Slaac mSlaac;
@@ -187,10 +216,14 @@ private:
     Mac::Mac                mMac;
     MeshForwarder           mMeshForwarder;
     Mle::MleRouter          mMleRouter;
+    Mle::DiscoverScanner    mDiscoverScanner;
 #if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     NetworkData::Local mNetworkDataLocal;
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     NetworkData::Leader mNetworkDataLeader;
+#if OPENTHREAD_FTD || OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
+    NetworkData::Notifier mNetworkDataNotifier;
+#endif
 #if OPENTHREAD_FTD || OPENTHREAD_CONFIG_TMF_NETWORK_DIAG_MTD_ENABLE
     NetworkDiagnostic::NetworkDiagnostic mNetworkDiagnostic;
 #endif // OPENTHREAD_FTD || OPENTHREAD_CONFIG_TMF_NETWORK_DIAG_MTD_ENABLE
@@ -221,6 +254,19 @@ private:
     AddressResolver       mAddressResolver;
 #endif // OPENTHREAD_FTD
 
+#if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
+    BackboneRouter::Leader mBackboneRouterLeader;
+#endif
+#if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
+    BackboneRouter::Local   mBackboneRouterLocal;
+    BackboneRouter::Manager mBackboneRouterManager;
+#endif
+#if OPENTHREAD_CONFIG_MLR_ENABLE || OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE
+    MlrManager mMlrManager;
+#endif
+#if OPENTHREAD_CONFIG_DUA_ENABLE || OPENTHREAD_CONFIG_TMF_PROXY_DUA_ENABLE
+    DuaManager mDuaManager;
+#endif
     Utils::ChildSupervisor     mChildSupervisor;
     Utils::SupervisionListener mSupervisionListener;
     AnnounceBeginServer        mAnnounceBegin;

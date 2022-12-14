@@ -33,8 +33,9 @@
 
 #include "cli_joiner.hpp"
 
+#include <inttypes.h>
+
 #include "cli/cli.hpp"
-#include "cli/cli_server.hpp"
 
 #if OPENTHREAD_CONFIG_JOINER_ENABLE
 
@@ -42,84 +43,119 @@ namespace ot {
 namespace Cli {
 
 const struct Joiner::Command Joiner::sCommands[] = {
-    {"help", &Joiner::ProcessHelp},
-    {"id", &Joiner::ProcessId},
-    {"start", &Joiner::ProcessStart},
-    {"stop", &Joiner::ProcessStop},
+    {"discerner", &Joiner::ProcessDiscerner}, {"help", &Joiner::ProcessHelp}, {"id", &Joiner::ProcessId},
+    {"start", &Joiner::ProcessStart},         {"stop", &Joiner::ProcessStop},
 };
 
-otError Joiner::ProcessHelp(int argc, char *argv[])
+otError Joiner::ProcessDiscerner(uint8_t aArgsLength, char *aArgs[])
 {
-    OT_UNUSED_VARIABLE(argc);
-    OT_UNUSED_VARIABLE(argv);
+    otError error = OT_ERROR_NONE;
 
-    for (size_t i = 0; i < OT_ARRAY_LENGTH(sCommands); i++)
+    if (aArgsLength == 2)
     {
-        mInterpreter.mServer->OutputFormat("%s\r\n", sCommands[i].mName);
+        otJoinerDiscerner discerner;
+
+        memset(&discerner, 0, sizeof(discerner));
+        if (strcmp(aArgs[1], "clear") == 0)
+        {
+            SuccessOrExit(error = otJoinerSetDiscerner(mInterpreter.mInstance, nullptr));
+        }
+        else
+        {
+            VerifyOrExit(OT_ERROR_NONE == Interpreter::ParseJoinerDiscerner(aArgs[1], discerner),
+                         error = OT_ERROR_INVALID_ARGS);
+            SuccessOrExit(error = otJoinerSetDiscerner(mInterpreter.mInstance, &discerner));
+        }
     }
-
-    return OT_ERROR_NONE;
-}
-
-otError Joiner::ProcessId(int argc, char *argv[])
-{
-    OT_UNUSED_VARIABLE(argc);
-    OT_UNUSED_VARIABLE(argv);
-
-    otExtAddress joinerId;
-
-    otJoinerGetId(mInterpreter.mInstance, &joinerId);
-
-    mInterpreter.OutputBytes(joinerId.m8, sizeof(joinerId));
-    mInterpreter.mServer->OutputFormat("\r\n");
-
-    return OT_ERROR_NONE;
-}
-
-otError Joiner::ProcessStart(int argc, char *argv[])
-{
-    otError     error;
-    const char *provisioningUrl = NULL;
-
-    VerifyOrExit(argc > 1, error = OT_ERROR_INVALID_ARGS);
-
-    if (argc > 2)
+    else if (aArgsLength == 1)
     {
-        provisioningUrl = argv[2];
-    }
+        const otJoinerDiscerner *discerner = otJoinerGetDiscerner(mInterpreter.mInstance);
 
-    error = otJoinerStart(mInterpreter.mInstance, argv[1], provisioningUrl, PACKAGE_NAME,
-                          OPENTHREAD_CONFIG_PLATFORM_INFO, PACKAGE_VERSION, NULL, &Joiner::HandleCallback, this);
+        VerifyOrExit(discerner != nullptr, error = OT_ERROR_NOT_FOUND);
+
+        mInterpreter.OutputFormat("0x%" PRIx64 "/%u\r\n", discerner->mValue, discerner->mLength);
+    }
+    else
+    {
+        error = OT_ERROR_INVALID_ARGS;
+    }
 
 exit:
     return error;
 }
 
-otError Joiner::ProcessStop(int argc, char *argv[])
+otError Joiner::ProcessHelp(uint8_t aArgsLength, char *aArgs[])
 {
-    OT_UNUSED_VARIABLE(argc);
-    OT_UNUSED_VARIABLE(argv);
+    OT_UNUSED_VARIABLE(aArgsLength);
+    OT_UNUSED_VARIABLE(aArgs);
+
+    for (const Command &command : sCommands)
+    {
+        mInterpreter.OutputFormat("%s\r\n", command.mName);
+    }
+
+    return OT_ERROR_NONE;
+}
+
+otError Joiner::ProcessId(uint8_t aArgsLength, char *aArgs[])
+{
+    OT_UNUSED_VARIABLE(aArgsLength);
+    OT_UNUSED_VARIABLE(aArgs);
+
+    const otExtAddress *joinerId;
+
+    joinerId = otJoinerGetId(mInterpreter.mInstance);
+
+    mInterpreter.OutputBytes(joinerId->m8, sizeof(otExtAddress));
+    mInterpreter.OutputFormat("\r\n");
+
+    return OT_ERROR_NONE;
+}
+
+otError Joiner::ProcessStart(uint8_t aArgsLength, char *aArgs[])
+{
+    otError     error;
+    const char *provisioningUrl = nullptr;
+
+    VerifyOrExit(aArgsLength > 1, error = OT_ERROR_INVALID_ARGS);
+
+    if (aArgsLength > 2)
+    {
+        provisioningUrl = aArgs[2];
+    }
+
+    error = otJoinerStart(mInterpreter.mInstance, aArgs[1], provisioningUrl, PACKAGE_NAME,
+                          OPENTHREAD_CONFIG_PLATFORM_INFO, PACKAGE_VERSION, nullptr, &Joiner::HandleCallback, this);
+
+exit:
+    return error;
+}
+
+otError Joiner::ProcessStop(uint8_t aArgsLength, char *aArgs[])
+{
+    OT_UNUSED_VARIABLE(aArgsLength);
+    OT_UNUSED_VARIABLE(aArgs);
 
     otJoinerStop(mInterpreter.mInstance);
 
     return OT_ERROR_NONE;
 }
 
-otError Joiner::Process(int argc, char *argv[])
+otError Joiner::Process(uint8_t aArgsLength, char *aArgs[])
 {
-    otError error = OT_ERROR_INVALID_ARGS;
+    otError error = OT_ERROR_INVALID_COMMAND;
 
-    if (argc < 1)
+    if (aArgsLength < 1)
     {
-        ProcessHelp(0, NULL);
+        IgnoreError(ProcessHelp(0, nullptr));
     }
     else
     {
-        for (size_t i = 0; i < OT_ARRAY_LENGTH(sCommands); i++)
+        for (const Command &command : sCommands)
         {
-            if (strcmp(argv[0], sCommands[i].mName) == 0)
+            if (strcmp(aArgs[0], command.mName) == 0)
             {
-                error = (this->*sCommands[i].mCommand)(argc, argv);
+                error = (this->*command.mCommand)(aArgsLength, aArgs);
                 break;
             }
         }
@@ -138,11 +174,11 @@ void Joiner::HandleCallback(otError aError)
     switch (aError)
     {
     case OT_ERROR_NONE:
-        mInterpreter.mServer->OutputFormat("Join success\r\n");
+        mInterpreter.OutputFormat("Join success\r\n");
         break;
 
     default:
-        mInterpreter.mServer->OutputFormat("Join failed [%s]\r\n", otThreadErrorToString(aError));
+        mInterpreter.OutputFormat("Join failed [%s]\r\n", otThreadErrorToString(aError));
         break;
     }
 }

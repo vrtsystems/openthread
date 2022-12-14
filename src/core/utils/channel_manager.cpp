@@ -51,11 +51,10 @@ ChannelManager::ChannelManager(Instance &aInstance)
     , mSupportedChannelMask(0)
     , mFavoredChannelMask(0)
     , mActiveTimestamp(0)
-    , mNotifierCallback(aInstance, &ChannelManager::HandleStateChanged, this)
     , mDelay(kMinimumDelay)
     , mChannel(0)
     , mState(kStateIdle)
-    , mTimer(aInstance, &ChannelManager::HandleTimer, this)
+    , mTimer(aInstance, ChannelManager::HandleTimer, this)
     , mAutoSelectInterval(kDefaultAutoSelectInterval)
     , mAutoSelectEnabled(false)
 {
@@ -77,7 +76,7 @@ void ChannelManager::RequestChannelChange(uint8_t aChannel)
 
     mTimer.Start(1 + Random::NonCrypto::GetUint32InRange(0, kRequestStartJitterInterval));
 
-    Get<Notifier>().Signal(OT_CHANGED_CHANNEL_MANAGER_NEW_CHANNEL);
+    Get<Notifier>().Signal(kEventChannelManagerNewChannelChanged);
 
 exit:
     return;
@@ -102,9 +101,9 @@ void ChannelManager::PreparePendingDataset(void)
     otOperationalDataset dataset;
     otError              error;
 
-    VerifyOrExit(mState == kStateChangeRequested);
+    VerifyOrExit(mState == kStateChangeRequested, OT_NOOP);
 
-    VerifyOrExit(mChannel != Get<Mac::Mac>().GetPanChannel());
+    VerifyOrExit(mChannel != Get<Mac::Mac>().GetPanChannel(), OT_NOOP);
 
     if (Get<MeshCoP::PendingDataset>().Read(dataset) == OT_ERROR_NONE)
     {
@@ -140,7 +139,7 @@ void ChannelManager::PreparePendingDataset(void)
         // situation where a channel change request comes right after the
         // network is formed but before the active dataset is created.
 
-        if (Get<Mle::Mle>().GetRole() != OT_DEVICE_ROLE_DISABLED)
+        if (!Get<Mle::Mle>().IsDisabled())
         {
             mTimer.Start(kPendingDatasetTxRetryInterval);
         }
@@ -204,7 +203,7 @@ void ChannelManager::PreparePendingDataset(void)
     dataset.mDelay                                 = delayInMs;
     dataset.mComponents.mIsDelayPresent            = true;
 
-    error = Get<MeshCoP::PendingDataset>().SendSetRequest(dataset, NULL, 0);
+    error = Get<MeshCoP::PendingDataset>().SendSetRequest(dataset, nullptr, 0);
 
     if (error == OT_ERROR_NONE)
     {
@@ -236,7 +235,7 @@ void ChannelManager::HandleTimer(void)
     {
     case kStateIdle:
         otLogInfoUtil("ChannelManager: Auto-triggered channel select");
-        IgnoreReturnValue(RequestChannelSelect(false));
+        IgnoreError(RequestChannelSelect(false));
         StartAutoSelectTimer();
         break;
 
@@ -252,15 +251,10 @@ void ChannelManager::HandleTimer(void)
     }
 }
 
-void ChannelManager::HandleStateChanged(Notifier::Callback &aCallback, otChangedFlags aChangedFlags)
+void ChannelManager::HandleNotifierEvents(Events aEvents)
 {
-    aCallback.GetOwner<ChannelManager>().HandleStateChanged(aChangedFlags);
-}
-
-void ChannelManager::HandleStateChanged(otChangedFlags aChangedFlags)
-{
-    VerifyOrExit((aChangedFlags & OT_CHANGED_THREAD_CHANNEL) != 0);
-    VerifyOrExit(mChannel == Get<Mac::Mac>().GetPanChannel());
+    VerifyOrExit(aEvents.Contains(kEventThreadChannelChanged), OT_NOOP);
+    VerifyOrExit(mChannel == Get<Mac::Mac>().GetPanChannel(), OT_NOOP);
 
     mState = kStateIdle;
     StartAutoSelectTimer();
@@ -345,9 +339,9 @@ otError ChannelManager::RequestChannelSelect(bool aSkipQualityCheck)
     otLogInfoUtil("ChannelManager: Request to select channel (skip quality check: %s)",
                   aSkipQualityCheck ? "yes" : "no");
 
-    VerifyOrExit(Get<Mle::Mle>().GetRole() != OT_DEVICE_ROLE_DISABLED, error = OT_ERROR_INVALID_STATE);
+    VerifyOrExit(!Get<Mle::Mle>().IsDisabled(), error = OT_ERROR_INVALID_STATE);
 
-    VerifyOrExit(aSkipQualityCheck || ShouldAttemptChannelChange());
+    VerifyOrExit(aSkipQualityCheck || ShouldAttemptChannelChange(), OT_NOOP);
 
     SuccessOrExit(error = FindBetterChannel(newChannel, newOccupancy));
 
@@ -389,7 +383,7 @@ exit:
 
 void ChannelManager::StartAutoSelectTimer(void)
 {
-    VerifyOrExit(mState == kStateIdle);
+    VerifyOrExit(mState == kStateIdle, OT_NOOP);
 
     if (mAutoSelectEnabled)
     {
@@ -409,7 +403,7 @@ void ChannelManager::SetAutoChannelSelectionEnabled(bool aEnabled)
     if (aEnabled != mAutoSelectEnabled)
     {
         mAutoSelectEnabled = aEnabled;
-        IgnoreReturnValue(RequestChannelSelect(false));
+        IgnoreError(RequestChannelSelect(false));
         StartAutoSelectTimer();
     }
 }

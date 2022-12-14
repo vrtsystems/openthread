@@ -60,9 +60,8 @@ TimeSync::TimeSync(Instance &aInstance)
 #endif
     , mLastTimeSyncReceived(0)
     , mNetworkTimeOffset(0)
-    , mTimeSyncCallback(NULL)
-    , mTimeSyncCallbackContext(NULL)
-    , mNotifierCallback(aInstance, &TimeSync::HandleStateChanged, this)
+    , mTimeSyncCallback(nullptr)
+    , mTimeSyncCallbackContext(nullptr)
     , mTimer(aInstance, HandleTimeout, this)
     , mCurrentStatus(OT_NETWORK_TIME_UNSYNCHRONIZED)
 {
@@ -81,7 +80,7 @@ void TimeSync::HandleTimeSyncMessage(const Message &aMessage)
     const int64_t origNetworkTimeOffset = mNetworkTimeOffset;
     int8_t        timeSyncSeqDelta;
 
-    VerifyOrExit(aMessage.GetTimeSyncSeq() != OT_TIME_SYNC_INVALID_SEQ);
+    VerifyOrExit(aMessage.GetTimeSyncSeq() != OT_TIME_SYNC_INVALID_SEQ, OT_NOOP);
 
     timeSyncSeqDelta = static_cast<int8_t>(aMessage.GetTimeSyncSeq() - mTimeSyncSeq);
 
@@ -94,7 +93,7 @@ void TimeSync::HandleTimeSyncMessage(const Message &aMessage)
         otLogInfoCore("Older time sync seq received:%u. Forwarding current seq:%u", aMessage.GetTimeSyncSeq(),
                       mTimeSyncSeq);
     }
-    else if (Get<Mle::MleRouter>().GetRole() == OT_DEVICE_ROLE_LEADER && timeSyncSeqDelta > 0)
+    else if (Get<Mle::MleRouter>().IsLeader() && timeSyncSeqDelta > 0)
     {
         // Another device is forwarding a later time sync sequence, perhaps because it merged from a different
         // partition. The leader is authoritative, so ensure all devices synchronize to the time being seeded by this
@@ -105,14 +104,13 @@ void TimeSync::HandleTimeSyncMessage(const Message &aMessage)
         otLogInfoCore("Newer time sync seq:%u received by leader. Setting current seq to:%u and forwarding",
                       aMessage.GetTimeSyncSeq(), mTimeSyncSeq);
     }
-    else if (Get<Mle::MleRouter>().GetRole() != OT_DEVICE_ROLE_LEADER)
+    else if (!Get<Mle::MleRouter>().IsLeader())
     {
         // For all devices aside from the leader, update network time in following three cases:
         //  1. During first attach.
         //  2. Already attached, and a newer time sync sequence was received.
         //  3. During reattach or migration process.
-        if (mTimeSyncSeq == OT_TIME_SYNC_INVALID_SEQ || timeSyncSeqDelta > 0 ||
-            Get<Mle::MleRouter>().GetRole() == OT_DEVICE_ROLE_DETACHED)
+        if (mTimeSyncSeq == OT_TIME_SYNC_INVALID_SEQ || timeSyncSeqDelta > 0 || Get<Mle::MleRouter>().IsDetached())
         {
             // Update network time and forward it.
             mLastTimeSyncReceived = TimerMilli::GetNow();
@@ -143,7 +141,7 @@ void TimeSync::IncrementTimeSyncSeq(void)
 
 void TimeSync::NotifyTimeSyncCallback(void)
 {
-    if (mTimeSyncCallback != NULL)
+    if (mTimeSyncCallback != nullptr)
     {
         mTimeSyncCallback(mTimeSyncCallbackContext);
     }
@@ -152,7 +150,7 @@ void TimeSync::NotifyTimeSyncCallback(void)
 #if OPENTHREAD_FTD
 void TimeSync::ProcessTimeSync(void)
 {
-    if (Get<Mle::MleRouter>().GetRole() == OT_DEVICE_ROLE_LEADER &&
+    if (Get<Mle::MleRouter>().IsLeader() &&
         (TimerMilli::GetNow() - mLastTimeSyncSent > Time::SecToMsec(mTimeSyncPeriod)))
     {
         IncrementTimeSyncSeq();
@@ -163,7 +161,7 @@ void TimeSync::ProcessTimeSync(void)
 
     if (mTimeSyncRequired)
     {
-        VerifyOrExit(Get<Mle::MleRouter>().SendTimeSync() == OT_ERROR_NONE);
+        VerifyOrExit(Get<Mle::MleRouter>().SendTimeSync() == OT_ERROR_NONE, OT_NOOP);
 
         mLastTimeSyncSent = TimerMilli::GetNow();
         mTimeSyncRequired = false;
@@ -174,16 +172,16 @@ exit:
 }
 #endif // OPENTHREAD_FTD
 
-void TimeSync::HandleStateChanged(otChangedFlags aFlags)
+void TimeSync::HandleNotifierEvents(Events aEvents)
 {
     bool stateChanged = false;
 
-    if ((aFlags & OT_CHANGED_THREAD_ROLE) != 0)
+    if (aEvents.Contains(kEventThreadRoleChanged))
     {
         stateChanged = true;
     }
 
-    if ((aFlags & OT_CHANGED_THREAD_PARTITION_ID) != 0 && Get<Mle::MleRouter>().GetRole() != OT_DEVICE_ROLE_LEADER)
+    if (aEvents.Contains(kEventThreadPartitionIdChanged) && !Get<Mle::MleRouter>().IsLeader())
     {
         // Partition has changed. Accept any network time currently being seeded on the new partition
         // and don't attempt to forward the currently held network time from the previous partition.
@@ -210,11 +208,6 @@ void TimeSync::HandleTimeout(void)
     CheckAndHandleChanges(false);
 }
 
-void TimeSync::HandleStateChanged(Notifier::Callback &aCallback, otChangedFlags aFlags)
-{
-    aCallback.GetOwner<TimeSync>().HandleStateChanged(aFlags);
-}
-
 void TimeSync::HandleTimeout(Timer &aTimer)
 {
     aTimer.GetOwner<TimeSync>().HandleTimeout();
@@ -230,14 +223,14 @@ void TimeSync::CheckAndHandleChanges(bool aTimeUpdated)
 
     switch (Get<Mle::MleRouter>().GetRole())
     {
-    case OT_DEVICE_ROLE_DISABLED:
-    case OT_DEVICE_ROLE_DETACHED:
+    case Mle::kRoleDisabled:
+    case Mle::kRoleDetached:
         networkTimeStatus = OT_NETWORK_TIME_UNSYNCHRONIZED;
         otLogInfoCore("Time sync status UNSYNCHRONIZED as role:DISABLED/DETACHED");
         break;
 
-    case OT_DEVICE_ROLE_CHILD:
-    case OT_DEVICE_ROLE_ROUTER:
+    case Mle::kRoleChild:
+    case Mle::kRoleRouter:
         if (mLastTimeSyncReceived.GetValue() == 0)
         {
             // Haven't yet received any time sync
@@ -254,13 +247,13 @@ void TimeSync::CheckAndHandleChanges(bool aTimeUpdated)
         else
         {
             // Schedule a check 1 millisecond after two periods of time
-            assert(resyncNeededThresholdMs >= timeSyncLastSyncMs);
+            OT_ASSERT(resyncNeededThresholdMs >= timeSyncLastSyncMs);
             mTimer.Start(resyncNeededThresholdMs - timeSyncLastSyncMs + 1);
             otLogInfoCore("Time sync status SYNCHRONIZED");
         }
         break;
 
-    case OT_DEVICE_ROLE_LEADER:
+    case Mle::kRoleLeader:
         otLogInfoCore("Time sync status SYNCHRONIZED as role:LEADER");
         break;
     }

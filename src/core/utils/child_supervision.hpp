@@ -90,6 +90,8 @@ namespace Utils {
  */
 class ChildSupervisor : public InstanceLocator
 {
+    friend class ot::Notifier;
+
 public:
     /**
      * This constructor initializes the object.
@@ -135,7 +137,8 @@ public:
      *
      * @param[in] aMessage The message for which to get the destination.
      *
-     * @returns  A pointer to the destination child of the message, or NULL if @p aMessage is not of supervision type.
+     * @returns  A pointer to the destination child of the message, or nullptr if @p aMessage is not of supervision
+     * type.
      *
      */
     Child *GetDestination(const Message &aMessage) const;
@@ -160,12 +163,10 @@ private:
     void        CheckState(void);
     static void HandleTimer(Timer &aTimer);
     void        HandleTimer(void);
-    static void HandleStateChanged(Notifier::Callback &aCallback, otChangedFlags aFlags);
-    void        HandleStateChanged(otChangedFlags aFlags);
+    void        HandleNotifierEvents(Events aEvents);
 
-    uint16_t           mSupervisionInterval;
-    TimerMilli         mTimer;
-    Notifier::Callback mNotifierCallback;
+    uint16_t   mSupervisionInterval;
+    TimerMilli mTimer;
 };
 
 #else // #if OPENTHREAD_CONFIG_CHILD_SUPERVISION_ENABLE && OPENTHREAD_FTD
@@ -178,7 +179,7 @@ public:
     void     Stop(void) {}
     void     SetSupervisionInterval(uint16_t) {}
     uint16_t GetSupervisionInterval(void) const { return 0; }
-    Child *  GetDestination(const Message &) const { return NULL; }
+    Child *  GetDestination(const Message &) const { return nullptr; }
     void     UpdateOnSend(Child &) {}
 };
 

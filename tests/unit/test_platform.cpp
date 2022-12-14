@@ -32,55 +32,43 @@
 
 bool                 g_testPlatAlarmSet     = false;
 uint32_t             g_testPlatAlarmNext    = 0;
-testPlatAlarmStop    g_testPlatAlarmStop    = NULL;
-testPlatAlarmStartAt g_testPlatAlarmStartAt = NULL;
-testPlatAlarmGetNow  g_testPlatAlarmGetNow  = NULL;
+testPlatAlarmStop    g_testPlatAlarmStop    = nullptr;
+testPlatAlarmStartAt g_testPlatAlarmStartAt = nullptr;
+testPlatAlarmGetNow  g_testPlatAlarmGetNow  = nullptr;
 
 otRadioCaps                     g_testPlatRadioCaps               = OT_RADIO_CAPS_NONE;
-testPlatRadioSetPanId           g_testPlatRadioSetPanId           = NULL;
-testPlatRadioSetExtendedAddress g_testPlatRadioSetExtendedAddress = NULL;
-testPlatRadioIsEnabled          g_testPlatRadioIsEnabled          = NULL;
-testPlatRadioEnable             g_testPlatRadioEnable             = NULL;
-testPlatRadioDisable            g_testPlatRadioDisable            = NULL;
-testPlatRadioSetShortAddress    g_testPlatRadioSetShortAddress    = NULL;
-testPlatRadioReceive            g_testPlatRadioReceive            = NULL;
-testPlatRadioTransmit           g_testPlatRadioTransmit           = NULL;
-testPlatRadioGetTransmitBuffer  g_testPlatRadioGetTransmitBuffer  = NULL;
+testPlatRadioSetPanId           g_testPlatRadioSetPanId           = nullptr;
+testPlatRadioSetExtendedAddress g_testPlatRadioSetExtendedAddress = nullptr;
+testPlatRadioIsEnabled          g_testPlatRadioIsEnabled          = nullptr;
+testPlatRadioEnable             g_testPlatRadioEnable             = nullptr;
+testPlatRadioDisable            g_testPlatRadioDisable            = nullptr;
+testPlatRadioSetShortAddress    g_testPlatRadioSetShortAddress    = nullptr;
+testPlatRadioReceive            g_testPlatRadioReceive            = nullptr;
+testPlatRadioTransmit           g_testPlatRadioTransmit           = nullptr;
+testPlatRadioGetTransmitBuffer  g_testPlatRadioGetTransmitBuffer  = nullptr;
 
-void testPlatResetToDefaults(void)
+enum
 {
-    g_testPlatAlarmSet     = false;
-    g_testPlatAlarmNext    = 0;
-    g_testPlatAlarmStop    = NULL;
-    g_testPlatAlarmStartAt = NULL;
-    g_testPlatAlarmGetNow  = NULL;
+    FLASH_SWAP_SIZE = 2048,
+    FLASH_SWAP_NUM  = 2,
+};
 
-    g_testPlatRadioCaps               = OT_RADIO_CAPS_NONE;
-    g_testPlatRadioSetPanId           = NULL;
-    g_testPlatRadioSetExtendedAddress = NULL;
-    g_testPlatRadioSetShortAddress    = NULL;
-    g_testPlatRadioIsEnabled          = NULL;
-    g_testPlatRadioEnable             = NULL;
-    g_testPlatRadioDisable            = NULL;
-    g_testPlatRadioReceive            = NULL;
-    g_testPlatRadioTransmit           = NULL;
-    g_testPlatRadioGetTransmitBuffer  = NULL;
-}
+uint8_t g_flash[FLASH_SWAP_SIZE * FLASH_SWAP_NUM];
 
 ot::Instance *testInitInstance(void)
 {
-    otInstance *instance = NULL;
+    otInstance *instance = nullptr;
 
 #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
     size_t   instanceBufferLength = 0;
-    uint8_t *instanceBuffer       = NULL;
+    uint8_t *instanceBuffer       = nullptr;
 
     // Call to query the buffer size
-    (void)otInstanceInit(NULL, &instanceBufferLength);
+    (void)otInstanceInit(nullptr, &instanceBufferLength);
 
     // Call to allocate the buffer
     instanceBuffer = (uint8_t *)malloc(instanceBufferLength);
-    VerifyOrQuit(instanceBuffer != NULL, "Failed to allocate otInstance");
+    VerifyOrQuit(instanceBuffer != nullptr, "Failed to allocate otInstance");
     memset(instanceBuffer, 0, instanceBufferLength);
 
     // Initialize OpenThread with the buffer
@@ -159,7 +147,7 @@ uint32_t otPlatAlarmMilliGetNow(void)
     else
     {
         struct timeval tv;
-        gettimeofday(&tv, NULL);
+        gettimeofday(&tv, nullptr);
         return (uint32_t)((tv.tv_sec * 1000) + (tv.tv_usec / 1000) + 123456);
     }
 }
@@ -198,7 +186,7 @@ uint32_t otPlatAlarmMicroGetNow(void)
     else
     {
         struct timeval tv;
-        gettimeofday(&tv, NULL);
+        gettimeofday(&tv, nullptr);
         return (uint32_t)((tv.tv_sec * 1000000) + tv.tv_usec + 123456);
     }
 }
@@ -339,7 +327,7 @@ void otPlatRadioEnableSrcMatch(otInstance *aInstance, bool aEnable)
     OT_UNUSED_VARIABLE(aEnable);
 }
 
-otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, const uint16_t aShortAddress)
+otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, uint16_t aShortAddress)
 {
     OT_UNUSED_VARIABLE(aInstance);
     OT_UNUSED_VARIABLE(aShortAddress);
@@ -353,7 +341,7 @@ otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress
     return OT_ERROR_NONE;
 }
 
-otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, const uint16_t aShortAddress)
+otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, uint16_t aShortAddress)
 {
     OT_UNUSED_VARIABLE(aInstance);
     OT_UNUSED_VARIABLE(aShortAddress);
@@ -417,14 +405,14 @@ exit:
 // Diag
 //
 
-void otPlatDiagProcess(otInstance *aInstance, int argc, char *argv[], char *aOutput, size_t aOutputMaxLen)
+void otPlatDiagProcess(otInstance *aInstance, uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aInstance);
-    OT_UNUSED_VARIABLE(argc);
+    OT_UNUSED_VARIABLE(aArgsLength);
     OT_UNUSED_VARIABLE(aOutputMaxLen);
 
     // no more diagnostics features for Posix platform
-    sprintf(aOutput, "diag feature '%s' is not supported\r\n", argv[0]);
+    sprintf(aOutput, "diag feature '%s' is not supported\r\n", aArgs[0]);
 }
 
 void otPlatDiagModeSet(bool aMode)
@@ -543,12 +531,72 @@ void otPlatSettingsWipe(otInstance *aInstance)
     OT_UNUSED_VARIABLE(aInstance);
 }
 
+void otPlatFlashInit(otInstance *aInstance)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    memset(g_flash, 0xff, sizeof(g_flash));
+}
+
+uint32_t otPlatFlashGetSwapSize(otInstance *aInstance)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    return FLASH_SWAP_SIZE;
+}
+
+void otPlatFlashErase(otInstance *aInstance, uint8_t aSwapIndex)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    uint32_t address;
+
+    VerifyOrQuit(aSwapIndex < FLASH_SWAP_NUM, "aSwapIndex invalid");
+
+    address = aSwapIndex ? FLASH_SWAP_SIZE : 0;
+
+    memset(g_flash + address, 0xff, FLASH_SWAP_SIZE);
+}
+
+void otPlatFlashRead(otInstance *aInstance, uint8_t aSwapIndex, uint32_t aOffset, void *aData, uint32_t aSize)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    uint32_t address;
+
+    VerifyOrQuit(aSwapIndex < FLASH_SWAP_NUM, "aSwapIndex invalid");
+    VerifyOrQuit(aSize <= FLASH_SWAP_SIZE, "aSize invalid");
+    VerifyOrQuit(aOffset <= (FLASH_SWAP_SIZE - aSize), "aOffset + aSize invalid");
+
+    address = aSwapIndex ? FLASH_SWAP_SIZE : 0;
+
+    memcpy(aData, g_flash + address + aOffset, aSize);
+}
+
+void otPlatFlashWrite(otInstance *aInstance, uint8_t aSwapIndex, uint32_t aOffset, const void *aData, uint32_t aSize)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    uint32_t address;
+
+    VerifyOrQuit(aSwapIndex < FLASH_SWAP_NUM, "aSwapIndex invalid");
+    VerifyOrQuit(aSize <= FLASH_SWAP_SIZE, "aSize invalid");
+    VerifyOrQuit(aOffset <= (FLASH_SWAP_SIZE - aSize), "aOffset + aSize invalid");
+
+    address = aSwapIndex ? FLASH_SWAP_SIZE : 0;
+
+    for (uint32_t index = 0; index < aSize; index++)
+    {
+        g_flash[address + aOffset + index] &= ((uint8_t *)aData)[index];
+    }
+}
+
 #if OPENTHREAD_CONFIG_TIME_SYNC_ENABLE
 uint64_t otPlatTimeGet(void)
 {
     struct timeval tv;
 
-    gettimeofday(&tv, NULL);
+    gettimeofday(&tv, nullptr);
 
     return (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
 }
@@ -558,5 +606,12 @@ uint16_t otPlatTimeGetXtalAccuracy(void)
     return 0;
 }
 #endif // OPENTHREAD_CONFIG_TIME_SYNC_ENABLE
+
+#if OPENTHREAD_CONFIG_OTNS_ENABLE
+void otPlatOtnsStatus(const char *aStatus)
+{
+    OT_UNUSED_VARIABLE(aStatus);
+}
+#endif // OPENTHREAD_CONFIG_OTNS_ENABLE
 
 } // extern "C"

@@ -75,7 +75,7 @@ void TimerMilli::Start(uint32_t aDelay)
 
 void TimerMilli::StartAt(TimeMilli aStartTime, uint32_t aDelay)
 {
-    assert(aDelay <= kMaxDelay);
+    OT_ASSERT(aDelay <= kMaxDelay);
     FireAt(aStartTime + aDelay);
 }
 
@@ -100,7 +100,7 @@ void TimerMilli::Stop(void)
 
 void TimerScheduler::Add(Timer &aTimer, const AlarmApi &aAlarmApi)
 {
-    Timer *prev = NULL;
+    Timer *prev = nullptr;
     Time   now(aAlarmApi.AlarmGetNow());
 
     Remove(aTimer, aAlarmApi);
@@ -113,7 +113,7 @@ void TimerScheduler::Add(Timer &aTimer, const AlarmApi &aAlarmApi)
         }
     }
 
-    if (prev == NULL)
+    if (prev == nullptr)
     {
         mTimerList.Push(aTimer);
         SetAlarm(aAlarmApi);
@@ -126,7 +126,7 @@ void TimerScheduler::Add(Timer &aTimer, const AlarmApi &aAlarmApi)
 
 void TimerScheduler::Remove(Timer &aTimer, const AlarmApi &aAlarmApi)
 {
-    VerifyOrExit(aTimer.IsRunning());
+    VerifyOrExit(aTimer.IsRunning(), OT_NOOP);
 
     if (mTimerList.GetHead() == &aTimer)
     {
@@ -135,7 +135,7 @@ void TimerScheduler::Remove(Timer &aTimer, const AlarmApi &aAlarmApi)
     }
     else
     {
-        mTimerList.Remove(aTimer);
+        IgnoreError(mTimerList.Remove(aTimer));
     }
 
     aTimer.SetNext(&aTimer);
@@ -188,7 +188,7 @@ extern "C" void otPlatAlarmMilliFired(otInstance *aInstance)
 {
     Instance *instance = static_cast<Instance *>(aInstance);
 
-    VerifyOrExit(otInstanceIsInitialized(aInstance));
+    VerifyOrExit(otInstanceIsInitialized(aInstance), OT_NOOP);
     instance->Get<TimerMilliScheduler>().ProcessTimers();
 
 exit:
@@ -205,7 +205,7 @@ void                           TimerMicro::Start(uint32_t aDelay)
 
 void TimerMicro::StartAt(TimeMicro aStartTime, uint32_t aDelay)
 {
-    assert(aDelay <= kMaxDelay);
+    OT_ASSERT(aDelay <= kMaxDelay);
     FireAt(aStartTime + aDelay);
 }
 
@@ -224,7 +224,7 @@ extern "C" void otPlatAlarmMicroFired(otInstance *aInstance)
 {
     Instance *instance = static_cast<Instance *>(aInstance);
 
-    VerifyOrExit(otInstanceIsInitialized(aInstance));
+    VerifyOrExit(otInstanceIsInitialized(aInstance), OT_NOOP);
     instance->Get<TimerMicroScheduler>().ProcessTimers();
 
 exit:

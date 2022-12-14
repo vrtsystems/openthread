@@ -45,12 +45,36 @@
 #endif
 
 /**
+ * @def OPENTHREAD_CONFIG_LOG_OUTPUT
+ *
+ * Select the log output.
+ *
+ */
+#ifndef OPENTHREAD_CONFIG_LOG_OUTPUT
+#define OPENTHREAD_CONFIG_LOG_OUTPUT OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED
+#endif
+
+/**
+ * @def OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE
+ *
+ * Define as 1 to enable dynamic log level control.
+ *
+ * Note that the OPENTHREAD_CONFIG_LOG_LEVEL determines the log level at
+ * compile time. The dynamic log level control (if enabled) only allows
+ * decreasing the log level from the compile time value.
+ *
+ */
+#ifndef OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE
+#define OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE 1
+#endif
+
+/**
  * @def OPENTHREAD_CONFIG_PLATFORM_INFO
  *
  * The platform-specific string to insert into the OpenThread version string.
  *
  */
-#define OPENTHREAD_CONFIG_PLATFORM_INFO "POSIX-APP"
+#define OPENTHREAD_CONFIG_PLATFORM_INFO "POSIX"
 
 /**
  * @def OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE
@@ -61,8 +85,6 @@
 #ifndef OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE /* allows command line override */
 #define OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE 1
 #endif
-
-#define OPENTHREAD_CONFIG_UART_CLI_RAW 1
 
 /**
  * @def OPENTHREAD_CONFIG_NCP_UART_ENABLE
@@ -82,13 +104,13 @@
 #define OPENTHREAD_CONFIG_PLATFORM_RADIO_COEX_ENABLE 1
 #endif
 
-#if OPENTHREAD_ENABLE_POSIX_APP_DAEMON
+#if OPENTHREAD_POSIX_CONFIG_DAEMON_ENABLE
 
-#ifndef OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE 
+#ifndef OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
 #define OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE 1
 #endif
 
-#ifndef OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE 
+#ifndef OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE
 #define OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE 1
 #endif
 

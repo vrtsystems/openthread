@@ -28,6 +28,10 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
+# Do not enable -Wcast-align for this platform
+override CFLAGS    := $(filter-out -Wcast-align,$(CFLAGS))
+override CXXFLAGS  := $(filter-out -Wcast-align,$(CXXFLAGS))
+
 lib_LIBRARIES                             = libopenthread-gp712.a
 
 libopenthread_gp712_a_CPPFLAGS            = \
@@ -62,10 +66,6 @@ libopenthread_gp712_a_LIBADD              = \
     $(shell find $(top_builddir)/examples/platforms/utils $(Dash)type f $(Dash)name "*.o")
 
 libopenthread_gp712_a_SOURCES             = \
-    $(PLATFORM_SOURCES)                     \
-    $(NULL)
-
-PRETTY_FILES                              = \
     $(PLATFORM_SOURCES)                     \
     $(NULL)
 

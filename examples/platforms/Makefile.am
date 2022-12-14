@@ -35,10 +35,12 @@ DIST_SUBDIRS                            = \
     cc2538                                \
     cc2650                                \
     cc2652                                \
+    efr32mg1    			  \
     efr32mg12                             \
     efr32mg13                             \
     efr32mg21                             \
     gp712                                 \
+    k32w                                  \
     kw41z                                 \
     nrf528xx                              \
     simulation                            \
@@ -69,6 +71,10 @@ if OPENTHREAD_PLATFORM_CC2652
 SUBDIRS                                += cc2652
 endif
 
+if OPENTHREAD_PLATFORM_EFR32MG1
+SUBDIRS                                += efr32mg1
+endif
+
 if OPENTHREAD_PLATFORM_EFR32MG12
 SUBDIRS                                += efr32mg12
 endif
@@ -83,6 +89,10 @@ endif
 
 if OPENTHREAD_PLATFORM_GP712
 SUBDIRS                                += gp712
+endif
+
+if OPENTHREAD_PLATFORM_K32W
+SUBDIRS                                += k32w
 endif
 
 if OPENTHREAD_PLATFORM_KW41Z
@@ -107,25 +117,6 @@ endif
 
 noinst_HEADERS                          = \
     openthread-system.h                   \
-    $(NULL)
-
-# Always pretty (e.g. for 'make pretty') these subdirectories.
-
-PRETTY_SUBDIRS                          = \
-    cc1352                                \
-    cc2538                                \
-    cc2650                                \
-    cc2652                                \
-    efr32mg12                             \
-    efr32mg13                             \
-    efr32mg21                             \
-    gp712                                 \
-    kw41z                                 \
-    nrf528xx                              \
-    simulation                            \
-    qpg6095                               \
-    samr21                                \
-    utils                                 \
     $(NULL)
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

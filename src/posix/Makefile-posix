@@ -58,15 +58,19 @@ LEGACY                               ?= 1
 LINK_RAW                             ?= 0
 LOG_OUTPUT                           ?= PLATFORM_DEFINED
 MAC_FILTER                           ?= 1
+MAX_POWER_TABLE                      ?= 1
 MTD_NETDIAG                          ?= 1
 READLINE                             ?= readline
 REFERENCE_DEVICE                     ?= 1
 SERVICE                              ?= 1
 SNTP_CLIENT                          ?= 1
+ifneq ($(DAEMON),1)
 UDP_FORWARD                          ?= 1
+endif
 
 COMMONCFLAGS                         := \
     -g                                  \
+    -DOPENTHREAD_CONFIG_UART_CLI_RAW=1  \
     $(NULL)
 
 # If the user has asserted COVERAGE, alter the configuration options
@@ -76,13 +80,13 @@ configure_OPTIONS                   = \
     --enable-cli                      \
     --enable-ftd                      \
     --enable-ncp                      \
-    --enable-posix-app                \
+    --with-platform=posix             \
     $(NULL)
 
 # Platform specific switches
 
 ifeq ($(DAEMON),1)
-configure_OPTIONS              += --enable-posix-app-daemon
+configure_OPTIONS              += --enable-posix-daemon
 endif
 
 ifneq ($(DEBUG),1)
@@ -95,18 +99,23 @@ ifneq ($(HOST),)
 configure_OPTIONS              += --host=$(HOST)
 endif
 
+ifeq ($(MAX_POWER_TABLE),1)
+COMMONCFLAGS                   += -DOPENTHREAD_POSIX_CONFIG_MAX_POWER_TABLE_ENABLE=1
+endif
+
 ifeq ($(PLATFORM_NETIF),1)
 COMMONCFLAGS                   += -DOPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE=1
 endif
 
 ifneq ($(READLINE),)
 configure_OPTIONS              += --with-readline=$(READLINE)
+CLI_TRANSPORT                   = $(if $(and $(filter-out no,$(READLINE)),$(filter 0,$(DAEMON))),CONSOLE,UART)
 endif
 
-ifeq ($(RCP_SPI),1)
-COMMONCFLAGS                   += -DOPENTHREAD_POSIX_RCP_SPI_ENABLE=1
+ifeq ($(RCP_BUS),spi)
+COMMONCFLAGS                   += -DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_SPI
 else
-COMMONCFLAGS                   += -DOPENTHREAD_POSIX_RCP_UART_ENABLE=1
+COMMONCFLAGS                   += -DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_UART
 endif
 
 ifeq ($(VIRTUAL_TIME),1)

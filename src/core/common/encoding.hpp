@@ -149,6 +149,36 @@ inline uint32_t ReadUint32(const uint8_t *aBuffer)
 }
 
 /**
+ * This function reads a 24-bit integer value from a given buffer assuming big-ending encoding.
+ *
+ * @param[in] aBuffer   Pointer to buffer to read from.
+ *
+ * @returns The value read from buffer.
+ *
+ */
+inline uint32_t ReadUint24(const uint8_t *aBuffer)
+{
+    return ((static_cast<uint32_t>(aBuffer[0]) << 16) | (static_cast<uint32_t>(aBuffer[1]) << 8) |
+            (static_cast<uint32_t>(aBuffer[2]) << 0));
+}
+
+/**
+ * This function reads a `uint64_t` value from a given buffer assuming big-ending encoding.
+ *
+ * @param[in] aBuffer   Pointer to buffer to read from.
+ *
+ * @returns The `uint64_t` value read from buffer.
+ *
+ */
+inline uint64_t ReadUint64(const uint8_t *aBuffer)
+{
+    return ((static_cast<uint64_t>(aBuffer[0]) << 56) | (static_cast<uint64_t>(aBuffer[1]) << 48) |
+            (static_cast<uint64_t>(aBuffer[2]) << 40) | (static_cast<uint64_t>(aBuffer[3]) << 32) |
+            (static_cast<uint64_t>(aBuffer[4]) << 24) | (static_cast<uint64_t>(aBuffer[5]) << 16) |
+            (static_cast<uint64_t>(aBuffer[6]) << 8) | (static_cast<uint64_t>(aBuffer[7]) << 0));
+}
+
+/**
  * This function writes a `uint16_t` value to a given buffer using big-ending encoding.
  *
  * @param[in]  aValue    The value to write to buffer.
@@ -159,6 +189,20 @@ inline void WriteUint16(uint16_t aValue, uint8_t *aBuffer)
 {
     aBuffer[0] = (aValue >> 8) & 0xff;
     aBuffer[1] = (aValue >> 0) & 0xff;
+}
+
+/**
+ * This function writes a 24-bit integer value to a given buffer using big-ending encoding.
+ *
+ * @param[in]  aValue    The value to write to buffer.
+ * @param[out] aBuffer   Pointer to buffer where the value will be written.
+ *
+ */
+inline void WriteUint24(uint32_t aValue, uint8_t *aBuffer)
+{
+    aBuffer[0] = (aValue >> 16) & 0xff;
+    aBuffer[1] = (aValue >> 8) & 0xff;
+    aBuffer[2] = (aValue >> 0) & 0xff;
 }
 
 /**
@@ -174,6 +218,25 @@ inline void WriteUint32(uint32_t aValue, uint8_t *aBuffer)
     aBuffer[1] = (aValue >> 16) & 0xff;
     aBuffer[2] = (aValue >> 8) & 0xff;
     aBuffer[3] = (aValue >> 0) & 0xff;
+}
+
+/**
+ * This function writes a `uint64_t` value to a given buffer using big-ending encoding.
+ *
+ * @param[in]  aValue    The value to write to buffer.
+ * @param[out] aBuffer   Pointer to buffer where the value will be written.
+ *
+ */
+inline void WriteUint64(uint64_t aValue, uint8_t *aBuffer)
+{
+    aBuffer[0] = (aValue >> 56) & 0xff;
+    aBuffer[1] = (aValue >> 48) & 0xff;
+    aBuffer[2] = (aValue >> 40) & 0xff;
+    aBuffer[3] = (aValue >> 32) & 0xff;
+    aBuffer[4] = (aValue >> 24) & 0xff;
+    aBuffer[5] = (aValue >> 16) & 0xff;
+    aBuffer[6] = (aValue >> 8) & 0xff;
+    aBuffer[7] = (aValue >> 0) & 0xff;
 }
 
 } // namespace BigEndian
@@ -226,6 +289,20 @@ inline uint16_t ReadUint16(const uint8_t *aBuffer)
 }
 
 /**
+ * This function reads a 24-bit integer value from a given buffer assuming little-ending encoding.
+ *
+ * @param[in] aBuffer   Pointer to buffer to read from.
+ *
+ * @returns The value read from buffer.
+ *
+ */
+inline uint32_t ReadUint24(const uint8_t *aBuffer)
+{
+    return ((static_cast<uint32_t>(aBuffer[0]) << 0) | (static_cast<uint32_t>(aBuffer[1]) << 8) |
+            (static_cast<uint32_t>(aBuffer[2]) << 16));
+}
+
+/**
  * This function reads a `uint32_t` value from a given buffer assuming little-ending encoding.
  *
  * @param[in] aBuffer   Pointer to buffer to read from.
@@ -237,6 +314,22 @@ inline uint32_t ReadUint32(const uint8_t *aBuffer)
 {
     return ((static_cast<uint32_t>(aBuffer[0]) << 0) | (static_cast<uint32_t>(aBuffer[1]) << 8) |
             (static_cast<uint32_t>(aBuffer[2]) << 16) | (static_cast<uint32_t>(aBuffer[3]) << 24));
+}
+
+/**
+ * This function reads a `uint64_t` value from a given buffer assuming little-ending encoding.
+ *
+ * @param[in] aBuffer   Pointer to buffer to read from.
+ *
+ * @returns The `uint64_t` value read from buffer.
+ *
+ */
+inline uint64_t ReadUint64(const uint8_t *aBuffer)
+{
+    return ((static_cast<uint64_t>(aBuffer[0]) << 0) | (static_cast<uint64_t>(aBuffer[1]) << 8) |
+            (static_cast<uint64_t>(aBuffer[2]) << 16) | (static_cast<uint64_t>(aBuffer[3]) << 24) |
+            (static_cast<uint64_t>(aBuffer[4]) << 32) | (static_cast<uint64_t>(aBuffer[5]) << 40) |
+            (static_cast<uint64_t>(aBuffer[6]) << 48) | (static_cast<uint64_t>(aBuffer[7]) << 56));
 }
 
 /**
@@ -253,6 +346,20 @@ inline void WriteUint16(uint16_t aValue, uint8_t *aBuffer)
 }
 
 /**
+ * This function writes a 24-bit integer value to a given buffer using little-ending encoding.
+ *
+ * @param[in]  aValue   The value to write to buffer.
+ * @param[out] aBuffer  Pointer to buffer where the value will be written.
+ *
+ */
+inline void WriteUint24(uint32_t aValue, uint8_t *aBuffer)
+{
+    aBuffer[0] = (aValue >> 0) & 0xff;
+    aBuffer[1] = (aValue >> 8) & 0xff;
+    aBuffer[2] = (aValue >> 16) & 0xff;
+}
+
+/**
  * This function writes a `uint32_t` value to a given buffer using little-ending encoding.
  *
  * @param[in]  aValue   The value to write to buffer.
@@ -265,6 +372,25 @@ inline void WriteUint32(uint32_t aValue, uint8_t *aBuffer)
     aBuffer[1] = (aValue >> 8) & 0xff;
     aBuffer[2] = (aValue >> 16) & 0xff;
     aBuffer[3] = (aValue >> 24) & 0xff;
+}
+
+/**
+ * This function writes a `uint64_t` value to a given buffer using little-ending encoding.
+ *
+ * @param[in]  aValue   The value to write to buffer.
+ * @param[out] aBuffer  Pointer to buffer where the value will be written.
+ *
+ */
+inline void WriteUint64(uint64_t aValue, uint8_t *aBuffer)
+{
+    aBuffer[0] = (aValue >> 0) & 0xff;
+    aBuffer[1] = (aValue >> 8) & 0xff;
+    aBuffer[2] = (aValue >> 16) & 0xff;
+    aBuffer[3] = (aValue >> 24) & 0xff;
+    aBuffer[4] = (aValue >> 32) & 0xff;
+    aBuffer[5] = (aValue >> 40) & 0xff;
+    aBuffer[6] = (aValue >> 48) & 0xff;
+    aBuffer[7] = (aValue >> 56) & 0xff;
 }
 
 } // namespace LittleEndian

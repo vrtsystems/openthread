@@ -29,21 +29,32 @@
 add_library(openthread-cli-ftd)
 add_library(openthread-cli-mtd)
 
+set(OT_CLI_TRANSPORT "UART" CACHE STRING "set the CLI transport")
+set(OT_CLI_TRANSPORT_VALUES
+    "UART"
+    "CONSOLE"
+)
+set_property(CACHE OT_CLI_TRANSPORT PROPERTY STRINGS ${OT_CLI_TRANSPORT_VALUES})
+
 set_target_properties(
     openthread-cli-ftd openthread-cli-mtd
     PROPERTIES
         C_STANDARD 99
-        CXX_STANDARD 98
+        CXX_STANDARD 11
 )
 
-target_compile_definitions(openthread-cli-ftd PRIVATE
-    ${OT_PRIVATE_DEFINES}
-    OPENTHREAD_FTD=1
+target_compile_definitions(openthread-cli-ftd
+    PRIVATE
+        OPENTHREAD_FTD=1
+    PUBLIC
+        "OPENTHREAD_CONFIG_CLI_TRANSPORT=OT_CLI_TRANSPORT_${OT_CLI_TRANSPORT}"
 )
 
-target_compile_definitions(openthread-cli-mtd PRIVATE
-    ${OT_PRIVATE_DEFINES}
-    OPENTHREAD_MTD=1
+target_compile_definitions(openthread-cli-mtd
+    PRIVATE
+        OPENTHREAD_MTD=1
+    PUBLIC
+        "OPENTHREAD_CONFIG_CLI_TRANSPORT=OT_CLI_TRANSPORT_${OT_CLI_TRANSPORT}"
 )
 
 target_compile_options(openthread-cli-ftd PRIVATE
@@ -55,7 +66,6 @@ target_compile_options(openthread-cli-mtd PRIVATE
 )
 
 set(COMMON_INCLUDES
-    ${OT_PRIVATE_INCLUDES}
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/core
 )
@@ -68,7 +78,6 @@ set(COMMON_SOURCES
     cli_console.cpp
     cli_dataset.cpp
     cli_joiner.cpp
-    cli_server.cpp
     cli_uart.cpp
     cli_udp.cpp
 )
@@ -82,9 +91,15 @@ target_sources(openthread-cli-mtd PRIVATE ${COMMON_SOURCES})
 target_link_libraries(openthread-cli-ftd
     PUBLIC
         openthread-ftd
+    PRIVATE
+        ${OT_MBEDTLS}
+        ot-config
 )
 
 target_link_libraries(openthread-cli-mtd
     PUBLIC
         openthread-mtd
+    PRIVATE
+        ${OT_MBEDTLS}
+        ot-config
 )

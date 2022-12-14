@@ -41,6 +41,7 @@
 #include "common/tlvs.hpp"
 #include "net/ip6_address.hpp"
 #include "thread/mle.hpp"
+#include "thread/mle_types.hpp"
 
 namespace ot {
 
@@ -50,6 +51,10 @@ using ot::Encoding::BigEndian::HostSwap32;
 enum
 {
     kCoapUdpPort = 61631,
+
+    // Thread 1.2.0 5.19.13 limits the number of IPv6 addresses should be [1, 15].
+    kIPv6AddressesNumMin = 1,
+    kIPv6AddressesNumMax = 15,
 };
 
 /**
@@ -76,6 +81,7 @@ public:
         kNDOption            = 8,  ///< ND Option TLV
         kNDData              = 9,  ///< ND Data TLV
         kThreadNetworkData   = 10, ///< Thread Network Data TLV
+        kIPv6Addresses       = 14, ///< IPv6 Addresses TLV
     };
 
     /**
@@ -93,23 +99,6 @@ public:
      *
      */
     void SetType(Type aType) { ot::Tlv::SetType(static_cast<uint8_t>(aType)); }
-
-    /**
-     * This static method reads the requested TLV out of @p aMessage.
-     *
-     * @param[in]   aMessage    A reference to the message.
-     * @param[in]   aType       The Type value to search for.
-     * @param[in]   aMaxLength  Maximum number of bytes to read.
-     * @param[out]  aTlv        A reference to the TLV that will be copied to.
-     *
-     * @retval OT_ERROR_NONE       Successfully copied the TLV.
-     * @retval OT_ERROR_NOT_FOUND  Could not find the TLV with Type @p aType.
-     *
-     */
-    static otError GetTlv(const Message &aMessage, Type aType, uint16_t aMaxLength, Tlv &aTlv)
-    {
-        return ot::Tlv::Get(aMessage, static_cast<uint8_t>(aType), aMaxLength, aTlv);
-    }
 
 } OT_TOOL_PACKED_END;
 
@@ -132,6 +121,35 @@ public:
         kHaveChildIdRequest    = 3, ///< Address Solicit due to child ID request.
         kParentPartitionChange = 4, ///< Address Solicit due to parent partition change
     };
+
+    /**
+     * Multicast Listener Registration (MLR) Status values
+     *
+     */
+    enum MlrStatus
+    {
+        kMlrSuccess        = 0, ///< Successful (de)registration of all IPv6 addresses.
+        kMlrInvalid        = 2, ///< Invalid IPv6 address(es) in request.
+        kMlrNoPersistent   = 3, ///< This device does not support persistent registrations.
+        kMlrNoResources    = 4, ///< BBR resource shortage.
+        kMlrBbrNotPrimary  = 5, ///< BBR is not Primary at this moment.
+        kMlrGeneralFailure = 6, ///< Reason(s) for failure are not further specified.
+    };
+
+    /**
+     * Domain Unicast Address (DUA) Registration Status values
+     *
+     */
+    enum DuaStatus : uint8_t
+    {
+        kDuaSuccess        = 0, ///< Successful registration.
+        kDuaReRegister     = 1, ///< Registration was accepted but immediate reregistration is required to solve.
+        kDuaInvalid        = 2, ///< Registration rejected (Fatal): Target EID is not a valid DUA.
+        kDuaDuplicate      = 3, ///< Registration rejected (Fatal): DUA is already in use by another device.
+        kDuaNoResources    = 4, ///< Registration rejected (Non-fatal): Backbone Router Resource shortage.
+        kDuaNotPrimary     = 5, ///< Registration rejected (Non-fatal): Backbone Router is not primary at this moment.
+        kDuaGeneralFailure = 6, ///< Registration failure (Non-fatal): Reason(s) not futher specified.
+    };
 };
 
 /**
@@ -149,6 +167,7 @@ public:
     {
         SetType(kRouterMask);
         SetLength(sizeof(*this) - sizeof(ThreadTlv));
+        mAssignedRouterIdMask.Clear();
     }
 
     /**
@@ -177,36 +196,24 @@ public:
     void SetIdSequence(uint8_t aSequence) { mIdSequence = aSequence; }
 
     /**
-     * This method clears the Assigned Router ID Mask.
+     * This method gets the Assigned Router ID Mask.
+     *
+     * @returns The Assigned Router ID Mask.
      *
      */
-    void ClearAssignedRouterIdMask(void) { memset(mAssignedRouterIdMask, 0, sizeof(mAssignedRouterIdMask)); }
+    const Mle::RouterIdSet &GetAssignedRouterIdMask(void) const { return mAssignedRouterIdMask; }
 
     /**
-     * This method indicates whether or not a given Router ID is set in the Assigned Router ID Mask.
+     * This method sets the Assigned Router ID Mask.
      *
-     * @param[in]  aRouterId  The Router ID.
-     *
-     * @retval TRUE   If the given Router ID is set in the Assigned Router ID Mask.
-     * @retval FALSE  If the given Router ID is not set in the Assigned Router ID Mask.
+     * @param[in]  aRouterIdSet A reference to the Assigned Router ID Mask.
      *
      */
-    bool IsAssignedRouterIdSet(uint8_t aRouterId) const
-    {
-        return (mAssignedRouterIdMask[aRouterId / 8] & (0x80 >> (aRouterId % 8))) != 0;
-    }
-
-    /**
-     * This method clears the Assigned Router ID Mask.
-     *
-     * @param[in]  aRouterId  The Router ID.
-     *
-     */
-    void SetAssignedRouterId(uint8_t aRouterId) { mAssignedRouterIdMask[aRouterId / 8] |= 0x80 >> (aRouterId % 8); }
+    void SetAssignedRouterIdMask(const Mle::RouterIdSet &aRouterIdSet) { mAssignedRouterIdMask = aRouterIdSet; }
 
 private:
-    uint8_t mIdSequence;
-    uint8_t mAssignedRouterIdMask[BitVectorBytes(Mle::kMaxRouterId + 1)];
+    uint8_t          mIdSequence;
+    Mle::RouterIdSet mAssignedRouterIdMask;
 };
 
 /**
@@ -251,6 +258,51 @@ private:
 
     uint8_t mTlvs[kMaxSize];
 } OT_TOOL_PACKED_END;
+
+#if OPENTHREAD_CONFIG_MLR_ENABLE || OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE
+
+/**
+ * This class implements IPv6 Addresses TLV generation and parsing.
+ *
+ */
+OT_TOOL_PACKED_BEGIN
+class IPv6AddressesTlv : public ThreadTlv
+{
+public:
+    /**
+     * This method initializes the TLV.
+     *
+     */
+    void Init(void) { SetType(kIPv6Addresses); }
+
+    /**
+     * This method indicates whether or not the TLV appears to be well-formed.
+     *
+     * @retval TRUE   If the TLV appears to be well-formed.
+     * @retval FALSE  If the TLV does not appear to be well-formed.
+     *
+     */
+    bool IsValid(void) const
+    {
+        return GetLength() >= sizeof(Ip6::Address) * kIPv6AddressesNumMin &&
+               GetLength() <= sizeof(Ip6::Address) * kIPv6AddressesNumMax && (GetLength() % sizeof(Ip6::Address)) == 0;
+    }
+
+    /**
+     * This method returns a pointer to the IPv6 address entry.
+     *
+     * @param[in]  aIndex  The index into the IPv6 address list.
+     *
+     * @returns A reference to the IPv6 address.
+     *
+     */
+    const Ip6::Address &GetIp6Address(uint8_t aIndex) const
+    {
+        return *reinterpret_cast<const Ip6::Address *>(GetValue() + (aIndex * sizeof(Ip6::Address)));
+    }
+} OT_TOOL_PACKED_END;
+
+#endif // OPENTHREAD_CONFIG_MLR_ENABLE || OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE
 
 } // namespace ot
 

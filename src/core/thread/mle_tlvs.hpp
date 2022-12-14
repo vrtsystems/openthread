@@ -41,7 +41,7 @@
 #include "common/tlvs.hpp"
 #include "meshcop/timestamp.hpp"
 #include "net/ip6_address.hpp"
-#include "thread/mle_constants.hpp"
+#include "thread/mle_types.hpp"
 
 namespace ot {
 
@@ -49,10 +49,6 @@ namespace Mle {
 
 using ot::Encoding::BigEndian::HostSwap16;
 using ot::Encoding::BigEndian::HostSwap32;
-
-#define TLVREQUESTTLV_ITERATOR_INIT 0 ///< Initializer for TlvRequestTlvIterator.
-
-typedef uint8_t TlvRequestIterator; ///< Used to iterate through TlvRequestTlv.
 
 /**
  * @addtogroup core-mle-tlvs
@@ -134,51 +130,28 @@ public:
      */
     void SetType(Type aType) { ot::Tlv::SetType(static_cast<uint8_t>(aType)); }
 
-    /**
-     * This static method reads the requested TLV out of @p aMessage.
-     *
-     * @param[in]   aMessage    A reference to the message.
-     * @param[in]   aType       The Type value to search for.
-     * @param[in]   aMaxLength  Maximum number of bytes to read.
-     * @param[out]  aTlv        A reference to the TLV that will be copied to.
-     *
-     * @retval OT_ERROR_NONE       Successfully copied the TLV.
-     * @retval OT_ERROR_NOT_FOUND  Could not find the TLV with Type @p aType.
-     *
-     */
-    static otError GetTlv(const Message &aMessage, Type aType, uint16_t aMaxLength, Tlv &aTlv)
-    {
-        return ot::Tlv::Get(aMessage, static_cast<uint8_t>(aType), aMaxLength, aTlv);
-    }
-
-    /**
-     * This static method obtains the offset of a TLV within @p aMessage.
-     *
-     * @param[in]   aMessage    A reference to the message.
-     * @param[in]   aType       The Type value to search for.
-     * @param[out]  aOffset     A reference to the offset of the TLV.
-     *
-     * @retval OT_ERROR_NONE       Successfully copied the TLV.
-     * @retval OT_ERROR_NOT_FOUND  Could not find the TLV with Type @p aType.
-     *
-     */
-    static otError GetOffset(const Message &aMessage, Type aType, uint16_t &aOffset)
-    {
-        return ot::Tlv::GetOffset(aMessage, static_cast<uint8_t>(aType), aOffset);
-    }
-
 } OT_TOOL_PACKED_END;
 
 #if !OPENTHREAD_CONFIG_MLE_LONG_ROUTES_ENABLE
 
 /**
- * This class implements Source Address TLV generation and parsing.
+ * This class implements Route TLV generation and parsing.
  *
  */
 OT_TOOL_PACKED_BEGIN
 class RouteTlv : public Tlv
 {
 public:
+    enum
+    {
+#if OPENTHREAD_CONFIG_TIME_SYNC_ENABLE
+        kLinkAcceptMaxRouters = 3,
+#else
+        kLinkAcceptMaxRouters = 20,
+#endif
+        kLinkAcceptSequenceRollback = 64,
+    };
+
     /**
      * This method initializes the TLV.
      *
@@ -187,7 +160,7 @@ public:
     {
         SetType(kRoute);
         SetLength(sizeof(*this) - sizeof(Tlv));
-        memset(mRouterIdMask, 0, sizeof(mRouterIdMask));
+        mRouterIdMask.Clear();
         memset(mRouteData, 0, sizeof(mRouteData));
     }
 
@@ -217,32 +190,29 @@ public:
     void SetRouterIdSequence(uint8_t aSequence) { mRouterIdSequence = aSequence; }
 
     /**
-     * This method clears the Router ID Mask.
+     * This method gets the Router ID Mask.
      *
      */
-    void ClearRouterIdMask(void) { memset(mRouterIdMask, 0, sizeof(mRouterIdMask)); }
+    const RouterIdSet &GetRouterIdMask(void) const { return mRouterIdMask; }
+
+    /**
+     * This method sets the Router ID Mask.
+     *
+     * @param[in]  aRouterIdSet The Router ID Mask to set.
+     *
+     */
+    void SetRouterIdMask(const RouterIdSet &aRouterIdSet) { mRouterIdMask = aRouterIdSet; }
 
     /**
      * This method indicates whether or not a Router ID bit is set.
      *
-     * @param[in]  aRouterId  The Router ID.
+     * @param[in]  aRouterId  The Router ID bit.
      *
      * @retval TRUE   If the Router ID bit is set.
      * @retval FALSE  If the Router ID bit is not set.
      *
      */
-    bool IsRouterIdSet(uint8_t aRouterId) const
-    {
-        return (mRouterIdMask[aRouterId / 8] & (0x80 >> (aRouterId % 8))) != 0;
-    }
-
-    /**
-     * This method sets the Router ID bit.
-     *
-     * @param[in]  aRouterId  The Router ID bit to set.
-     *
-     */
-    void SetRouterId(uint8_t aRouterId) { mRouterIdMask[aRouterId / 8] |= 0x80 >> (aRouterId % 8); }
+    bool IsRouterIdSet(uint8_t aRouterId) const { return mRouterIdMask.Contains(aRouterId); }
 
     /**
      * This method returns the Route Data Length value.
@@ -344,15 +314,15 @@ private:
         kRouteCostOffset      = 0,
         kRouteCostMask        = 0xf << kRouteCostOffset,
     };
-    uint8_t mRouterIdSequence;
-    uint8_t mRouterIdMask[BitVectorBytes(kMaxRouterId + 1)];
-    uint8_t mRouteData[kMaxRouterId + 1];
+    uint8_t     mRouterIdSequence;
+    RouterIdSet mRouterIdMask;
+    uint8_t     mRouteData[kMaxRouterId + 1];
 } OT_TOOL_PACKED_END;
 
 #else // OPENTHREAD_CONFIG_MLE_LONG_ROUTES_ENABLE
 
 /**
- * This class implements Source Address TLV generation and parsing.
+ * This class implements Route TLV generation and parsing.
  *
  */
 OT_TOOL_PACKED_BEGIN
@@ -395,10 +365,18 @@ public:
     void SetRouterIdSequence(uint8_t aSequence) { mRouterIdSequence = aSequence; }
 
     /**
-     * This method clears the Router ID Mask.
+     * This method gets the Router ID Mask.
      *
      */
-    void ClearRouterIdMask(void) { memset(mRouterIdMask, 0, sizeof(mRouterIdMask)); }
+    const RouterIdSet &GetRouterIdMask(void) const { return mRouterIdMask; }
+
+    /**
+     * This method sets the Router ID Mask.
+     *
+     * @param[in]  aRouterIdSet The Router ID Mask to set.
+     *
+     */
+    void SetRouterIdMask(const RouterIdSet &aRouterIdSet) { mRouterIdMask = aRouterIdSet; }
 
     /**
      * This method indicates whether or not a Router ID bit is set.
@@ -409,10 +387,7 @@ public:
      * @retval FALSE  If the Router ID bit is not set.
      *
      */
-    bool IsRouterIdSet(uint8_t aRouterId) const
-    {
-        return (mRouterIdMask[aRouterId / 8] & (0x80 >> (aRouterId % 8))) != 0;
-    }
+    bool IsRouterIdSet(uint8_t aRouterId) const { return mRouterIdMask.Contains(aRouterId); }
 
     /**
      * This method sets the Router ID bit.
@@ -420,7 +395,7 @@ public:
      * @param[in]  aRouterId  The Router ID bit to set.
      *
      */
-    void SetRouterId(uint8_t aRouterId) { mRouterIdMask[aRouterId / 8] |= 0x80 >> (aRouterId % 8); }
+    void SetRouterId(uint8_t aRouterId) { mRouterIdMask.Add(aRouterId); }
 
     /**
      * This method returns the Route Data Length value.
@@ -560,29 +535,23 @@ private:
         kRouteCostMask        = 0xf << kRouteCostOffset,
         kOddEntryOffset       = 4,
     };
-    uint8_t mRouterIdSequence;
-    uint8_t mRouterIdMask[BitVectorBytes(kMaxRouterId + 1)];
-    // Since we do hold 12 (compressible to 11) bits of data per router, each entry occupies 1.5 bytes, consecutively.
-    // First 4 bits are link qualities, remaining 8 bits are route cost.
+    uint8_t     mRouterIdSequence;
+    RouterIdSet mRouterIdMask;
+    // Since we do hold 12 (compressible to 11) bits of data per router, each entry occupies 1.5 bytes,
+    // consecutively. First 4 bits are link qualities, remaining 8 bits are route cost.
     uint8_t mRouteData[kMaxRouterId + 1 + kMaxRouterId / 2 + 1];
 } OT_TOOL_PACKED_END;
 
 #endif // OPENTHREAD_CONFIG_MLE_LONG_ROUTES_ENABLE
 
 /**
- * This class implements Source Address TLV generation and parsing.
+ * This class implements Leader Data TLV generation and parsing.
  *
  */
 OT_TOOL_PACKED_BEGIN
 class LeaderDataTlv : public Tlv
 {
 public:
-    /**
-     * This method clears the object (setting all fields to zero).
-     *
-     */
-    void Clear(void) { memset(this, 0, sizeof(*this)); }
-
     /**
      * This method initializes the TLV.
      *
@@ -603,84 +572,34 @@ public:
     bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
 
     /**
-     * This method returns the Partition ID value.
+     * This method gets the Leader Data info from TLV.
      *
-     * @returns The Partition ID value.
+     * @param[out] aLeaderData   A reference to output Leader Data info.
      *
      */
-    uint32_t GetPartitionId(void) const { return HostSwap32(mPartitionId); }
+    void Get(LeaderData &aLeaderData) const
+    {
+        aLeaderData.SetPartitionId(HostSwap32(mPartitionId));
+        aLeaderData.SetWeighting(mWeighting);
+        aLeaderData.SetDataVersion(mDataVersion);
+        aLeaderData.SetStableDataVersion(mStableDataVersion);
+        aLeaderData.SetLeaderRouterId(mLeaderRouterId);
+    }
 
     /**
-     * This method sets the Partition ID value.
+     * This method sets the Leader Data.
      *
-     * @param[in]  aPartitionId  The Partition ID value.
-     *
-     */
-    void SetPartitionId(uint32_t aPartitionId) { mPartitionId = HostSwap32(aPartitionId); }
-
-    /**
-     * This method returns the Weighting value.
-     *
-     * @returns The Weighting value.
+     * @param[in] aLeaderData   A Leader Data.
      *
      */
-    uint8_t GetWeighting(void) const { return mWeighting; }
-
-    /**
-     * This method sets the Weighting value.
-     *
-     * @param[in]  aWeighting  The Weighting value.
-     *
-     */
-    void SetWeighting(uint8_t aWeighting) { mWeighting = aWeighting; }
-
-    /**
-     * This method returns the Data Version value.
-     *
-     * @returns The Data Version value.
-     *
-     */
-    uint8_t GetDataVersion(void) const { return mDataVersion; }
-
-    /**
-     * This method sets the Data Version value.
-     *
-     * @param[in]  aVersion  The Data Version value.
-     *
-     */
-    void SetDataVersion(uint8_t aVersion) { mDataVersion = aVersion; }
-
-    /**
-     * This method returns the Stable Data Version value.
-     *
-     * @returns The Stable Data Version value.
-     *
-     */
-    uint8_t GetStableDataVersion(void) const { return mStableDataVersion; }
-
-    /**
-     * This method sets the Stable Data Version value.
-     *
-     * @param[in]  aVersion  The Stable Data Version value.
-     *
-     */
-    void SetStableDataVersion(uint8_t aVersion) { mStableDataVersion = aVersion; }
-
-    /**
-     * This method returns the Leader Router ID value.
-     *
-     * @returns The Leader Router ID value.
-     *
-     */
-    uint8_t GetLeaderRouterId(void) const { return mLeaderRouterId; }
-
-    /**
-     * This method sets the Leader Router ID value.
-     *
-     * @param[in]  aRouterId  The Leader Router ID value.
-     *
-     */
-    void SetLeaderRouterId(uint8_t aRouterId) { mLeaderRouterId = aRouterId; }
+    void Set(const LeaderData &aLeaderData)
+    {
+        mPartitionId       = HostSwap32(aLeaderData.GetPartitionId());
+        mWeighting         = aLeaderData.GetWeighting();
+        mDataVersion       = aLeaderData.GetDataVersion();
+        mStableDataVersion = aLeaderData.GetStableDataVersion();
+        mLeaderRouterId    = aLeaderData.GetLeaderRouterId();
+    }
 
 private:
     uint32_t mPartitionId;
@@ -725,7 +644,7 @@ public:
 };
 
 /**
- * This class implements Source Address TLV generation and parsing.
+ * This class implements Connectivity TLV generation and parsing.
  *
  */
 OT_TOOL_PACKED_BEGIN
@@ -1014,28 +933,28 @@ public:
     void SetContextId(uint8_t aContextId) { mControl = kCompressed | aContextId; }
 
     /**
-     * This method returns a pointer to the IID value.
+     * This method returns the IID value.
      *
-     * @returns A pointer to the IID value.
+     * @returns The IID value.
      *
      */
-    const uint8_t *GetIid(void) const { return mIid; }
+    const Ip6::InterfaceIdentifier &GetIid(void) const { return mIid; }
 
     /**
      * This method sets the IID value.
      *
-     * @param[in]  aIid  A pointer to the IID value.
+     * @param[in]  aIid  The IID value.
      *
      */
-    void SetIid(const uint8_t *aIid) { memcpy(mIid, aIid, sizeof(mIid)); }
+    void SetIid(const Ip6::InterfaceIdentifier &aIid) { mIid = aIid; }
 
     /**
-     * This method returns a pointer to the IPv6 Address value.
+     * This method returns the IPv6 Address value.
      *
-     * @returns A pointer to the IPv6 Address value.
+     * @returns The IPv6 Address value.
      *
      */
-    const Ip6::Address *GetIp6Address(void) const { return &mIp6Address; }
+    const Ip6::Address &GetIp6Address(void) const { return mIp6Address; }
 
     /**
      * This method sets the IPv6 Address value.
@@ -1055,8 +974,8 @@ private:
     uint8_t mControl;
     union
     {
-        uint8_t      mIid[Ip6::Address::kInterfaceIdentifierSize];
-        Ip6::Address mIp6Address;
+        Ip6::InterfaceIdentifier mIid;
+        Ip6::Address             mIp6Address;
     } OT_TOOL_PACKED_FIELD;
 } OT_TOOL_PACKED_END;
 

@@ -54,9 +54,11 @@ extern "C" {
  */
 
 /**
- * Maximum Number of Network Diagnostic TLV Types to Request or Reset.
+ * Maximum value length of Thread Base TLV.
  */
-#define OT_NETWORK_DIAGNOSTIC_TYPELIST_MAX_ENTRIES 19
+#define OT_NETWORK_BASE_TLV_MAX_LENGTH 254
+
+#define OT_NETWORK_MAX_ROUTER_ID 62 ///< Maximum Router ID
 
 /**
  * Represents a Thread device role.
@@ -261,6 +263,30 @@ otError otThreadDiscover(otInstance *             aInstance,
  *
  */
 bool otThreadIsDiscoverInProgress(otInstance *aInstance);
+
+/**
+ * This method sets the Thread Joiner Advertisement when discovering Thread network.
+ *
+ * Thread Joiner Advertisement is used to allow a Joiner to advertise its own application-specific information
+ * (such as Vendor ID, Product ID, Discriminator, etc.) via a newly-proposed Joiner Advertisement TLV,
+ * and to make this information available to Commissioners or Commissioner Candidates without human interaction.
+ *
+ * @param[in]  aInstance        A pointer to an OpenThread instance.
+ * @param[in]  aOui             The Vendor IEEE OUI value that will be included in the Joiner Advertisement. Only the
+ *                              least significant 3 bytes will be used, and the most significant byte will be ignored.
+ * @param[in]  aAdvData         A pointer to the AdvData that will be included in the Joiner Advertisement.
+ * @param[in]  aAdvDataLength   The length of AdvData in bytes.
+ *
+ * @retval OT_ERROR_NONE         Successfully set Joiner Advertisement.
+ * @retval OT_ERROR_INVALID_ARGS Invalid AdvData.
+ *
+ */
+otError otThreadSetJoinerAdvertisement(otInstance *   aInstance,
+                                       uint32_t       aOui,
+                                       const uint8_t *aAdvData,
+                                       uint8_t        aAdvDataLength);
+
+#define OT_JOINER_ADVDATA_MAX_LENGTH 64 ///< Maximum AdvData Length of Joiner Advertisement
 
 /**
  * Get the Thread Child Timeout used when operating in the Child role.
@@ -473,6 +499,66 @@ const char *otThreadGetNetworkName(otInstance *aInstance);
 otError otThreadSetNetworkName(otInstance *aInstance, const char *aNetworkName);
 
 /**
+ * Get the Thread Domain Name.
+ *
+ * This function is only available since Thread 1.2.
+ *
+ * @param[in]  aInstance A pointer to an OpenThread instance.
+ *
+ * @returns A pointer to the Thread Domain Name.
+ *
+ * @sa otThreadSetDomainName
+ *
+ */
+const char *otThreadGetDomainName(otInstance *aInstance);
+
+/**
+ * Set the Thread Domain Name.
+ *
+ * This function is only available since Thread 1.2.
+ * This function succeeds only when Thread protocols are disabled.
+ *
+ * @param[in]  aInstance     A pointer to an OpenThread instance.
+ * @param[in]  aDomainName   A pointer to the Thread Domain Name.
+ *
+ * @retval OT_ERROR_NONE           Successfully set the Thread Domain Name.
+ * @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.
+ *
+ * @sa otThreadGetDomainName
+ *
+ */
+otError otThreadSetDomainName(otInstance *aInstance, const char *aDomainName);
+
+/**
+ * Set/Clear the Interface Identifier manually specified for the Thread Domain Unicast Address.
+ *
+ * This function is only available since Thread 1.2 when `OPENTHREAD_CONFIG_DUA_ENABLE` is enabled.
+ *
+ * @param[in]  aInstance   A pointer to an OpenThread instance.
+ * @param[in]  aIid        A pointer to the Interface Identifier to set or NULL to clear.
+ *
+ * @retval OT_ERROR_NONE           Successfully set/cleared the Interface Identifier.
+ * @retval OT_ERROR_INVALID_ARGS   The specified Interface Identifier is reserved.
+ *
+ * @sa otThreadGetFixedDuaInterfaceIdentifier
+ */
+otError otThreadSetFixedDuaInterfaceIdentifier(otInstance *aInstance, const otIp6InterfaceIdentifier *aIid);
+
+/**
+ * Get the Interface Identifier manually specified for the Thread Domain Unicast Address.
+ *
+ * This function is only available since Thread 1.2 when `OPENTHREAD_CONFIG_DUA_ENABLE` is enabled.
+ *
+ * @param[in]  aInstance A pointer to an OpenThread instance.
+ *
+ * @returns A pointer to the Interface Identifier which was set manually, or NULL if none was set.
+ *
+ * @sa otThreadSetFixedDuaInterfaceIdentifier
+ *
+ */
+const otIp6InterfaceIdentifier *otThreadGetFixedDuaInterfaceIdentifier(otInstance *aInstance);
+
+/**
  * Get the thrKeySequenceCounter.
  *
  * @param[in]  aInstance A pointer to an OpenThread instance.
@@ -587,7 +673,6 @@ otDeviceRole otThreadGetDeviceRole(otInstance *aInstance);
  *
  * @retval OT_ERROR_NONE          Successfully retrieved the leader data.
  * @retval OT_ERROR_DETACHED      Not currently attached.
- * @retval OT_ERROR_INVALID_ARGS  @p aLeaderData is NULL.
  *
  */
 otError otThreadGetLeaderData(otInstance *aInstance, otLeaderData *aLeaderData);
@@ -664,58 +749,6 @@ otError otThreadGetParentAverageRssi(otInstance *aInstance, int8_t *aParentRssi)
 otError otThreadGetParentLastRssi(otInstance *aInstance, int8_t *aLastRssi);
 
 /**
- * This function pointer is called when Network Diagnostic Get response is received.
- *
- * @param[in]  aMessage      A pointer to the message buffer containing the received Network Diagnostic
- *                           Get response payload.
- * @param[in]  aMessageInfo  A pointer to the message info for @p aMessage.
- * @param[in]  aContext      A pointer to application-specific context.
- *
- */
-typedef void (*otReceiveDiagnosticGetCallback)(otMessage *aMessage, const otMessageInfo *aMessageInfo, void *aContext);
-
-/**
- * This function registers a callback to provide received raw Network Diagnostic Get response payload.
- *
- * @param[in]  aInstance         A pointer to an OpenThread instance.
- * @param[in]  aCallback         A pointer to a function that is called when Network Diagnostic Get response
- *                               is received or NULL to disable the callback.
- * @param[in]  aCallbackContext  A pointer to application-specific context.
- *
- */
-void otThreadSetReceiveDiagnosticGetCallback(otInstance *                   aInstance,
-                                             otReceiveDiagnosticGetCallback aCallback,
-                                             void *                         aCallbackContext);
-
-/**
- * Send a Network Diagnostic Get request.
- *
- * @param[in]  aInstance      A pointer to an OpenThread instance.
- * @param[in]  aDestination   A pointer to destination address.
- * @param[in]  aTlvTypes      An array of Network Diagnostic TLV types.
- * @param[in]  aCount         Number of types in aTlvTypes
- *
- */
-otError otThreadSendDiagnosticGet(otInstance *        aInstance,
-                                  const otIp6Address *aDestination,
-                                  const uint8_t       aTlvTypes[],
-                                  uint8_t             aCount);
-
-/**
- * Send a Network Diagnostic Reset request.
- *
- * @param[in]  aInstance      A pointer to an OpenThread instance.
- * @param[in]  aDestination   A pointer to destination address.
- * @param[in]  aTlvTypes      An array of Network Diagnostic TLV types. Currently only Type 9 is allowed.
- * @param[in]  aCount         Number of types in aTlvTypes
- *
- */
-otError otThreadSendDiagnosticReset(otInstance *        aInstance,
-                                    const otIp6Address *aDestination,
-                                    const uint8_t       aTlvTypes[],
-                                    uint8_t             aCount);
-
-/**
  * Get the IPv6 counters.
  *
  * @param[in]  aInstance  A pointer to an OpenThread instance.
@@ -772,6 +805,37 @@ void otThreadRegisterParentResponseCallback(otInstance *                   aInst
                                             otThreadParentResponseCallback aCallback,
                                             void *                         aContext);
 
+/**
+ * This structure represents the Thread Discovery Request data.
+ *
+ */
+typedef struct otThreadDiscoveryRequestInfo
+{
+    otExtAddress mExtAddress;   ///< IEEE 802.15.4 Extended Address of the requester
+    uint8_t      mVersion : 4;  ///< Thread version.
+    bool         mIsJoiner : 1; ///< Whether is from joiner.
+} otThreadDiscoveryRequestInfo;
+
+/**
+ * This function pointer is called every time an MLE Discovery Request message is received.
+ *
+ * @param[in]  aInfo     A pointer to the Discovery Request info data.
+ * @param[in]  aContext  A pointer to callback application-specific context.
+ *
+ */
+typedef void (*otThreadDiscoveryRequestCallback)(const otThreadDiscoveryRequestInfo *aInfo, void *aContext);
+
+/**
+ * This function sets a callback to receive MLE Discovery Request data.
+ *
+ * @param[in]  aInstance  A pointer to an OpenThread instance.
+ * @param[in]  aCallback  A pointer to a function that is called upon receiving an MLE Discovery Request message.
+ * @param[in]  aContext   A pointer to callback application-specific context.
+ *
+ */
+void otThreadSetDiscoveryRequestCallback(otInstance *                     aInstnace,
+                                         otThreadDiscoveryRequestCallback aCallback,
+                                         void *                           aContext);
 /**
  * @}
  *

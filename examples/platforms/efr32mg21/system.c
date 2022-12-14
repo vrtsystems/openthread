@@ -32,6 +32,9 @@
  *   This file includes the platform-specific initializers.
  */
 
+#include <openthread-core-config.h>
+#include <openthread/config.h>
+
 #include <assert.h>
 #include <string.h>
 
@@ -52,16 +55,13 @@
 #include "sl_mpu.h"
 #include "sl_sleeptimer.h"
 
-#include "openthread-core-efr32-config.h"
 #include "platform-efr32.h"
 
 #if (HAL_FEM_ENABLE)
 #include "fem-control.h"
 #endif
 
-#define USE_EFR32_LOG                                                                   \
-    ((OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED) || \
-     (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_NCP_SPINEL))
+#define USE_EFR32_LOG (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED)
 
 void halInitChipSpecific(void);
 

@@ -39,7 +39,7 @@
 
 #include <mbedtls/cmac.h>
 
-#if OPENTHREAD_CONFIG_COMMISSIONER_ENABLE && OPENTHREAD_FTD
+#if OPENTHREAD_FTD
 
 void otPbkdf2Cmac(const uint8_t *aPassword,
                   uint16_t       aPasswordLen,
@@ -60,8 +60,13 @@ void otPbkdf2Cmac(const uint8_t *aPassword,
     uint16_t     useLen       = 0;
 
     memcpy(prfInput, aSalt, aSaltLen);
-    assert(aIterationCounter % 2 == 0);
+    OT_ASSERT(aIterationCounter % 2 == 0);
     aIterationCounter /= 2;
+
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    // limit iterations to avoid OSS-Fuzz timeouts
+    aIterationCounter = 2;
+#endif
 
     while (keyLen)
     {
@@ -106,4 +111,4 @@ void otPbkdf2Cmac(const uint8_t *aPassword,
     }
 }
 
-#endif // OPENTHREAD_CONFIG_COMMISSIONER_ENABLE && OPENTHREAD_FTD
+#endif // OPENTHREAD_FTD

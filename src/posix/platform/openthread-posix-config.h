@@ -38,53 +38,91 @@
  */
 
 /**
- * @def OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE
+ * @def OPENTHREAD_POSIX_CONFIG_RCP_PTY_ENABLE
  *
- * Define as 1 to enable PTY device support in POSIX app.
+ * Define as 1 to enable PTY RCP support.
  *
  */
-#ifndef OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE
-#define OPENTHREAD_CONFIG_POSIX_APP_ENABLE_PTY_DEVICE 1
+#ifndef OPENTHREAD_POSIX_CONFIG_RCP_PTY_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_RCP_PTY_ENABLE 1
 #endif
 
 /**
- * @def OPENTHREAD_POSIX_APP_SOCKET_BASENAME
+ * @def OPENTHREAD_POSIX_CONFIG_DAEMON_SOCKET_BASENAME
  *
  * Define socket basename used by POSIX app daemon.
  *
  */
-#ifndef OPENTHREAD_POSIX_APP_SOCKET_BASENAME
-#define OPENTHREAD_POSIX_APP_SOCKET_BASENAME "/tmp/openthread"
+#ifndef OPENTHREAD_POSIX_CONFIG_DAEMON_SOCKET_BASENAME
+#define OPENTHREAD_POSIX_CONFIG_DAEMON_SOCKET_BASENAME "/tmp/openthread"
 #endif
 
 /**
- * @def OPENTHREAD_POSIX_VIRTUAL_TIME
+ * @def OPENTHREAD_POSIX_CONFIG_DAEMON_ENABLE
  *
- * This setting configures whether to use virtual time.
+ * Define to 1 to enable POSIX daemon.
  *
  */
-#ifndef OPENTHREAD_POSIX_VIRTUAL_TIME
-#define OPENTHREAD_POSIX_VIRTUAL_TIME 0
+#ifndef OPENTHREAD_POSIX_CONFIG_DAEMON_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_DAEMON_ENABLE 0
 #endif
 
 /**
- * @def OPENTHREAD_POSIX_RCP_UART_ENABLE
+ * RCP bus UART.
  *
- * Define as 1 to enable UART interface to RCP.
+ * @note This value is also for simulated UART bus.
  *
  */
-#ifndef OPENTHREAD_POSIX_RCP_UART_ENABLE
-#define OPENTHREAD_POSIX_RCP_UART_ENABLE 0
+#define OT_POSIX_RCP_BUS_UART 1
+
+/**
+ * RCP bus SPI.
+ *
+ */
+#define OT_POSIX_RCP_BUS_SPI 2
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_RCP_BUS
+ *
+ * This setting configures what type of RCP bus to use.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_RCP_BUS
+#define OPENTHREAD_POSIX_CONFIG_RCP_BUS OT_POSIX_RCP_BUS_UART
 #endif
 
 /**
- * @def OPENTHREAD_POSIX_RCP_SPI_ENABLE
+ * @def OPENTHREAD_POSIX_CONFIG_MAX_POWER_TABLE_ENABLE
  *
- * Define as 1 to enable SPI interface to RCP.
+ * Define as 1 to enable max power table support.
  *
  */
-#ifndef OPENTHREAD_POSIX_RCP_SPI_ENABLE
-#define OPENTHREAD_POSIX_RCP_SPI_ENABLE 0
+#ifndef OPENTHREAD_POSIX_CONFIG_MAX_POWER_TABLE_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_MAX_POWER_TABLE_ENABLE 0
 #endif
+
+#ifdef __APPLE__
+
+/**
+ * Use built-in utun driver on mac OS
+ */
+#define OT_POSIX_CONFIG_MACOS_UTUN 1
+
+/**
+ * Use open-source tun driver on mac OS
+ */
+#define OT_POSIX_CONFIG_MACOS_TUN 2
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_MACOS_TUN_OPTION
+ *
+ * This setting configures which tunnel driver to use.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_MACOS_TUN_OPTION
+#define OPENTHREAD_POSIX_CONFIG_MACOS_TUN_OPTION OT_POSIX_CONFIG_MACOS_UTUN
+#endif
+
+#endif // __APPLE__
 
 #endif // OPENTHREAD_PLATFORM_CONFIG_H_

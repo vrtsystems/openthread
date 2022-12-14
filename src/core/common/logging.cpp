@@ -44,8 +44,7 @@
 #error OPENTHREAD_CONFIG_ENABLE_DEBUG_UART_LOG requires OPENTHREAD_CONFIG_ENABLE_DEBUG_UART
 #endif
 
-#define otLogDump(aFormat, ...) \
-    _otDynamicLog(aLogLevel, aLogRegion, aFormat OPENTHREAD_CONFIG_LOG_SUFFIX, ##__VA_ARGS__)
+#define otLogDump(aFormat, ...) _otDynamicLog(aLogLevel, aLogRegion, aFormat OPENTHREAD_CONFIG_LOG_SUFFIX, __VA_ARGS__)
 
 #ifdef __cplusplus
 extern "C" {
@@ -124,7 +123,7 @@ void otDump(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aId, const
         cur += strlen(cur);
     }
 
-    snprintf(cur, sizeof(buf) - static_cast<size_t>(cur - buf), "[%s len=%03u]", aId, static_cast<uint16_t>(aLength));
+    snprintf(cur, sizeof(buf) - static_cast<size_t>(cur - buf), "[%s len=%03u]", aId, static_cast<unsigned>(aLength));
     cur += strlen(cur);
 
     for (size_t i = 0; i < (width - idlen) / 2 - 4; i++)
@@ -192,6 +191,7 @@ static const char *const sThreadErrorStrings[OT_NUM_ERRORS] = {
     "NonLowpanDataFrame",         // OT_ERROR_NOT_LOWPAN_DATA_FRAME = 32
     "ReservedError33",            // otError 33 is reserved
     "LinkMarginLow",              // OT_ERROR_LINK_MARGIN_LOW = 34
+    "InvalidCommand",             // OT_ERROR_INVALID_COMMAND = 35
 };
 
 const char *otThreadErrorToString(otError aError)

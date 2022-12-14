@@ -72,6 +72,8 @@ libopenthread_efr32mg21_a_CPPFLAGS                                            = 
     -I$(SDK_SRC_DIR)/platform/emdrv/ustimer/inc                                 \
     -I$(SDK_SRC_DIR)/platform/emdrv/dmadrv/inc                                  \
     -I$(SDK_SRC_DIR)/platform/emdrv/dmadrv/config                               \
+    -I$(SDK_SRC_DIR)/platform/emdrv/nvm3/inc                                    \
+    -I$(SDK_SRC_DIR)/platform/emdrv/nvm3/config                                 \
     -I$(SDK_SRC_DIR)/platform/emlib/inc                                         \
     -I$(SDK_SRC_DIR)/platform/halconfig/inc/hal-config                          \
     -I$(SDK_SRC_DIR)/platform/radio/rail_lib/chip/efr32                         \
@@ -118,10 +120,6 @@ libopenthread_efr32mg21_a_SOURCES                                             = 
     $(PLATFORM_SOURCES)                                                         \
     $(NULL)
 
-PRETTY_FILES                                                                  = \
-    $(PLATFORM_SOURCES)                                                         \
-    $(NULL)
-
 Dash = -
 libopenthread_efr32mg21_a_LIBADD                                                                     = \
     $(shell find $(top_builddir)/examples/platforms/utils $(Dash)type f $(Dash)name "*.o")             \
@@ -130,13 +128,9 @@ libopenthread_efr32mg21_a_LIBADD                                                
 DIST_SUBDIRS                                                                  = \
     sleepy-demo                                                                 \
     $(NULL)
-    
+
 SUBDIRS                                                                       = \
     sleepy-demo                                                                 \
     $(NULL)
 
-PRETTY_SUBDIRS                                                                = \
-    sleepy-demo                                                                 \
-    $(NULL)
-    
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

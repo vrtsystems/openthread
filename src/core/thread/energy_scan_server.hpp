@@ -52,6 +52,8 @@ namespace ot {
  */
 class EnergyScanServer : public InstanceLocator
 {
+    friend class ot::Notifier;
+
 public:
     /**
      * This constructor initializes the object.
@@ -75,10 +77,9 @@ private:
     static void HandleTimer(Timer &aTimer);
     void        HandleTimer(void);
 
-    static void HandleStateChanged(Notifier::Callback &aCallback, otChangedFlags aFlags);
-    void        HandleStateChanged(otChangedFlags aFlags);
+    void HandleNotifierEvents(Events aEvents);
 
-    otError SendReport(void);
+    void SendReport(void);
 
     Ip6::Address mCommissioner;
     uint32_t     mChannelMask;
@@ -92,8 +93,6 @@ private:
     uint8_t mScanResultsLength;
 
     TimerMilli mTimer;
-
-    Notifier::Callback mNotifierCallback;
 
     Coap::Resource mEnergyScan;
 };

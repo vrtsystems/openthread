@@ -30,7 +30,22 @@ set(OT_PLATFORM_LIB "openthread-posix" PARENT_SCOPE)
 
 option(OT_DAEMON "Enable daemon mode" OFF)
 if(OT_DAEMON)
-    list(APPEND OT_PLATFORM_DEFINES "OPENTHREAD_ENABLE_POSIX_APP_DAEMON=1")
+    list(APPEND OT_PLATFORM_DEFINES "OPENTHREAD_POSIX_CONFIG_DAEMON_ENABLE=1")
+endif()
+
+option(OT_POSIX_VIRTUAL_TIME "enable virtual time" OFF)
+if(OT_POSIX_VIRTUAL_TIME)
+    list(APPEND OT_PLATFORM_DEFINES "OPENTHREAD_POSIX_VIRTUAL_TIME=1")
+endif()
+
+option(OT_POSIX_MAX_POWER_TABLE  "enable max power table" OFF)
+if(OT_POSIX_MAX_POWER_TABLE)
+    list(APPEND OT_PLATFORM_DEFINES "OPENTHREAD_POSIX_CONFIG_MAX_POWER_TABLE_ENABLE=1")
+endif()
+
+set(OT_POSIX_CONFIG_RCP_BUS "" CACHE STRING "RCP bus type")
+if(OT_POSIX_CONFIG_RCP_BUS)
+    list(APPEND OT_PLATFORM_DEFINES "OPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_${OT_POSIX_CONFIG_RCP_BUS}")
 endif()
 
 if(NOT OT_CONFIG)
@@ -38,12 +53,7 @@ if(NOT OT_CONFIG)
     set(OT_CONFIG ${OT_CONFIG} PARENT_SCOPE)
 endif()
 
-list(APPEND OT_PLATFORM_DEFINES
-    "OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE=1"
-    "OPENTHREAD_CONFIG_NCP_UART_ENABLE=1"
-    "OPENTHREAD_POSIX=1"
-    "OPENTHREAD_POSIX_RCP_UART_ENABLE=1"
-)
+list(APPEND OT_PLATFORM_DEFINES "OPENTHREAD_POSIX=1")
 
 set(OT_PLATFORM_DEFINES ${OT_PLATFORM_DEFINES} PARENT_SCOPE)
 
@@ -56,7 +66,8 @@ add_library(openthread-posix
     logging.cpp
     misc.cpp
     netif.cpp
-    radio_spinel.cpp
+    radio.cpp
+    radio_url.cpp
     settings.cpp
     spi_interface.cpp
     system.cpp
@@ -65,8 +76,21 @@ add_library(openthread-posix
     virtual_time.cpp
 )
 
-target_link_libraries(openthread-posix PUBLIC
-    util
+set_target_properties(
+    openthread-posix
+    PROPERTIES
+        C_STANDARD 99
+        CXX_STANDARD 11
+)
+
+target_link_libraries(openthread-posix
+    PUBLIC
+        openthread-platform
+    PRIVATE
+        openthread-url
+        ot-config
+        util
+        $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:rt>
 )
 
 target_compile_definitions(openthread-posix
@@ -74,7 +98,6 @@ target_compile_definitions(openthread-posix
         ${OT_PUBLIC_DEFINES}
     PRIVATE
         ${OT_PLATFORM_DEFINES}
-        ${OT_PRIVATE_DEFINES}
 )
 
 target_compile_options(openthread-posix PRIVATE
@@ -83,7 +106,6 @@ target_compile_options(openthread-posix PRIVATE
 
 target_include_directories(openthread-posix PRIVATE
     ${OT_PUBLIC_INCLUDES}
-    ${OT_PRIVATE_INCLUDES}
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/core
     ${PROJECT_SOURCE_DIR}/third_party/mbedtls/repo/include

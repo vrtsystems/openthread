@@ -28,11 +28,11 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
-lib_LIBRARIES = libopenthread-cc2652.a
+# Do not enable -Wcast-align for this platform
+override CFLAGS    := $(filter-out -Wcast-align,$(CFLAGS))
+override CXXFLAGS  := $(filter-out -Wcast-align,$(CXXFLAGS))
 
-# Do not enable -pedantic-errors for cc26xx driverlib
-override CFLAGS   := $(filter-out -pedantic-errors,$(CFLAGS))
-override CXXFLAGS := $(filter-out -pedantic-errors,$(CXXFLAGS))
+lib_LIBRARIES = libopenthread-cc2652.a
 
 libopenthread_cc2652_a_CPPFLAGS                                                         = \
     -I$(top_srcdir)/include                                                               \
@@ -71,10 +71,6 @@ libopenthread_cc2652_a_SOURCES                                                  
 
 libopenthread_cc2652_a_DEPENDENCIES                                                     = \
     $(top_srcdir)/third_party/ti/devices/cc13x2_cc26x2/driverlib/bin/gcc/driverlib.a      \
-    $(NULL)
-
-PRETTY_FILES                                                                            = \
-    $(PLATFORM_SOURCES)                                                                   \
     $(NULL)
 
 Dash = -

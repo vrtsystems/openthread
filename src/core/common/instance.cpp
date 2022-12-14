@@ -51,8 +51,8 @@ OT_DEFINE_ALIGNED_VAR(gInstanceRaw, sizeof(Instance), uint64_t);
 
 #if OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
 
-otHeapFreeFn   ot::Instance::mFree   = NULL;
-otHeapCAllocFn ot::Instance::mCAlloc = NULL;
+otHeapFreeFn   ot::Instance::mFree   = nullptr;
+otHeapCAllocFn ot::Instance::mCAlloc = nullptr;
 
 #endif // OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
 
@@ -75,6 +75,7 @@ Instance::Instance(void)
 #if OPENTHREAD_MTD || OPENTHREAD_FTD
     , mNotifier(*this)
     , mSettings(*this)
+    , mSettingsDriver(*this)
     , mMessagePool(*this)
     , mIp6(*this)
     , mThreadNetif(*this)
@@ -92,6 +93,9 @@ Instance::Instance(void)
 #endif
 #if OPENTHREAD_CONFIG_ANNOUNCE_SENDER_ENABLE
     , mAnnounceSender(*this)
+#endif
+#if OPENTHREAD_CONFIG_OTNS_ENABLE
+    , mOtns(*this)
 #endif
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
 #if OPENTHREAD_RADIO || OPENTHREAD_CONFIG_LINK_RAW_ENABLE
@@ -116,7 +120,7 @@ Instance &Instance::InitSingle(void)
 {
     Instance *instance = &Get();
 
-    VerifyOrExit(!instance->mIsInitialized);
+    VerifyOrExit(!instance->mIsInitialized, OT_NOOP);
 
     instance = new (&gInstanceRaw) Instance();
 
@@ -137,14 +141,14 @@ Instance &Instance::Get(void)
 
 Instance *Instance::Init(void *aBuffer, size_t *aBufferSize)
 {
-    Instance *instance = NULL;
+    Instance *instance = nullptr;
 
-    VerifyOrExit(aBufferSize != NULL);
+    VerifyOrExit(aBufferSize != nullptr, OT_NOOP);
 
     // Make sure the input buffer is big enough
     VerifyOrExit(sizeof(Instance) <= *aBufferSize, *aBufferSize = sizeof(Instance));
 
-    VerifyOrExit(aBuffer != NULL);
+    VerifyOrExit(aBuffer != nullptr, OT_NOOP);
 
     instance = new (aBuffer) Instance();
 
@@ -169,7 +173,7 @@ void Instance::AfterInit(void)
     // Restore datasets and network information
 
     Get<Settings>().Init();
-    Get<Mle::MleRouter>().Restore();
+    IgnoreError(Get<Mle::MleRouter>().Restore());
 
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
 
@@ -180,17 +184,19 @@ void Instance::AfterInit(void)
 
 void Instance::Finalize(void)
 {
-    VerifyOrExit(mIsInitialized);
+    VerifyOrExit(mIsInitialized, OT_NOOP);
 
     mIsInitialized = false;
 
 #if OPENTHREAD_MTD || OPENTHREAD_FTD
-    IgnoreReturnValue(otThreadSetEnabled(this, false));
-    IgnoreReturnValue(otIp6SetEnabled(this, false));
-    IgnoreReturnValue(otLinkSetEnabled(this, false));
+    IgnoreError(otThreadSetEnabled(this, false));
+    IgnoreError(otIp6SetEnabled(this, false));
+    IgnoreError(otLinkSetEnabled(this, false));
 
     Get<Settings>().Deinit();
 #endif
+
+    IgnoreError(Get<Mac::SubMac>().Disable());
 
 #if !OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
 
@@ -217,7 +223,7 @@ otError Instance::ErasePersistentInfo(void)
 {
     otError error = OT_ERROR_NONE;
 
-    VerifyOrExit(Get<Mle::MleRouter>().GetRole() == OT_DEVICE_ROLE_DISABLED, error = OT_ERROR_INVALID_STATE);
+    VerifyOrExit(Get<Mle::MleRouter>().IsDisabled(), error = OT_ERROR_INVALID_STATE);
     Get<Settings>().Wipe();
 
 exit:

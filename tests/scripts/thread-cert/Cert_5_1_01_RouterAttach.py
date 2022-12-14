@@ -29,40 +29,28 @@
 
 import unittest
 
-import config
 import mle
 import network_layer
-import node
+import thread_cert
 
 LEADER = 1
 ROUTER = 2
 
 
-class Cert_5_1_01_RouterAttach(unittest.TestCase):
-
-    def setUp(self):
-        self.simulator = config.create_default_simulator()
-
-        self.nodes = {}
-        for i in range(1, 3):
-            self.nodes[i] = node.Node(i, simulator=self.simulator)
-
-        self.nodes[LEADER].set_panid(0xface)
-        self.nodes[LEADER].set_mode('rsdn')
-        self.nodes[LEADER].add_whitelist(self.nodes[ROUTER].get_addr64())
-        self.nodes[LEADER].enable_whitelist()
-
-        self.nodes[ROUTER].set_panid(0xface)
-        self.nodes[ROUTER].set_mode('rsdn')
-        self.nodes[ROUTER].add_whitelist(self.nodes[LEADER].get_addr64())
-        self.nodes[ROUTER].enable_whitelist()
-        self.nodes[ROUTER].set_router_selection_jitter(1)
-
-    def tearDown(self):
-        for n in list(self.nodes.values()):
-            n.stop()
-            n.destroy()
-        self.simulator.stop()
+class Cert_5_1_01_RouterAttach(thread_cert.TestCase):
+    TOPOLOGY = {
+        LEADER: {
+            'mode': 'rsdn',
+            'panid': 0xface,
+            'whitelist': [ROUTER]
+        },
+        ROUTER: {
+            'mode': 'rsdn',
+            'panid': 0xface,
+            'router_selection_jitter': 1,
+            'whitelist': [LEADER]
+        },
+    }
 
     def test(self):
         self.nodes[LEADER].start()
@@ -123,8 +111,7 @@ class Cert_5_1_01_RouterAttach(unittest.TestCase):
         msg.assertMleMessageDoesNotContainTlv(mle.AddressRegistration)
 
         # 5 - Leader
-        msg = leader_messages.next_mle_message(
-            mle.CommandType.CHILD_ID_RESPONSE)
+        msg = leader_messages.next_mle_message(mle.CommandType.CHILD_ID_RESPONSE)
         msg.assertSentToNode(self.nodes[ROUTER])
         msg.assertMleMessageContainsTlv(mle.SourceAddress)
         msg.assertMleMessageContainsTlv(mle.LeaderData)
@@ -159,8 +146,7 @@ class Cert_5_1_01_RouterAttach(unittest.TestCase):
         self.assertIn(mle.TlvType.LINK_MARGIN, tlv_request.tlvs)
 
         # 9 - Leader
-        msg = leader_messages.next_mle_message(
-            mle.CommandType.LINK_ACCEPT_AND_REQUEST)
+        msg = leader_messages.next_mle_message(mle.CommandType.LINK_ACCEPT_AND_REQUEST)
         msg.assertMleMessageContainsTlv(mle.SourceAddress)
         msg.assertMleMessageContainsTlv(mle.LeaderData)
         msg.assertMleMessageContainsTlv(mle.Response)

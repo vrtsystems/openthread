@@ -41,13 +41,14 @@
 #include <openthread/platform/radio.h>
 
 #include "common/locator.hpp"
+#include "common/non_copyable.hpp"
 
 namespace ot {
 namespace FactoryDiags {
 
 #if OPENTHREAD_CONFIG_DIAG_ENABLE
 
-class Diags : public InstanceLocator
+class Diags : public InstanceLocator, private NonCopyable
 {
 public:
     /**
@@ -61,7 +62,7 @@ public:
     /**
      * This method processes a factory diagnostics command line.
      *
-     * @param[in]   aString        A NULL-terminated input string.
+     * @param[in]   aString        A null-terminated input string.
      * @param[out]  aOutput        The diagnostics execution result.
      * @param[in]   aOutputMaxLen  The output buffer size.
      *
@@ -71,8 +72,8 @@ public:
     /**
      * This method processes a factory diagnostics command line.
      *
-     * @param[in]   aArgCount      The argument counter of diagnostics command line.
-     * @param[in]   aArgVector     The argument vector of diagnostics command line.
+     * @param[in]   aArgsLength    The number of args in @p aArgs.
+     * @param[in]   aArgs          The arguments of diagnostics command line.
      * @param[out]  aOutput        The diagnostics execution result.
      * @param[in]   aOutputMaxLen  The output buffer size.
      *
@@ -81,7 +82,7 @@ public:
      * @retval  OT_ERROR_NOT_IMPLEMENTED    The command is not supported.
      *
      */
-    otError ProcessCmd(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessCmd(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
 
     /**
      * This method indicates whether or not the factory diagnostics mode is enabled.
@@ -101,7 +102,7 @@ public:
     /**
      * The radio driver calls this method to notify OpenThread diagnostics module of a received frame.
      *
-     * @param[in]  aFrame  A pointer to the received frame or NULL if the receive operation failed.
+     * @param[in]  aFrame  A pointer to the received frame or nullptr if the receive operation failed.
      * @param[in]  aError  OT_ERROR_NONE when successfully received a frame,
      *                     OT_ERROR_ABORT when reception was aborted and a frame was not received,
      *                     OT_ERROR_NO_BUFS when a frame could not be received due to lack of rx buffer space.
@@ -123,7 +124,7 @@ private:
     struct Command
     {
         const char *mName;
-        otError (Diags::*mCommand)(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
+        otError (Diags::*mCommand)(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
     };
 
     struct Stats
@@ -138,14 +139,14 @@ private:
         uint8_t  mLastLqi;
     };
 
-    otError ProcessChannel(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
-    otError ProcessPower(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
-    otError ProcessRadio(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
-    otError ProcessRepeat(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
-    otError ProcessSend(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
-    otError ProcessStart(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
-    otError ProcessStats(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
-    otError ProcessStop(int aArgCount, char *aArgVector[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessChannel(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessPower(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessRadio(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessRepeat(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessSend(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessStart(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessStats(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
+    otError ProcessStop(uint8_t aArgsLength, char *aArgs[], char *aOutput, size_t aOutputMaxLen);
 
     void TransmitPacket(void);
 

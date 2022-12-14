@@ -49,22 +49,8 @@ if OPENTHREAD_ENABLE_CLI
 SUBDIRS                                += cli
 endif
 
-if OPENTHREAD_ENABLE_NCP
-SUBDIRS                                += ncp
-endif
-
-if OPENTHREAD_PLATFORM_POSIX_APP
+if OPENTHREAD_PLATFORM_POSIX
 SUBDIRS                                += posix
 endif
-
-# Always pretty (e.g. for 'make pretty') these subdirectories.
-
-PRETTY_SUBDIRS                          = \
-    cli                                   \
-    core                                  \
-    ncp                                   \
-    posix                                 \
-    lib                                   \
-    $(NULL)
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

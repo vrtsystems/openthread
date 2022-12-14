@@ -1891,6 +1891,10 @@ const char *spinel_prop_key_to_cstr(spinel_prop_key_t prop_key)
         ret = "MESHCOP_COMMISSIONER_SESSION_ID";
         break;
 
+    case SPINEL_PROP_MESHCOP_JOINER_DISCERNER:
+        ret = "MESHCOP_JOINER_DISCERNER";
+        break;
+
     case SPINEL_PROP_MESHCOP_COMMISSIONER_ANNOUNCE_BEGIN:
         ret = "MESHCOP_COMMISSIONER_ANNOUNCE_BEGIN";
         break;
@@ -2631,8 +2635,8 @@ const char *spinel_capability_to_cstr(spinel_capability_t capability)
         ret = "CHILD_SUPERVISION";
         break;
 
-    case SPINEL_CAP_POSIX_APP:
-        ret = "POSIX_APP";
+    case SPINEL_CAP_POSIX:
+        ret = "POSIX";
         break;
 
     case SPINEL_CAP_SLAAC:

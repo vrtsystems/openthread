@@ -27,30 +27,25 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 #
 
-import unittest
 import time
+import unittest
 
-import node
-import config
+import thread_cert
 
 
-class TestDiag(unittest.TestCase):
+class TestDiag(thread_cert.TestCase):
+    SUPPORT_NCP = False
 
-    def setUp(self):
-        self.simulator = config.create_default_simulator()
-        self.node = node.Node(1, False, simulator=self.simulator)
-
-    def tearDown(self):
-        self.node.destroy()
-        self.simulator.stop()
+    TOPOLOGY = {1: None}
 
     def test(self):
+        node = self.nodes[1]
+
         cases = [
             ('diag\n', 'diagnostics mode is disabled\r\n'),
             ('diag send 10 100\n', 'Error 13: InvalidState\r\n'),
             ('diag start\n', 'Done\r\n'),
-            ('diag invalid test\n',
-             'diag feature \'invalid\' is not supported'),
+            ('diag invalid test\n', 'diag feature \'invalid\' is not supported'),
             ('diag', 'diagnostics mode is enabled\r\n'),
             ('diag channel 10\n', 'failed\r\nstatus 0x7\r\n'),
             ('diag channel 11\n', 'set channel to 11\r\nstatus 0x00\r\n'),
@@ -94,11 +89,11 @@ class TestDiag(unittest.TestCase):
         ]
 
         for case in cases:
-            self.node.send_command(case[0])
+            node.send_command(case[0])
             self.simulator.go(1)
             if type(self.simulator).__name__ == 'VirtualTime':
                 time.sleep(0.1)
-            self.node._expect(case[1])
+            node._expect(case[1])
 
 
 if __name__ == '__main__':
